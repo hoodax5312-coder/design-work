@@ -1,0 +1,188 @@
+{
+  "meta": {
+    "projectName": "NeuralFlow Canvas",
+    "version": "1.0.0",
+    "description": "A dark-themed, node-based workflow editor design system focused on AI generative tasks. The aesthetic is 'Modern Cyberpunk SaaS' - clean, dark, immersive, and tool-focused.",
+    "designPrinciples": [
+      "Content-First: The UI chrome should recede; the node content and connections are the heroes.",
+      "Immersive Dark Mode: Deep blacks and grays to reduce eye strain during long sessions.",
+      "Spatial Hierarchy: clear distinction between Canvas (Level 0), Nodes (Level 1), and HUD/Floating Controls (Level 2).",
+      "Subtle Precision: Use fine borders and low-contrast separators instead of heavy blocks."
+    ]
+  },
+  "theme": {
+    "colors": {
+      "background": {
+        "canvas": "#050505",
+        "canvasGrid": "#222222",
+        "surface": "#121212",
+        "surfaceHover": "#1E1E1E",
+        "surfaceActive": "#262626",
+        "overlay": "rgba(0, 0, 0, 0.75)"
+      },
+      "border": {
+        "subtle": "#2A2A2A",
+        "default": "#333333",
+        "active": "#555555",
+        "selected": "#FFFFFF"
+      },
+      "text": {
+        "primary": "#FFFFFF",
+        "secondary": "#A1A1AA",
+        "tertiary": "#666666",
+        "disabled": "#444444"
+      },
+      "accent": {
+        "primary": "#22C55E",
+        "primaryHover": "#4ADE80",
+        "secondary": "#3B82F6",
+        "destructive": "#EF4444",
+        "warning": "#F59E0B"
+      }
+    },
+    "typography": {
+      "fontFamily": {
+        "sans": "Inter, system-ui, -apple-system, BlinkMacSystemFont, sans-serif",
+        "mono": "JetBrains Mono, Fira Code, monospace"
+      },
+      "fontSize": {
+        "xs": "11px",
+        "sm": "12px",
+        "base": "14px",
+        "lg": "16px",
+        "xl": "20px"
+      },
+      "fontWeight": {
+        "regular": 400,
+        "medium": 500,
+        "semibold": 600
+      },
+      "lineHeight": {
+        "tight": 1.2,
+        "base": 1.5,
+        "relaxed": 1.75
+      }
+    },
+    "spacing": {
+      "unit": 4,
+      "xs": "4px",
+      "sm": "8px",
+      "md": "12px",
+      "lg": "16px",
+      "xl": "24px",
+      "2xl": "32px"
+    },
+    "borderRadius": {
+      "sm": "4px",
+      "md": "8px",
+      "lg": "12px",
+      "pill": "9999px",
+      "circle": "50%"
+    },
+    "shadows": {
+      "sm": "0 1px 2px 0 rgba(0, 0, 0, 0.5)",
+      "md": "0 4px 6px -1px rgba(0, 0, 0, 0.5), 0 2px 4px -1px rgba(0, 0, 0, 0.3)",
+      "lg": "0 10px 15px -3px rgba(0, 0, 0, 0.5), 0 4px 6px -2px rgba(0, 0, 0, 0.3)",
+      "node": "0 4px 20px rgba(0, 0, 0, 0.4)"
+    },
+    "opacity": {
+      "disabled": 0.4,
+      "inactive": 0.6
+    }
+  },
+  "components": {
+    "canvas": {
+      "backgroundColor": "theme.colors.background.canvas",
+      "gridPattern": "dot",
+      "gridColor": "theme.colors.background.canvasGrid",
+      "gridSpacing": "20px"
+    },
+    "node": {
+      "layout": {
+        "width": "320px",
+        "minHeight": "180px",
+        "padding": "theme.spacing.lg",
+        "borderRadius": "theme.borderRadius.lg"
+      },
+      "appearance": {
+        "backgroundColor": "rgba(18, 18, 18, 0.9)",
+        "backdropFilter": "blur(8px)",
+        "borderColor": "theme.colors.border.default",
+        "borderWidth": "1px",
+        "shadow": "theme.shadows.node"
+      },
+      "header": {
+        "height": "32px",
+        "titleColor": "theme.colors.text.secondary",
+        "titleSize": "theme.typography.fontSize.xs",
+        "iconColor": "theme.colors.text.tertiary"
+      },
+      "body": {
+        "textColor": "theme.colors.text.primary",
+        "textSize": "theme.typography.fontSize.sm",
+        "lineHeight": "theme.typography.lineHeight.base"
+      },
+      "footer": {
+        "marginTop": "theme.spacing.lg",
+        "uploadAreaBorder": "dashed 1px theme.colors.border.subtle",
+        "uploadAreaBg": "transparent",
+        "uploadAreaRadius": "theme.borderRadius.md"
+      }
+    },
+    "connection": {
+      "type": "bezier",
+      "strokeWidth": "2px",
+      "strokeColor": {
+        "default": "#444444",
+        "active": "theme.colors.accent.primary",
+        "selected": "#FFFFFF"
+      },
+      "animation": "flow 2s linear infinite"
+    },
+    "toolbar": {
+      "position": "fixed",
+      "left": {
+        "width": "48px",
+        "borderRadius": "theme.borderRadius.pill",
+        "backgroundColor": "#181818",
+        "borderColor": "#2A2A2A",
+        "itemSpacing": "theme.spacing.sm"
+      },
+      "header": {
+        "height": "48px",
+        "backgroundColor": "transparent",
+        "borderBottom": "none",
+        "breadcrumbColor": "theme.colors.text.secondary"
+      },
+      "bottomRight": {
+        "height": "40px",
+        "borderRadius": "theme.borderRadius.pill",
+        "backgroundColor": "#181818",
+        "padding": "0 theme.spacing.sm"
+      }
+    },
+    "controls": {
+      "button": {
+        "height": "32px",
+        "padding": "0 theme.spacing.md",
+        "borderRadius": "theme.borderRadius.md",
+        "variants": {
+          "primary": {
+            "bg": "theme.colors.accent.primary",
+            "text": "#000000"
+          },
+          "secondary": {
+            "bg": "theme.colors.background.surfaceActive",
+            "text": "theme.colors.text.primary",
+            "border": "theme.colors.border.default"
+          },
+          "icon": {
+            "bg": "transparent",
+            "text": "theme.colors.text.secondary",
+            "hoverText": "theme.colors.text.primary"
+          }
+        }
+      }
+    }
+  }
+}
