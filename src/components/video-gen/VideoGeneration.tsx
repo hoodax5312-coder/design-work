@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Camera,
   CheckCircle2,
@@ -6,19 +6,36 @@ import {
   Clock,
   Copy,
   Film,
+  FolderPlus,
   Layers3,
   Loader2,
   Music,
+  MapPin,
+  PanelLeftClose,
+  PanelLeftOpen,
   Pause,
   Play,
+  Plus,
   RefreshCcw,
   RotateCcw,
   Save,
+  Search,
   Settings2,
   Sparkles,
+  UserRound,
+  UploadCloud,
   Wand2,
+  X,
 } from 'lucide-react';
 import { cn } from '../../lib/utils';
+import { getActiveProvider, getSelectedModel, useProviderStore } from '../../stores/useProviderStore';
+import { useUIStore } from '../../stores/useUIStore';
+import { contentFeed, type GeneratedContentItem } from '../../services/contentFeed';
+import { assetService, waitForTask } from '../../services/assetService';
+import type { AssetSummary, ImportSession } from '../../types/asset.types';
+import { ImportCenter } from '../assets/ImportCenter';
+import { TaskDrawer } from '../assets/TaskDrawer';
+import { Badge, Button, Card, Input, Select, Switch, Tabs, TabsList, TabsTrigger, Textarea } from '../ui';
 
 type PipelineStageId = 'script' | 'storyboard' | 'image' | 'camera' | 'video';
 type StageStatus = 'idle' | 'running' | 'done';
@@ -75,6 +92,22 @@ const createShots = (prompt: string, durationLabel: string): StoryboardShot[] =>
 };
 
 export const VideoGeneration = () => {
+  const [view, setView] = useState<'assets' | 'studio'>('assets');
+  const setRightPanelOpen = useUIStore((state) => state.setRightPanelOpen);
+
+  useEffect(() => {
+    setRightPanelOpen(view === 'studio');
+    return () => setRightPanelOpen(true);
+  }, [setRightPanelOpen, view]);
+
+  return view === 'assets'
+    ? <VideoAssetLibrary onCreate={() => setView('studio')} />
+    : <VideoStudio onOpenLibrary={() => setView('assets')} />;
+};
+
+const VideoStudio = ({ onOpenLibrary }: { onOpenLibrary: () => void }) => {
+  const provider = useProviderStore(getActiveProvider);
+  const videoModel = getSelectedModel(provider, 'video');
   const [prompt, setPrompt] = useState('');
   const [resolution, setResolution] = useState<(typeof RESOLUTION_OPTIONS)[number]>('1080P');
   const [duration, setDuration] = useState<(typeof DURATION_OPTIONS)[number]>('30s');
@@ -162,6 +195,7 @@ export const VideoGeneration = () => {
       cameraPreset,
       voice,
       smartAudio,
+      model: videoModel,
       shots,
       savedAt: new Date().toISOString(),
     };
@@ -173,24 +207,24 @@ export const VideoGeneration = () => {
   };
 
   return (
-    <div className="flex h-full w-full gap-2 bg-white p-2 text-slate-900 transition-colors dark:bg-black dark:text-zinc-100">
-      <aside className="flex w-[390px] shrink-0 flex-col gap-4 overflow-y-auto rounded-xl bg-white p-4 shadow-sm dark:bg-zinc-900">
+    <div className="ui-module-frame module-workspace h-full w-full flex-col text-foreground md:flex-row">
+      <aside className="ui-module-panel flex max-h-[46vh] w-full shrink-0 flex-col gap-3 overflow-y-auto p-4 md:max-h-none md:w-[390px]">
         <section>
           <div className="mb-2 flex items-center justify-between">
-            <label className="text-sm font-semibold text-[#1d2531] dark:text-slate-200">故事主题 / 视频大纲</label>
-            <button
+            <label className="text-sm font-semibold">故事主题 / 视频大纲</label>
+            <Button variant="link" size="sm"
               onClick={polishPrompt}
-              className="flex items-center gap-1 text-xs font-medium text-indigo-600 dark:text-indigo-400"
+              className="h-auto text-xs"
             >
               <Sparkles size={13} />
               智能润色
-            </button>
+            </Button>
           </div>
-          <textarea
+          <Textarea
             value={prompt}
             onChange={(event) => setPrompt(event.target.value)}
             placeholder="输入故事主题、产品卖点、科普知识或短剧大纲..."
-            className="h-36 w-full resize-none rounded-xl border border-slate-200 bg-[#f7f9fa] px-3 py-3 text-sm leading-6 outline-none transition-colors placeholder:text-slate-400 focus:border-indigo-400 dark:border-zinc-800 dark:bg-black dark:placeholder:text-zinc-600"
+            className="h-36 text-sm leading-6"
           />
         </section>
 
@@ -202,148 +236,145 @@ export const VideoGeneration = () => {
         </div>
 
         <section>
-          <label className="mb-2 block text-sm font-semibold text-[#1d2531] dark:text-slate-200">画面比例</label>
+          <label className="mb-2 block text-sm font-semibold">画面比例</label>
           <div className="grid grid-cols-5 gap-2">
             {RATIO_OPTIONS.map((option) => (
-              <button
+              <Button
                 key={option}
+                variant={ratio === option ? 'primary' : 'secondary'}
+                size="sm"
                 onClick={() => setRatio(option)}
-                className={cn(
-                  'rounded-lg border px-2 py-2 text-xs font-semibold transition-colors',
-                  ratio === option
-                    ? 'border-indigo-400 bg-indigo-50 text-indigo-600 dark:border-indigo-500/50 dark:bg-indigo-500/15 dark:text-indigo-300'
-                    : 'border-slate-200 text-slate-500 hover:bg-slate-50 dark:border-zinc-800 dark:text-zinc-400 dark:hover:bg-white/10',
-                )}
+                className="px-2"
               >
                 {option}
-              </button>
+              </Button>
             ))}
           </div>
         </section>
 
         <div className="grid grid-cols-2 gap-3">
           <InlineSelector label="清晰度" value={resolution} options={[...RESOLUTION_OPTIONS]} onChange={(value) => setResolution(value as typeof resolution)} />
-          <div className="rounded-xl border border-slate-200 p-3 dark:border-zinc-800">
+          <Card padding="sm">
             <div className="mb-3 flex items-center justify-between">
-              <span className="flex items-center gap-2 text-sm font-semibold text-slate-600 dark:text-zinc-300">
+              <span className="flex items-center gap-2 text-sm font-semibold">
                 <Music size={15} />
                 智能配音
               </span>
-              <button
-                onClick={() => setSmartAudio(!smartAudio)}
-                className={cn('relative h-5 w-10 rounded-full transition-colors', smartAudio ? 'bg-indigo-600' : 'bg-slate-200 dark:bg-zinc-700')}
-              >
-                <span className={cn('absolute top-1 h-3 w-3 rounded-full bg-white transition-all', smartAudio ? 'left-6' : 'left-1')} />
-              </button>
+              <Switch checked={smartAudio} onCheckedChange={setSmartAudio} aria-label="智能配音" />
             </div>
-            <p className="text-xs leading-5 text-slate-500 dark:text-zinc-500">{smartAudio ? `${voice} · 自动字幕` : '仅生成无声画面'}</p>
-          </div>
+            <p className="text-xs leading-5 text-muted-foreground">{smartAudio ? `${voice} · 自动字幕` : '仅生成无声画面'}</p>
+          </Card>
         </div>
 
-        <section className="rounded-xl border border-slate-200 p-3 dark:border-zinc-800">
+        <Card padding="sm">
           <div className="mb-3 flex items-center justify-between">
             <h3 className="flex items-center gap-2 text-sm font-bold">
               <Layers3 size={16} />
               AI Story 流水线
             </h3>
-            <span className="text-xs font-semibold text-indigo-600 dark:text-indigo-400">{progress}%</span>
+            <Badge variant="secondary">{progress}%</Badge>
           </div>
           <div className="space-y-2">
             {PIPELINE.map((stage) => (
               <PipelineRow key={stage.id} stage={stage} status={stageStatus[stage.id]} />
             ))}
           </div>
-        </section>
+        </Card>
 
         <div className="grid grid-cols-2 gap-2">
-          <button
+          <Button variant="secondary"
             onClick={generateStoryboardOnly}
             disabled={!prompt.trim() || isRunning}
-            className="flex items-center justify-center gap-2 rounded-xl border border-slate-200 px-4 py-3 text-sm font-bold text-slate-700 transition-colors hover:bg-slate-50 disabled:opacity-50 dark:border-zinc-800 dark:text-zinc-200 dark:hover:bg-white/10"
+            className="h-8"
           >
             <Wand2 size={16} />
             拆分分镜
-          </button>
-          <button
+          </Button>
+          <Button variant="primary"
             onClick={runPipeline}
             disabled={!prompt.trim() || isRunning}
-            className="flex items-center justify-center gap-2 rounded-xl bg-indigo-600 px-4 py-3 text-sm font-bold text-white transition-colors hover:bg-indigo-500 disabled:opacity-60"
+            className="video-library-action h-8"
           >
             {isRunning ? <Loader2 className="animate-spin" size={16} /> : <Play size={16} />}
             一键生成
-          </button>
+          </Button>
         </div>
       </aside>
 
-      <main className="flex min-w-0 flex-1 flex-col overflow-hidden rounded-xl bg-white shadow-sm dark:bg-zinc-900">
-        <header className="flex h-14 items-center justify-between border-b border-slate-200 px-5 dark:border-zinc-800">
+      <main className="ui-module-panel flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+        <header className="ui-module-toolbar h-10 shrink-0 px-3">
           <div>
             <h2 className="text-sm font-bold">故事视频工作台</h2>
-            <p className="text-xs text-slate-500 dark:text-zinc-500">融合 AI Story 的脚本、分镜、运镜和视频生产流程</p>
+            <p className="text-xs text-muted-foreground">融合 AI Story 的脚本、分镜、运镜和视频生产流程</p>
           </div>
           <div className="flex items-center gap-2">
-            <button
+            <Button variant="secondary" size="sm"
+              onClick={onOpenLibrary}
+            >
+              <Film size={14} />
+              <span className="hidden sm:inline">视频资产</span>
+            </Button>
+            <Button variant="secondary" size="sm"
               onClick={saveTemplate}
-              className="flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold hover:bg-slate-50 dark:border-zinc-800 dark:hover:bg-white/10"
             >
               <Save size={14} />
-              保存模板
-            </button>
-            <button
+              <span className="hidden sm:inline">保存模板</span>
+            </Button>
+            <Button variant="secondary" size="sm"
               onClick={() => {
                 setShots([]);
                 setStageStatus({ script: 'idle', storyboard: 'idle', image: 'idle', camera: 'idle', video: 'idle' });
               }}
-              className="flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold hover:bg-slate-50 dark:border-zinc-800 dark:hover:bg-white/10"
             >
               <RefreshCcw size={14} />
-              重置
-            </button>
+              <span className="hidden sm:inline">重置</span>
+            </Button>
           </div>
         </header>
 
-        <div className="grid min-h-0 flex-1 grid-cols-[minmax(0,1fr)_340px] gap-0">
-          <section className="min-w-0 overflow-y-auto p-5">
-            <div className="mb-4 grid grid-cols-4 gap-3">
+        <div className="grid min-h-0 flex-1 grid-cols-1 gap-0 xl:grid-cols-[minmax(0,1fr)_340px]">
+          <section className="min-w-0 overflow-y-auto p-4">
+            <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
               {projectSummary.map((item) => (
-                <div key={item.label} className="rounded-xl border border-slate-200 bg-[#f7f9fa] p-3 dark:border-zinc-800 dark:bg-black">
-                  <p className="text-xs text-slate-500 dark:text-zinc-500">{item.label}</p>
+                <Card key={item.label} padding="sm">
+                  <p className="text-xs text-muted-foreground">{item.label}</p>
                   <p className="mt-1 truncate text-sm font-bold">{item.value}</p>
-                </div>
+                </Card>
               ))}
             </div>
 
             {shots.length === 0 ? (
-              <div className="flex min-h-[520px] flex-col items-center justify-center rounded-2xl border border-dashed border-slate-200 bg-[#f7f9fa] text-center dark:border-zinc-800 dark:bg-black">
-                <div className="mb-5 flex h-16 w-16 items-center justify-center rounded-2xl bg-indigo-500/10 text-indigo-600 dark:text-indigo-400">
+              <div className="flex min-h-[320px] flex-col items-center justify-center rounded-lg border border-dashed border-border bg-muted/35 text-center">
+                <div className="mb-5 flex h-16 w-16 items-center justify-center rounded-lg bg-primary/15 text-foreground">
                   <Film size={32} />
                 </div>
                 <h3 className="text-lg font-bold">从一个主题开始生成完整故事视频</h3>
-                <p className="mt-2 max-w-md text-sm leading-6 text-slate-500 dark:text-zinc-500">
+                <p className="mt-2 max-w-md text-sm leading-6 text-muted-foreground">
                   这里会展示分镜、画面提示词、旁白、运镜和视频片段状态。先点击左侧“拆分分镜”或“一键生成”。
                 </p>
               </div>
             ) : (
               <div className="space-y-3">
                 {shots.map((shot) => (
-                  <button
+                  <Button
                     key={shot.id}
+                    variant="ghost"
                     onClick={() => setSelectedShotId(shot.id)}
                     className={cn(
-                      'w-full rounded-xl border p-4 text-left transition-colors',
+                      'h-auto w-full justify-start whitespace-normal rounded-lg border p-4 text-left',
                       selectedShotId === shot.id
-                        ? 'border-indigo-400 bg-indigo-50/70 dark:border-indigo-500/50 dark:bg-indigo-500/10'
-                        : 'border-slate-200 hover:bg-slate-50 dark:border-zinc-800 dark:hover:bg-white/5',
+                        ? 'border-primary bg-primary/10'
+                        : 'border-border hover:bg-accent',
                     )}
                   >
                     <div className="mb-3 flex items-start justify-between gap-3">
                       <div className="flex min-w-0 items-center gap-3">
-                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-slate-900 text-xs font-bold text-white dark:bg-white dark:text-black">
+                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-foreground text-xs font-bold text-background">
                           {String(shot.id).padStart(2, '0')}
                         </div>
                         <div className="min-w-0">
                           <h3 className="truncate text-sm font-bold">{shot.title}</h3>
-                          <p className="mt-1 flex items-center gap-2 text-xs text-slate-500 dark:text-zinc-500">
+                          <p className="mt-1 flex items-center gap-2 text-xs text-muted-foreground">
                             <Clock size={12} />
                             {shot.duration}s
                             <Camera size={12} />
@@ -353,30 +384,30 @@ export const VideoGeneration = () => {
                       </div>
                       <StatusBadge status={shot.status} />
                     </div>
-                    <p className="line-clamp-2 text-xs leading-5 text-slate-600 dark:text-zinc-400">{shot.narration}</p>
-                  </button>
+                    <p className="line-clamp-2 text-xs leading-5 text-muted-foreground">{shot.narration}</p>
+                  </Button>
                 ))}
               </div>
             )}
           </section>
 
-          <aside className="min-w-0 overflow-y-auto border-l border-slate-200 bg-[#f7f9fa] p-4 dark:border-zinc-800 dark:bg-black">
+          <aside className="min-w-0 overflow-y-auto border-0 bg-white p-4 dark:bg-[#0b0b0b]">
             {selectedShot ? (
               <div className="space-y-4">
-                <div className="overflow-hidden rounded-xl border border-slate-200 bg-white dark:border-zinc-800 dark:bg-zinc-900">
-                  <div className="flex aspect-video items-center justify-center bg-gradient-to-br from-slate-950 via-slate-900 to-indigo-950 text-white">
+                <Card padding="none" className="overflow-hidden">
+                  <div className="flex aspect-video items-center justify-center bg-foreground text-background">
                     <div className="text-center">
                       <Film className="mx-auto mb-3 opacity-70" size={36} />
                       <p className="text-sm font-bold">{selectedShot.title}</p>
                       <p className="mt-1 text-xs text-white/60">{selectedShot.cameraMove}</p>
                     </div>
                   </div>
-                  <div className="grid grid-cols-3 divide-x divide-slate-200 text-center dark:divide-zinc-800">
+                  <div className="grid grid-cols-3 divide-x divide-border text-center">
                     <MiniAction icon={Play} label="预览" />
                     <MiniAction icon={RotateCcw} label="重绘" />
                     <MiniAction icon={Copy} label="复制" />
                   </div>
-                </div>
+                </Card>
 
                 <EditBlock
                   title="旁白"
@@ -396,21 +427,21 @@ export const VideoGeneration = () => {
                   onChange={(value) => updateShot(selectedShot.id, { cameraMove: value })}
                 />
 
-                <section className="rounded-xl border border-slate-200 bg-white p-3 dark:border-zinc-800 dark:bg-zinc-900">
+                <Card padding="sm">
                   <h3 className="mb-3 flex items-center gap-2 text-sm font-bold">
                     <Settings2 size={15} />
                     生成服务配置
                   </h3>
-                  <div className="space-y-2 text-xs text-slate-500 dark:text-zinc-500">
+                  <div className="space-y-2 text-xs text-muted-foreground">
                     <p>文案模型：OpenAI / Claude 兼容</p>
                     <p>图片模型：Stable Diffusion / DALL-E / Midjourney</p>
                     <p>视频模型：Runway / Pika 兼容队列</p>
                     <p>状态策略：失败重试、阶段回滚、批量生成</p>
                   </div>
-                </section>
+                </Card>
               </div>
             ) : (
-              <div className="flex h-full items-center justify-center text-center text-sm text-slate-400">
+              <div className="flex h-full items-center justify-center text-center text-sm text-muted-foreground">
                 选择一个分镜后可编辑旁白、提示词和运镜
               </div>
             )}
@@ -418,6 +449,583 @@ export const VideoGeneration = () => {
         </div>
       </main>
     </div>
+  );
+};
+
+type VideoLibraryTab = 'assets' | 'projects';
+type VideoProject = {
+  id: string;
+  code: string;
+  title: string;
+  author: string;
+  views: string;
+  thumbnail?: string;
+};
+
+const PROJECT_SEEDS = [
+  ['空心骑士', '@bakha', '940'],
+  ['翡翠先锋', '@michelangelorobot1306', '182'],
+  ['学院入门包', '@driftingcoffee1246', '43'],
+  ['达尔哈雷尔瓶', '@flyinglamp1410', '16'],
+  ['失踪的代理人', '@monrox', '174'],
+  ['新来的女孩', '@alishaqantaar', '1.5万'],
+  ['沙漠来客', '@northbound', '68'],
+  ['霓虹余晖', '@nightframe', '239'],
+] as const;
+
+const VideoLibraryTabs = ({
+  activeTab,
+  onAssets,
+  onProjects,
+}: {
+  activeTab: VideoLibraryTab;
+  onAssets: () => void;
+  onProjects: () => void;
+}) => (
+  <Tabs value={activeTab} onValueChange={(value) => value === 'assets' ? onAssets() : onProjects()}>
+    <TabsList aria-label="视频内容" className="h-8 gap-0 rounded-lg bg-[#f8f8f6] p-0.5 shadow-none dark:bg-white/[0.035]">
+      <TabsTrigger value="assets" className="h-7 border-0 px-3 text-xs font-semibold shadow-none data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm">素材</TabsTrigger>
+      <TabsTrigger value="projects" className="h-7 border-0 px-3 text-xs font-semibold shadow-none data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm">工程</TabsTrigger>
+    </TabsList>
+  </Tabs>
+);
+
+const VideoAssetLibrary = ({ onCreate }: { onCreate: () => void }) => {
+  const [activeTab, setActiveTab] = useState<VideoLibraryTab>('assets');
+  const [query, setQuery] = useState('');
+
+  return (
+    <div className="video-library-shell module-workspace flex h-full min-w-0 flex-col overflow-hidden !bg-white text-foreground dark:!bg-[#0b0b0b]">
+      <header className="mx-16 flex h-14 shrink-0 items-center justify-between gap-4">
+        <VideoLibraryTabs
+          activeTab={activeTab}
+          onAssets={() => setActiveTab('assets')}
+          onProjects={() => setActiveTab('projects')}
+        />
+        <div className="relative ml-auto w-[min(28vw,360px)] min-w-[160px]">
+          <Search size={16} className="pointer-events-none absolute left-3 top-1/2 z-10 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            placeholder={activeTab === 'assets' ? '搜索视频标题和描述…' : '搜索视频工程…'}
+            className="h-8 border-0 bg-[#f3f3f1] py-0 pl-9 pr-9 shadow-none focus-visible:ring-1 focus-visible:ring-black/10 dark:bg-white/[0.06] dark:focus-visible:ring-white/15"
+          />
+          {query && <Button type="button" variant="ghost" size="iconSm" onClick={() => setQuery('')} aria-label="清空搜索" className="absolute right-0.5 top-1/2 h-6 w-6 -translate-y-1/2"><X size={13} /></Button>}
+        </div>
+      </header>
+      <div className="mx-16 mb-0 flex min-h-0 flex-1 overflow-hidden rounded-xl bg-[#f8f8f6] p-2 dark:bg-white/[0.035]">
+        {activeTab === 'assets'
+          ? <VideoAssetCatalog query={query} />
+          : <VideoProjectLibrary onCreate={onCreate} query={query} />}
+      </div>
+    </div>
+  );
+};
+
+const VideoProjectLibrary = ({ onCreate, query }: { onCreate: () => void; query: string }) => {
+  const [assets, setAssets] = useState<AssetSummary[]>([]);
+  const [selectedProjectId, setSelectedProjectId] = useState('project-1');
+  const [isPlaying, setIsPlaying] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+    assetService.list({ limit: 16 })
+      .then((result) => active && setAssets(result.items))
+      .catch(() => undefined);
+    return () => { active = false; };
+  }, []);
+
+  const projects: VideoProject[] = PROJECT_SEEDS.map(([title, author, views], index) => ({
+    id: `project-${index + 1}`,
+    code: `P-${String(index + 1).padStart(3, '0')}`,
+    title,
+    author,
+    views,
+    thumbnail: assets[index % Math.max(assets.length, 1)]?.previewUrl,
+  }));
+  const normalizedQuery = query.trim().toLocaleLowerCase('zh-CN');
+  const visibleProjects = projects.filter((project) => !normalizedQuery || `${project.title} ${project.author} ${project.code}`.toLocaleLowerCase('zh-CN').includes(normalizedQuery));
+  const selectedProject = projects.find((project) => project.id === selectedProjectId) || projects[0];
+
+  return (
+    <main className="grid h-full min-w-0 grid-cols-1 gap-3 overflow-hidden text-foreground md:grid-cols-[260px_minmax(0,1fr)]">
+      <aside aria-label="视频工程列表" className="flex min-h-0 flex-col overflow-hidden rounded-lg bg-transparent p-3">
+        <header className="shrink-0 px-1 pb-3">
+          <h1 className="text-sm font-semibold tracking-[-0.01em]">视频工程</h1>
+          <p className="mt-1 text-xs leading-5 text-muted-foreground">选择工程查看成片、素材和剧本。</p>
+        </header>
+        <div className="min-h-0 flex-1 space-y-2 overflow-y-auto pr-1">
+          {visibleProjects.map((project) => {
+              const isSelected = selectedProjectId === project.id;
+              return (
+                <Button
+                  key={project.id}
+                  type="button"
+                  variant="ghost"
+                  onClick={() => {
+                    setSelectedProjectId(project.id);
+                    setIsPlaying(false);
+                  }}
+                  className={cn(
+                    'group flex h-auto w-full items-center gap-3 overflow-hidden rounded-lg border-0 bg-background/80 p-2 text-left shadow-none transition-colors hover:bg-background',
+                    isSelected && 'bg-foreground text-background hover:bg-foreground/90 hover:text-background',
+                  )}
+                >
+                  <div className="relative aspect-video w-[88px] shrink-0 overflow-hidden rounded-md bg-[#121212]">
+                    {project.thumbnail ? <img src={project.thumbnail} alt="" className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105" /> : <Film aria-hidden="true" className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 text-zinc-700" size={28} />}
+                    <span className="absolute bottom-1 left-1 rounded bg-black/70 px-1.5 py-0.5 text-xs text-white/85">{project.code}</span>
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <h2 className="truncate text-sm font-semibold">{project.title}</h2>
+                    <p className={cn('mt-1 truncate text-xs text-muted-foreground', isSelected && 'text-background/60')}>{project.author}</p>
+                    <p className={cn('mt-1 text-xs text-muted-foreground', isSelected && 'text-background/60')}>分镜 {4 + (Number(project.id.slice(-1)) % 4)} · 素材 {8 + Number(project.id.slice(-1))}
+                    </p>
+                  </div>
+                </Button>
+              );
+            })}
+          {!visibleProjects.length && <div className="px-2 py-8 text-center text-xs text-muted-foreground">没有匹配的视频工程</div>}
+        </div>
+        <Button type="button" variant="secondary" onClick={onCreate} className="mt-3 h-8 w-full shrink-0 justify-center border-0 bg-background hover:bg-background/80">
+          <FolderPlus aria-hidden="true" size={15} /> 创建工程
+        </Button>
+      </aside>
+
+      <ProjectMaterials
+        project={selectedProject}
+        assets={assets}
+        isPlaying={isPlaying}
+        onTogglePlayback={() => setIsPlaying((playing) => !playing)}
+      />
+    </main>
+  );
+};
+
+const ProjectMaterials = ({
+  project,
+  assets,
+  isPlaying,
+  onTogglePlayback,
+}: {
+  project: VideoProject;
+  assets: AssetSummary[];
+  isPlaying: boolean;
+  onTogglePlayback: () => void;
+}) => {
+  const projectNumber = Number(project.id.replace('project-', '')) || 1;
+  const detailGroups = [
+    { id: 'character', label: '角色', icon: UserRound, assets: assets.slice(0, 3) },
+    { id: 'scene', label: '场景', icon: MapPin, assets: assets.slice(3, 6) },
+    { id: 'storyboard', label: '分镜图', icon: Layers3, assets: assets.slice(6, 10) },
+  ];
+  const scriptPrompt = `以“${project.title}”为核心，用电影化短片结构展开。开场建立角色与环境，中段通过行动与镜头调度推进冲突，结尾保留清晰的情绪记忆点。`;
+
+  return (
+    <section aria-label={`${project.title} 工程详情`} className="min-h-0 min-w-0 overflow-y-auto rounded-lg bg-background">
+      <div className="mx-auto max-w-6xl p-4 lg:p-5">
+        <header className="mb-4 flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <p className="text-xs font-medium text-muted-foreground">{project.code} · 更新于今天</p>
+            <h2 className="mt-1 text-lg font-semibold tracking-[-0.025em]">{project.title}</h2>
+            <p className="mt-1 text-xs text-muted-foreground">成片、角色、场景、分镜与剧本会保存在同一工程。</p>
+          </div>
+          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+            <span>16:9</span><span aria-hidden="true">·</span><span>1080P</span><span aria-hidden="true">·</span><span>{26 + projectNumber * 3}s</span>
+          </div>
+        </header>
+
+        <div className="relative aspect-video w-full overflow-hidden rounded-lg bg-[#111]">
+          {project.thumbnail
+            ? <img src={project.thumbnail} alt={`${project.title} 视频封面`} className={cn('h-full w-full object-cover transition-transform duration-700', isPlaying && 'scale-[1.02]')} />
+            : <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_28%,#3f3f46_0%,#18181b_38%,#09090b_100%)]" />}
+          <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/5 to-black/10" />
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            onClick={onTogglePlayback}
+            aria-label={isPlaying ? '暂停工程预览' : '播放工程预览'}
+            className="absolute left-1/2 top-1/2 h-12 w-12 -translate-x-1/2 -translate-y-1/2 rounded-full bg-white text-black shadow-xl hover:bg-white/90"
+          >
+            {isPlaying ? <Pause size={19} fill="currentColor" /> : <Play size={19} fill="currentColor" className="translate-x-px" />}
+          </Button>
+          <div className="absolute inset-x-4 bottom-3 flex items-center gap-3 text-xs text-white/75">
+            <span>{isPlaying ? '00:08' : '00:00'}</span>
+            <span className="relative h-1 flex-1 overflow-hidden rounded-full bg-white/25"><span className={cn('absolute inset-y-0 left-0 rounded-full bg-white transition-all duration-500', isPlaying ? 'w-[34%]' : 'w-0')} /></span>
+            <span>00:{String(26 + projectNumber * 3).padStart(2, '0')}</span>
+          </div>
+        </div>
+
+        <div className="mt-6 space-y-6">
+          {detailGroups.map((group, groupIndex) => {
+            const Icon = group.icon;
+            return (
+              <section key={group.id}>
+                <div className="mb-3 flex items-center justify-between">
+                  <h3 className="flex items-center gap-2 text-sm font-semibold"><Icon aria-hidden="true" size={15} className="text-muted-foreground" />{group.label}</h3>
+                  <span className="text-xs tabular-nums text-muted-foreground">{group.assets.length || (groupIndex + 2)} 项</span>
+                </div>
+                <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+                  {(group.assets.length ? group.assets : Array.from({ length: groupIndex + 2 }, (_, index) => ({ id: `${group.id}-${index}`, title: `${group.label} ${index + 1}`, previewUrl: undefined }))).map((asset) => (
+                    <article key={`${group.id}-${asset.id}`} className="overflow-hidden rounded-lg bg-muted/70">
+                      <div className="relative aspect-video overflow-hidden bg-[#202020]">
+                        {asset.previewUrl
+                          ? <img src={asset.previewUrl} alt={asset.title} className="h-full w-full object-cover transition-transform duration-300 hover:scale-[1.03]" />
+                          : <Icon aria-hidden="true" className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 text-white/35" size={20} />}
+                      </div>
+                      <p className="truncate px-2.5 py-2 text-xs font-medium">{asset.title}</p>
+                    </article>
+                  ))}
+                </div>
+              </section>
+            );
+          })}
+
+          <section className="grid gap-3 lg:grid-cols-2">
+            <Card padding="md" className="border-0 bg-muted/65 shadow-none">
+              <p className="text-xs font-semibold text-muted-foreground">剧本概要</p>
+              <h3 className="mt-2 text-sm font-semibold">第一幕：角色进入世界</h3>
+              <p className="mt-2 text-xs leading-6 text-muted-foreground">{scriptPrompt}</p>
+            </Card>
+            <Card padding="md" className="border-0 bg-muted/65 shadow-none">
+              <div className="flex items-center justify-between gap-3">
+                <p className="text-xs font-semibold text-muted-foreground">视频提示词</p>
+                <Button type="button" variant="ghost" size="sm" className="h-7 px-2 text-xs"><Copy size={13} />复制</Button>
+              </div>
+              <p className="mt-2 text-xs leading-6 text-foreground/80">Cinematic short film, {project.title}, expressive character performance, layered environment, deliberate camera movement, restrained color palette, 16:9, high detail.</p>
+            </Card>
+          </section>
+        </div>
+      </div>
+    </section>
+  );
+};
+
+const VideoAssetCatalog = ({ query }: { query: string }) => {
+  const [sort, setSort] = useState<'updated' | 'title'>('updated');
+  const [sortOpen, setSortOpen] = useState(false);
+  const [filterPanelOpen, setFilterPanelOpen] = useState(true);
+  const [activeTag, setActiveTag] = useState<'all' | 'new' | 'tag-2'>('all');
+  const [items, setItems] = useState<GeneratedContentItem[]>(() => contentFeed.list().filter((item) => item.type === 'video'));
+  const [libraryAssets, setLibraryAssets] = useState<AssetSummary[]>([]);
+  const [dropZoneOpen, setDropZoneOpen] = useState(false);
+  const [draggingFiles, setDraggingFiles] = useState(false);
+  const [importSession, setImportSession] = useState<ImportSession | null>(null);
+  const [tasksOpen, setTasksOpen] = useState(false);
+  const [taskRefreshKey, setTaskRefreshKey] = useState(0);
+  const [importError, setImportError] = useState('');
+  const [notice, setNotice] = useState('');
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const loadLibraryAssets = useCallback(async () => {
+    try {
+      const result = await assetService.list({ type: 'video', limit: 100, sort: 'updatedAt' });
+      setLibraryAssets(result.items);
+    } catch (caught) {
+      setImportError(caught instanceof Error ? caught.message : '视频素材加载失败');
+    }
+  }, []);
+
+  useEffect(() => {
+    const sync = () => setItems(contentFeed.list().filter((item) => item.type === 'video'));
+    window.addEventListener('mboard:content-feed-updated', sync);
+    return () => window.removeEventListener('mboard:content-feed-updated', sync);
+  }, []);
+
+  useEffect(() => {
+    void loadLibraryAssets();
+  }, [loadLibraryAssets]);
+
+  const catalogItems = useMemo(() => {
+    const persistedItems: GeneratedContentItem[] = libraryAssets.map((asset) => ({
+      id: `asset-${asset.id}`,
+      type: 'video',
+      title: asset.title,
+      description: asset.description,
+      previewUrl: asset.previewUrl,
+      createdAt: asset.createdAt,
+      savedToAssets: true,
+      metadata: { assetId: asset.id },
+    }));
+    const seen = new Set<string>();
+
+    return [...persistedItems, ...items].filter((item) => {
+      const key = item.previewUrl ? `preview:${item.previewUrl}` : `id:${item.id}`;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+  }, [items, libraryAssets]);
+
+  const trackCommit = useCallback((taskId: string) => {
+    setImportSession(null);
+    setTasksOpen(true);
+    setTaskRefreshKey((value) => value + 1);
+    waitForTask(taskId)
+      .then((task) => {
+        setTaskRefreshKey((value) => value + 1);
+        if (task.status === 'completed') {
+          setNotice('视频素材导入完成');
+          setDropZoneOpen(false);
+          void loadLibraryAssets();
+          window.setTimeout(() => setNotice(''), 2200);
+          return;
+        }
+        setImportError(task.error?.message || '视频素材导入失败');
+      })
+      .catch((caught) => setImportError(caught instanceof Error ? caught.message : '视频素材导入失败'));
+  }, [loadLibraryAssets]);
+
+  const startImport = useCallback(async (paths: string[], autoConfirm = false) => {
+    const task = await assetService.scan(paths);
+    setTaskRefreshKey((value) => value + 1);
+    setTasksOpen(true);
+    const result = await waitForTask(task.id);
+    if (result.status !== 'waiting_for_user') {
+      throw new Error(result.error?.message || '文件扫描未完成');
+    }
+    const sessionId = (result.output as { sessionId?: string })?.sessionId;
+    if (!sessionId) throw new Error('扫描任务未返回导入会话');
+    const session = await assetService.importSession(sessionId);
+
+    if (autoConfirm && !session.items.some((item) => item.duplicateAssetId || item.duplicateItemId)) {
+      await assetService.saveImportDecisions(
+        session.id,
+        session.items.map((item) => ({
+          itemId: item.id,
+          decision: item.decision || 'import_new',
+        })),
+      );
+      const commit = await assetService.confirmImport(session.id);
+      setNotice(`已接收 ${session.items.length} 个视频，正在自动入库`);
+      trackCommit(commit.id);
+      return;
+    }
+
+    setImportSession(session);
+    setTasksOpen(false);
+  }, [trackCommit]);
+
+  const importDroppedVideos = useCallback(async (files: File[]) => {
+    const videoFiles = files.filter((file) => file.type.startsWith('video/') || /\.(mp4|mov|m4v|webm|avi|mkv)$/i.test(file.name));
+    if (!videoFiles.length) {
+      setImportError('请选择或拖入视频文件');
+      return;
+    }
+
+    try {
+      setImportError('');
+      const uploaded = await Promise.all(videoFiles.map((file) => assetService.dropImage(file)));
+      await startImport(uploaded.map((item) => item.path), true);
+    } catch (caught) {
+      setImportError(caught instanceof Error ? caught.message : '视频素材导入失败');
+    }
+  }, [startImport]);
+
+  const normalizedQuery = query.trim().toLocaleLowerCase('zh-CN');
+  const newItems = catalogItems.filter((item) => Date.now() - item.createdAt < 7 * 24 * 60 * 60 * 1000);
+  const tagOptions = [
+    { id: 'all' as const, label: '全部', count: catalogItems.length },
+    { id: 'new' as const, label: '新的', count: newItems.length },
+    { id: 'tag-2' as const, label: '标签2', count: 0 },
+  ];
+  const activeTagLabel = tagOptions.find((tag) => tag.id === activeTag)?.label || '全部';
+  const taggedItems = activeTag === 'all' ? catalogItems : activeTag === 'new' ? newItems : [];
+  const visibleItems = taggedItems
+    .filter((item) => !normalizedQuery || `${item.title} ${item.description || ''}`.toLocaleLowerCase('zh-CN').includes(normalizedQuery))
+    .sort((a, b) => sort === 'updated' ? b.createdAt - a.createdAt : a.title.localeCompare(b.title, 'zh-CN'));
+  const sortOptions = [
+    { id: 'updated' as const, label: '时间', hint: '最新优先' },
+    { id: 'title' as const, label: '名称', hint: 'A–Z' },
+  ];
+
+  return (
+    <>
+      <div className="flex min-h-0 flex-1 gap-3 text-foreground">
+      {filterPanelOpen && <aside aria-label="视频筛选" className="asset-filter-panel flex h-full w-[200px] shrink-0 flex-col overflow-hidden bg-transparent text-card-foreground">
+        <header className="flex h-11 shrink-0 items-center px-4">
+          <h2 className="text-sm font-semibold tracking-[-0.01em]">筛选</h2>
+        </header>
+        <nav className="min-h-0 flex-1 overflow-y-auto px-4 pb-3" aria-label="视频标签筛选">
+          <section className="px-0 py-1">
+            <div className="flex h-8 items-center justify-between">
+              <span className="text-[12px] font-semibold tracking-[0.04em] text-muted-foreground">标签</span>
+              <Button type="button" variant="ghost" size="iconSm" aria-label="新建视频标签" className="-mr-3 h-7 w-7 hover:bg-black/[0.05] hover:text-foreground dark:hover:bg-white/[0.08]"><Plus size={14} /></Button>
+            </div>
+            <div className="space-y-1">
+              {tagOptions.map((tag) => (
+                <Button
+                  key={tag.id}
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setActiveTag(tag.id)}
+                  aria-current={activeTag === tag.id ? 'page' : undefined}
+                  className={cn(
+                    '-mx-3 h-8 w-[calc(100%+1.5rem)] justify-between px-3 text-sm font-semibold hover:bg-black/[0.08] hover:text-foreground dark:hover:bg-white/[0.12]',
+                    activeTag === tag.id && 'bg-foreground text-background hover:bg-foreground/90 hover:text-background',
+                  )}
+                >
+                  <span>{tag.label}</span>
+                  <span className={cn('w-6 text-right text-sm font-semibold tabular-nums text-muted-foreground', activeTag === tag.id && 'text-background/70')}>{tag.count}</span>
+                </Button>
+              ))}
+            </div>
+          </section>
+        </nav>
+      </aside>}
+
+      <main className="flex min-w-0 flex-1 flex-col overflow-hidden rounded-lg bg-background">
+        <header className="relative flex h-11 shrink-0 items-center justify-between border-b border-black/[0.03] px-6 dark:border-white/[0.04]">
+          <div className="flex items-center gap-3">
+            <Button type="button" variant="ghost" size="iconSm" onClick={() => setFilterPanelOpen((open) => !open)} aria-label={filterPanelOpen ? '收起筛选' : '展开筛选'} className="h-7 w-7 text-muted-foreground hover:bg-black/[0.05] dark:hover:bg-white/[0.08]">
+              {filterPanelOpen ? <PanelLeftClose size={15} /> : <PanelLeftOpen size={15} />}
+            </Button>
+            <span aria-hidden="true" className="h-4 w-px bg-black/[0.06] dark:bg-white/[0.07]" />
+            <h1 className="text-sm font-semibold tracking-[-0.01em]">{activeTagLabel}</h1>
+          </div>
+          <div className="relative flex items-center gap-1">
+            <Button
+              type="button"
+              variant="ghost"
+              size="iconSm"
+              onClick={() => {
+                setImportError('');
+                setDropZoneOpen((open) => !open);
+              }}
+              aria-label="导入素材"
+              title="导入素材"
+              aria-expanded={dropZoneOpen}
+              className="h-8 w-8 text-muted-foreground hover:bg-black/[0.05] hover:text-foreground dark:hover:bg-white/[0.08]"
+            >
+              <Plus size={16} className={cn('transition-transform', dropZoneOpen && 'rotate-45')} />
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={() => setSortOpen((open) => !open)}
+              aria-expanded={sortOpen}
+              aria-controls="video-asset-sort-menu"
+              className="h-8 gap-1 px-2 text-xs font-medium text-muted-foreground hover:bg-black/[0.04] hover:text-foreground dark:hover:bg-white/[0.06]"
+            >
+              排序
+              <ChevronDown size={13} className={cn('transition-transform', sortOpen && 'rotate-180')} />
+            </Button>
+            {sortOpen && (
+              <div id="video-asset-sort-menu" className="absolute right-0 top-10 z-30 w-48 rounded-lg border border-black/[0.04] bg-background p-1.5 shadow-lg dark:border-white/[0.06]">
+                {sortOptions.map((option) => (
+                  <Button
+                    key={option.id}
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => {
+                      setSort(option.id);
+                      setSortOpen(false);
+                    }}
+                    aria-pressed={sort === option.id}
+                    className={cn(
+                      'h-9 w-full justify-between hover:bg-black/[0.05] hover:text-foreground dark:hover:bg-white/[0.08]',
+                      sort === option.id && 'bg-black/[0.06] text-foreground shadow-none dark:bg-white/[0.1]',
+                    )}
+                  >
+                    <span className="text-xs font-semibold">{option.label}</span>
+                    <span className="text-xs font-medium text-muted-foreground">{option.hint}</span>
+                  </Button>
+                ))}
+              </div>
+            )}
+          </div>
+        </header>
+
+        {dropZoneOpen && (
+          <section
+            className={cn(
+              'mx-6 mt-6 flex min-h-[220px] shrink-0 cursor-pointer flex-col items-center justify-center rounded-lg border border-dashed border-black/[0.12] bg-black/[0.02] px-6 text-center transition-colors dark:border-white/[0.14] dark:bg-white/[0.025]',
+              draggingFiles && 'border-foreground/40 bg-black/[0.06] dark:bg-white/[0.08]',
+            )}
+            onClick={() => fileInputRef.current?.click()}
+            onDragEnter={(event) => {
+              event.preventDefault();
+              setDraggingFiles(true);
+            }}
+            onDragOver={(event) => event.preventDefault()}
+            onDragLeave={(event) => {
+              if (event.currentTarget === event.target) setDraggingFiles(false);
+            }}
+            onDrop={(event) => {
+              event.preventDefault();
+              setDraggingFiles(false);
+              const files = Array.from(event.dataTransfer.files);
+              if (files.length) void importDroppedVideos(files);
+            }}
+          >
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="video/*,.mp4,.mov,.m4v,.webm,.avi,.mkv"
+              multiple
+              className="hidden"
+              onChange={(event) => {
+                const files = Array.from(event.target.files || []);
+                event.target.value = '';
+                if (files.length) void importDroppedVideos(files);
+              }}
+            />
+            <span className="mb-3 grid h-11 w-11 place-items-center rounded-full bg-muted text-muted-foreground">
+              <UploadCloud size={21} />
+            </span>
+            <p className="text-sm font-semibold">点击选择视频，或将视频拖入此处</p>
+            <p className="mt-1 text-xs text-muted-foreground">支持一次选择或拖入多个视频文件</p>
+            {importError && <p role="alert" className="mt-2 text-xs font-medium text-red-500">{importError}</p>}
+          </section>
+        )}
+
+        <section aria-label="视频资产列表" className="video-asset-stage relative flex min-h-0 flex-1 overflow-y-auto p-3 sm:p-4">
+        {visibleItems.length ? (
+          <div className="grid w-full content-start grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
+            {visibleItems.map((item) => (
+              <Card key={item.id} padding="none" className="video-asset-card group overflow-hidden">
+                <div className="relative aspect-video bg-gradient-to-br from-[#272727] to-[#080808]">
+                  {item.previewUrl ? <video src={item.previewUrl} muted preload="metadata" className="h-full w-full object-cover" /> : <Film aria-hidden="true" className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 text-zinc-600" size={30} />}
+                </div>
+                <div className="p-4">
+                  <h2 className="truncate text-sm font-semibold">{item.title}</h2>
+                  <p className="mt-1 truncate text-xs text-muted-foreground">{item.description || '视频资产'}</p>
+                </div>
+              </Card>
+            ))}
+          </div>
+        ) : (
+            <div className="m-auto flex max-w-sm flex-col items-center text-center">
+            <div className="mb-6 flex h-14 w-14 items-center justify-center rounded-lg border border-border bg-card text-foreground" aria-hidden="true"><Film size={25} /></div>
+            <h1 className="video-archive-title text-2xl font-semibold">没有视频资产</h1>
+            <p className="mt-3 text-sm leading-6 text-muted-foreground">调整搜索或标签筛选条件，已有视频不会被删除。</p>
+          </div>
+        )}
+        </section>
+      </main>
+    </div>
+    {importSession && (
+      <ImportCenter
+        session={importSession}
+        onClose={() => setImportSession(null)}
+        onCommitted={trackCommit}
+      />
+    )}
+    <TaskDrawer open={tasksOpen} onClose={() => setTasksOpen(false)} refreshKey={taskRefreshKey} />
+    {notice && (
+      <div role="status" className="fixed bottom-5 left-1/2 z-[90] -translate-x-1/2 rounded-md bg-foreground px-4 py-2 text-xs font-medium text-background shadow-lg">
+        {notice}
+      </div>
+    )}
+    {importError && !dropZoneOpen && (
+      <div role="alert" className="fixed bottom-5 left-1/2 z-[90] -translate-x-1/2 rounded-md bg-red-600 px-4 py-2 text-xs font-medium text-white shadow-lg">
+        {importError}
+      </div>
+    )}
+    </>
   );
 };
 
@@ -432,21 +1040,7 @@ const SelectControl = ({
   options: string[];
   onChange: (value: string) => void;
 }) => (
-  <label className="block">
-    <span className="mb-2 block text-xs font-semibold text-slate-500 dark:text-zinc-400">{label}</span>
-    <span className="relative block">
-      <select
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
-        className="h-10 w-full appearance-none rounded-lg border border-slate-200 bg-white px-3 pr-8 text-sm outline-none focus:border-indigo-400 dark:border-zinc-800 dark:bg-black"
-      >
-        {options.map((option) => (
-          <option key={option} value={option}>{option}</option>
-        ))}
-      </select>
-      <ChevronDown className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-slate-400" size={14} />
-    </span>
-  </label>
+  <Select label={label} value={value} onChange={(event) => onChange(event.target.value)} options={options.map((option) => ({ value: option, label: option }))} />
 );
 
 const InlineSelector = ({
@@ -460,25 +1054,22 @@ const InlineSelector = ({
   options: string[];
   onChange: (value: string) => void;
 }) => (
-  <div className="rounded-xl border border-slate-200 p-3 dark:border-zinc-800">
-    <p className="mb-3 text-sm font-semibold text-slate-600 dark:text-zinc-300">{label}</p>
-    <div className="flex rounded-lg bg-[#f7f9fa] p-1 dark:bg-zinc-800">
+  <Card padding="sm">
+    <p className="mb-3 text-sm font-semibold">{label}</p>
+    <div className="flex rounded-md bg-muted p-1">
       {options.map((option) => (
-        <button
+        <Button
           key={option}
+          variant={value === option ? 'secondary' : 'ghost'}
+          size="sm"
           onClick={() => onChange(option)}
-          className={cn(
-            'flex-1 rounded-md py-1.5 text-xs font-semibold transition-colors',
-            value === option
-              ? 'bg-white text-[#1d2531] shadow-sm dark:bg-zinc-700 dark:text-white'
-              : 'text-slate-500 dark:text-zinc-400',
-          )}
+          className="h-8 flex-1 px-2 text-xs"
         >
           {option}
-        </button>
+        </Button>
       ))}
     </div>
-  </div>
+  </Card>
 );
 
 const PipelineRow = ({
@@ -488,42 +1079,35 @@ const PipelineRow = ({
   stage: { label: string; desc: string };
   status: StageStatus;
 }) => (
-  <div className="flex items-center gap-3 rounded-lg bg-[#f7f9fa] px-3 py-2 dark:bg-black">
+  <div className="flex items-center gap-3 rounded-md bg-muted/55 px-3 py-2">
     <div className={cn(
       'flex h-7 w-7 items-center justify-center rounded-full',
       status === 'done'
         ? 'bg-emerald-500/10 text-emerald-500'
         : status === 'running'
-          ? 'bg-indigo-500/10 text-indigo-500'
-          : 'bg-slate-200 text-slate-400 dark:bg-zinc-800',
+          ? 'bg-primary/15 text-foreground'
+          : 'bg-muted text-muted-foreground',
     )}>
       {status === 'done' ? <CheckCircle2 size={15} /> : status === 'running' ? <Loader2 className="animate-spin" size={15} /> : <Pause size={13} />}
     </div>
     <div className="min-w-0">
       <p className="text-xs font-bold">{stage.label}</p>
-      <p className="truncate text-[11px] text-slate-500 dark:text-zinc-500">{stage.desc}</p>
+      <p className="truncate text-xs text-muted-foreground">{stage.desc}</p>
     </div>
   </div>
 );
 
 const StatusBadge = ({ status }: { status: StageStatus }) => (
-  <span className={cn(
-    'rounded-full px-2 py-1 text-[11px] font-bold',
-    status === 'done'
-      ? 'bg-emerald-500/10 text-emerald-500'
-      : status === 'running'
-        ? 'bg-indigo-500/10 text-indigo-500'
-        : 'bg-slate-100 text-slate-500 dark:bg-zinc-800 dark:text-zinc-400',
-  )}>
+  <Badge variant={status === 'done' ? 'secondary' : status === 'running' ? 'default' : 'subtle'} className="text-xs">
     {status === 'done' ? '已完成' : status === 'running' ? '生成中' : '待生成'}
-  </span>
+  </Badge>
 );
 
 const MiniAction = ({ icon: Icon, label }: { icon: React.ElementType; label: string }) => (
-  <button className="flex items-center justify-center gap-1.5 py-2 text-xs font-semibold text-slate-500 transition-colors hover:bg-slate-50 hover:text-slate-900 dark:text-zinc-400 dark:hover:bg-white/10 dark:hover:text-white">
+  <Button variant="ghost" size="sm" className="h-9 rounded-none text-xs">
     <Icon size={13} />
     {label}
-  </button>
+  </Button>
 );
 
 const EditBlock = ({
@@ -537,13 +1121,13 @@ const EditBlock = ({
   rows?: number;
   onChange: (value: string) => void;
 }) => (
-  <label className="block rounded-xl border border-slate-200 bg-white p-3 dark:border-zinc-800 dark:bg-zinc-900">
-    <span className="mb-2 block text-sm font-bold">{title}</span>
-    <textarea
+  <Card padding="sm">
+    <Textarea
+      label={title}
       value={value}
       rows={rows}
       onChange={(event) => onChange(event.target.value)}
-      className="w-full resize-none rounded-lg border border-slate-200 bg-[#f7f9fa] px-3 py-2 text-xs leading-5 outline-none focus:border-indigo-400 dark:border-zinc-800 dark:bg-black"
+      className="text-xs leading-5"
     />
-  </label>
+  </Card>
 );

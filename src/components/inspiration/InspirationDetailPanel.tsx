@@ -9,6 +9,7 @@ import {
   Folder
 } from 'lucide-react';
 import { cn } from '../../lib/utils';
+import { Badge, Button, Input, Textarea } from '../ui';
 
 interface InspirationDetailPanelProps {
   item: any;
@@ -21,9 +22,9 @@ export const InspirationDetailPanel = ({ item }: InspirationDetailPanelProps) =>
 
   if (!item) {
     return (
-      <div className="w-80 flex-shrink-0 bg-white dark:bg-zinc-900 border-l border-slate-200 dark:border-zinc-800 p-6 flex flex-col items-center justify-center text-center">
-        <div className="w-16 h-16 bg-slate-100 dark:bg-zinc-800 rounded-full flex items-center justify-center mb-4">
-          <Folder size={24} className="text-slate-400" />
+      <div className="flex w-80 flex-shrink-0 flex-col items-center justify-center border-l border-border bg-card p-6 text-center">
+        <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-muted">
+          <Folder size={24} className="text-muted-foreground" />
         </div>
         <h3 className="text-sm font-medium text-slate-800 dark:text-white mb-1">未选择创意</h3>
         <p className="text-xs text-slate-500 dark:text-slate-400">点击左侧列表中的创意查看详情</p>
@@ -32,7 +33,7 @@ export const InspirationDetailPanel = ({ item }: InspirationDetailPanelProps) =>
   }
 
   return (
-    <div className="w-80 flex-shrink-0 bg-white dark:bg-zinc-900 border-l border-slate-200 dark:border-zinc-800 flex flex-col overflow-hidden">
+    <div className="flex w-80 flex-shrink-0 flex-col overflow-hidden border-l border-border bg-card">
       {/* Top Preview */}
       <div className="aspect-video bg-slate-100 dark:bg-zinc-800 relative group">
         <img 
@@ -41,9 +42,9 @@ export const InspirationDetailPanel = ({ item }: InspirationDetailPanelProps) =>
           className="w-full h-full object-cover"
         />
         <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors flex items-center justify-center opacity-0 group-hover:opacity-100">
-           <button className="p-2 bg-white/90 dark:bg-zinc-800/90 rounded-lg shadow-sm hover:scale-105 transition-transform">
+           <Button variant="secondary" size="iconSm" className="shadow-sm">
              <Share size={16} className="text-slate-700 dark:text-slate-200" />
-           </button>
+           </Button>
         </div>
       </div>
 
@@ -62,15 +63,15 @@ export const InspirationDetailPanel = ({ item }: InspirationDetailPanelProps) =>
 
         {/* Title & Desc */}
         <div className="space-y-3">
-          <input 
+          <Input
             type="text" 
             defaultValue={item.title}
-            className="w-full bg-transparent text-sm font-bold text-slate-800 dark:text-white border-none p-0 focus:ring-0 placeholder:text-slate-400"
+            variant="ghost" className="text-sm font-bold"
             placeholder="添加标题"
           />
-          <textarea 
+          <Textarea
             placeholder="添加注释..."
-            className="w-full min-h-[80px] text-xs bg-slate-50 dark:bg-zinc-800/50 rounded-lg p-3 border-none resize-none focus:ring-1 focus:ring-indigo-500/50 text-slate-600 dark:text-slate-300 placeholder:text-slate-400"
+            className="min-h-[80px] text-xs"
           />
         </div>
 
@@ -78,11 +79,11 @@ export const InspirationDetailPanel = ({ item }: InspirationDetailPanelProps) =>
         <div className="space-y-2">
           <div className="flex items-center gap-2 px-3 py-2 bg-slate-50 dark:bg-zinc-800/50 rounded-lg border border-slate-100 dark:border-zinc-800">
             <LinkIcon size={14} className="text-slate-400 flex-shrink-0" />
-            <input 
+            <Input
               type="text"
               placeholder="https://..."
               defaultValue={item.link || ''}
-              className="flex-1 bg-transparent border-none p-0 text-xs text-slate-600 dark:text-slate-300 focus:ring-0 truncate"
+              variant="ghost" inputSize="sm" className="flex-1 truncate text-xs"
             />
           </div>
         </div>
@@ -92,16 +93,16 @@ export const InspirationDetailPanel = ({ item }: InspirationDetailPanelProps) =>
           <label className="text-xs font-medium text-slate-500 dark:text-slate-400">标签</label>
           <div className="flex flex-wrap gap-2">
             {tags.map(tag => (
-              <div key={tag} className="flex items-center gap-1 px-2 py-1 bg-slate-100 dark:bg-zinc-800 rounded text-xs text-slate-600 dark:text-slate-300">
+              <Badge key={tag} variant="secondary" className="gap-1 text-xs">
                 {tag}
-                <button onClick={() => setTags(tags.filter(t => t !== tag))} className="hover:text-red-500">
+                <Button variant="ghost" size="iconSm" onClick={() => setTags(tags.filter(t => t !== tag))} className="h-4 w-4 p-0 hover:text-destructive">
                   <X size={10} />
-                </button>
-              </div>
+                </Button>
+              </Badge>
             ))}
-            <button className="flex items-center gap-1 px-2 py-1 border border-dashed border-slate-300 dark:border-zinc-600 rounded text-xs text-slate-500 hover:text-indigo-600 hover:border-indigo-300 transition-colors">
+            <Button variant="secondary" size="sm" className="h-7 border-dashed text-xs">
               <Plus size={10} /> 添加标签
-            </button>
+            </Button>
           </div>
         </div>
 
@@ -110,9 +111,9 @@ export const InspirationDetailPanel = ({ item }: InspirationDetailPanelProps) =>
           <label className="text-xs font-medium text-slate-500 dark:text-slate-400">文件夹</label>
           <div className="flex items-center gap-2 px-3 py-2 bg-slate-50 dark:bg-zinc-800/50 rounded-lg border border-slate-100 dark:border-zinc-800">
              <span className="text-xs text-slate-400">未分类</span>
-             <button className="ml-auto text-slate-400 hover:text-slate-600">
+             <Button variant="ghost" size="iconSm" className="ml-auto h-7 w-7">
                <Plus size={14} />
-             </button>
+             </Button>
           </div>
         </div>
 
@@ -163,10 +164,10 @@ export const InspirationDetailPanel = ({ item }: InspirationDetailPanelProps) =>
 
       {/* Footer Actions */}
       <div className="p-4 border-t border-slate-200 dark:border-zinc-800">
-        <button className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-slate-100 dark:bg-zinc-800 hover:bg-slate-200 dark:hover:bg-zinc-700 text-slate-600 dark:text-slate-200 rounded-lg transition-colors text-sm font-medium">
+        <Button variant="secondary" className="w-full">
           <Download size={16} />
           导出
-        </button>
+        </Button>
       </div>
     </div>
   );

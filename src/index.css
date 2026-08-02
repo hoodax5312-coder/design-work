@@ -3,21 +3,406 @@
 @tailwind utilities;
 
 @layer base {
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 84 15% 9%;
+    --card: 0 0% 100%;
+    --card-foreground: 84 15% 9%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 84 15% 9%;
+    --primary: 75 100% 50%;
+    --primary-foreground: 84 15% 8%;
+    --secondary: 80 9% 92%;
+    --secondary-foreground: 84 15% 15%;
+    --muted: 80 8% 93%;
+    --muted-foreground: 84 7% 42%;
+    --accent: 75 100% 50%;
+    --accent-foreground: 84 15% 8%;
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 84 10% 86%;
+    --input: 84 10% 82%;
+    --ring: 75 100% 38%;
+    --radius: 0.625rem;
+    --workspace-bg: #ffffff;
+    --surface-bg: #ffffff;
+    --surface-subtle: #e9ece6;
+    --surface-hover: #e2e6df;
+    --surface-border: rgba(19, 28, 22, 0.10);
+    --text-primary: #111713;
+    --text-secondary: #59635c;
+    --text-muted: #8a948d;
+    --brand-accent: #c8ff00;
+    --accent-readable: #587100;
+    --ui-page-gutter: 64px;
+    --ui-surface-inset: 8px;
+    --ui-control-gap: 12px;
+    --ui-card-gap: 24px;
+    --ui-control-height: 32px;
+    --ui-control-radius: 10px;
+    --font-pingfang: "PingFang SC", "PingFang TC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans CJK SC", "Helvetica Neue", Arial, sans-serif;
+  }
+
+  .dark {
+    --background: 0 0% 7%;
+    --foreground: 0 0% 96%;
+    --card: 0 0% 10%;
+    --card-foreground: 0 0% 96%;
+    --popover: 0 0% 10%;
+    --popover-foreground: 0 0% 96%;
+    --primary: 75 100% 50%;
+    --primary-foreground: 0 0% 7%;
+    --secondary: 0 0% 15%;
+    --secondary-foreground: 0 0% 96%;
+    --muted: 0 0% 15%;
+    --muted-foreground: 0 0% 64%;
+    --accent: 75 100% 50%;
+    --accent-foreground: 0 0% 7%;
+    --destructive: 0 63% 43%;
+    --destructive-foreground: 0 0% 96%;
+    --border: 0 0% 21%;
+    --input: 0 0% 25%;
+    --ring: 75 100% 50%;
+    --workspace-bg: #0b0b0b;
+    --surface-bg: #151515;
+    --surface-subtle: #111111;
+    --surface-hover: #1d1d1d;
+    --surface-border: rgba(255, 255, 255, 0.10);
+    --text-primary: #f5f5f5;
+    --text-secondary: #a3a3a3;
+    --text-muted: #6f6f6f;
+    --accent-readable: #c8ff00;
+    --ui-page-gutter: 64px;
+    --ui-surface-inset: 8px;
+    --ui-control-gap: 12px;
+    --ui-card-gap: 24px;
+    --ui-control-height: 32px;
+    --ui-control-radius: 10px;
+  }
+
+  *,
+  ::before,
+  ::after {
+    border-color: hsl(var(--border));
+  }
+
+  *:focus-visible {
+    outline: 2px solid #c8ff00;
+    outline-offset: 2px;
+  }
+
   body {
     @apply bg-background text-foreground antialiased overflow-hidden;
-    /* Dot pattern overlay */
-    background-image: radial-gradient(rgba(255, 255, 255, 0.1) 1px, transparent 1px);
-    background-size: 24px 24px;
+    background-image: none;
+    font-family: var(--font-pingfang);
+  }
+
+  button,
+  input,
+  textarea,
+  select,
+  code,
+  pre,
+  kbd,
+  samp {
+    font-family: var(--font-pingfang);
   }
 }
 
 @layer components {
-  .glass-panel {
-    @apply bg-card backdrop-blur-md border border-border rounded-xl shadow-2xl;
+  /* Compatibility layer while feature pages migrate to the shared shadcn primitives. */
+  .rounded-xl,
+  .rounded-2xl,
+  .rounded-\[18px\],
+  .rounded-\[20px\],
+  .rounded-\[22px\] {
+    border-radius: var(--radius);
   }
 
-  .glass-panel-hover {
-    @apply hover:bg-card/95 transition-all duration-200;
+  button,
+  [role='button'],
+  input,
+  textarea,
+  select {
+    transition-property: color, background-color, border-color, box-shadow, opacity;
+    transition-duration: 150ms;
+  }
+
+  button:focus-visible,
+  [role='button']:focus-visible,
+  input:focus-visible,
+  textarea:focus-visible,
+  select:focus-visible {
+    outline: 2px solid hsl(var(--ring));
+    outline-offset: 2px;
+  }
+
+  button:disabled,
+  input:disabled,
+  textarea:disabled,
+  select:disabled {
+    cursor: not-allowed;
+    opacity: .5;
+  }
+
+  .creation-record-canvas {
+    background-color: var(--workspace-bg);
+    background-image:
+      linear-gradient(rgba(19, 28, 22, 0.045) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(19, 28, 22, 0.045) 1px, transparent 1px);
+    background-size: 64px 64px;
+  }
+
+  .mboard-flow .react-flow__pane {
+    cursor: default;
+  }
+
+  .mboard-flow .react-flow__node {
+    font-family: inherit;
+  }
+
+  .mboard-flow .react-flow__attribution {
+    display: none;
+  }
+
+  .mboard-flow .react-flow__controls {
+    display: none;
+  }
+
+  .dark .creation-record-canvas {
+    background-image:
+      linear-gradient(rgba(255, 255, 255, 0.045) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255, 255, 255, 0.045) 1px, transparent 1px);
+  }
+
+  .creation-record-list {
+    font-family: var(--font-pingfang);
+  }
+
+  .creation-record-kicker,
+  .creation-record-model,
+  .creation-record-time {
+    font-family: var(--font-pingfang);
+    letter-spacing: 0.08em;
+  }
+
+  .creation-record-kicker {
+    color: var(--accent-readable);
+    font-size: 12px;
+    font-weight: 700;
+    text-transform: uppercase;
+  }
+
+  .creation-record-title {
+    font-family: var(--font-pingfang);
+    font-size: 30px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+  }
+
+  .creation-record-model {
+    color: var(--accent-readable);
+    font-size: 12px;
+    font-weight: 700;
+  }
+
+  .creation-record-prompt {
+    align-self: stretch;
+    min-height: 190px;
+    padding: 22px;
+    background: var(--surface-bg);
+    border: 1px solid var(--surface-border);
+    border-radius: 10px;
+    color: var(--text-primary);
+    font-size: 15px;
+    line-height: 1.65;
+    transition: border-color 160ms ease, background-color 160ms ease;
+  }
+
+  .creation-record-prompt:hover {
+    background: var(--surface-hover);
+    border-color: rgba(200, 255, 0, 0.38);
+  }
+
+  .asset-filter-panel {
+    animation: asset-filter-enter 180ms cubic-bezier(0.23, 1, 0.32, 1) both;
+  }
+
+  .module-workspace {
+    gap: 0;
+    padding: 0;
+    background: var(--workspace-bg);
+    color: var(--text-primary);
+  }
+
+  /* Shared module composition primitives. Keep feature pages visually aligned. */
+  .ui-module-frame {
+    display: flex;
+    min-width: 0;
+    min-height: 0;
+    gap: var(--ui-control-gap);
+    padding: var(--ui-control-gap);
+    background: var(--workspace-bg);
+    color: var(--text-primary);
+  }
+
+  .ui-module-panel {
+    min-width: 0;
+    min-height: 0;
+    overflow: hidden;
+    border-radius: var(--ui-control-radius);
+    background: var(--surface-bg);
+    box-shadow: 0 1px 2px rgba(0, 0, 0, .04);
+  }
+
+  .ui-module-toolbar {
+    display: flex;
+    min-height: var(--ui-control-height);
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--ui-control-gap);
+    padding-inline: var(--ui-surface-inset);
+  }
+
+  .ui-control-height {
+    min-height: var(--ui-control-height);
+  }
+
+  .ui-number-column {
+    width: 2.5rem;
+    flex-shrink: 0;
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+  }
+
+  :root:not(.dark) .app-workspace,
+  :root:not(.dark) .app-workspace > main,
+  :root:not(.dark) .app-workspace .module-workspace,
+  :root:not(.dark) .app-workspace .module-surface,
+  :root:not(.dark) .app-workspace .video-library-shell,
+  :root:not(.dark) .app-workspace .video-asset-stage,
+  :root:not(.dark) .app-workspace .project-studio {
+    background-color: #fff;
+  }
+
+  .module-surface {
+    overflow: hidden;
+    border-radius: 0;
+    background: transparent;
+    box-shadow: none;
+  }
+
+  .dark .module-surface {
+    background: transparent;
+    box-shadow: none;
+  }
+
+  .module-card {
+    border-radius: var(--radius);
+    border: 1px solid var(--surface-border);
+    background: var(--surface-bg);
+    box-shadow: 0 1px 2px rgba(0,0,0,.04);
+    transition: background-color 160ms ease, border-color 160ms ease, transform 160ms ease, box-shadow 160ms ease;
+  }
+
+  .module-card:hover {
+    background: var(--surface-hover);
+    border-color: rgba(19, 28, 22, 0.16);
+  }
+
+  .dark .module-card {
+    background: var(--surface-bg);
+    border-color: var(--surface-border);
+    box-shadow: 0 1px 2px rgba(0,0,0,.12);
+  }
+
+  .dark .module-card:hover {
+    background: var(--surface-hover);
+    border-color: rgba(200, 255, 0, 0.22);
+  }
+
+  .prompt-library-card:hover {
+    background: rgba(17, 24, 39, 0.035);
+    border-color: var(--surface-border);
+  }
+
+  .dark .prompt-library-card:hover {
+    background: rgba(255, 255, 255, 0.06);
+    border-color: var(--surface-border);
+  }
+
+  @keyframes asset-filter-enter {
+    from { opacity: 0; transform: translateX(-16px); }
+    to { opacity: 1; transform: translateX(0); }
+  }
+
+  @media (max-width: 640px) {
+    .creation-record-title {
+      font-size: 25px;
+    }
+
+    .creation-record-prompt {
+      min-height: auto;
+      padding: 16px;
+      font-size: 14px;
+    }
+  }
+
+  .video-library-shell {
+    background-color: var(--workspace-bg);
+    font-family: var(--font-pingfang);
+  }
+
+  .video-library-tabs {
+    background: var(--surface-bg);
+    border-color: var(--surface-border);
+  }
+
+  .video-archive-title {
+    font-family: var(--font-pingfang);
+    letter-spacing: 0.04em;
+  }
+
+  .video-archive-meta {
+    font-family: var(--font-pingfang);
+    letter-spacing: 0.08em;
+  }
+
+  .video-library-action {
+    transition: transform 160ms cubic-bezier(0.23, 1, 0.32, 1), background-color 160ms ease, border-color 160ms ease, color 160ms ease;
+  }
+
+  .video-library-action:active {
+    transform: scale(0.975);
+  }
+
+  .video-asset-stage {
+    background: transparent;
+    box-shadow: none;
+  }
+
+  .video-asset-card {
+    transition: transform 180ms cubic-bezier(0.23, 1, 0.32, 1), border-color 180ms ease, box-shadow 180ms ease;
+  }
+
+  @media (hover: hover) and (pointer: fine) {
+    .video-asset-card:hover {
+      transform: translateY(-3px);
+      border-color: rgba(200, 255, 0, 0.5);
+      box-shadow: 0 16px 36px rgba(0, 0, 0, 0.26);
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .video-library-action,
+    .video-asset-card {
+      transition-duration: 0ms;
+    }
+
+    .video-library-action:active,
+    .video-asset-card:hover {
+      transform: none;
+    }
   }
 
   .node-container {
@@ -30,6 +415,6 @@
   }
 
   .node-selected {
-    @apply border-accent-cyan/50 shadow-lg shadow-accent-cyan/20;
+    @apply border-primary/60 shadow-lg shadow-primary/10;
   }
 }

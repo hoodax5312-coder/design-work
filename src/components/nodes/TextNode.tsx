@@ -1,62 +1,56 @@
-import { memo } from 'react';
-import { NodeProps, Node } from '@xyflow/react';
-import { TextNodeData } from '../../types/node.types';
-import { Type, Image as ImageIcon, Video, Edit3 } from 'lucide-react';
+import { memo, useMemo } from 'react';
+import { type Node, type NodeProps } from '@xyflow/react';
+import { Loader2, Send, Type } from 'lucide-react';
 import { BaseNode } from './BaseNode';
+import { type TextNodeData } from '../../types/node.types';
+import { getConfiguredModels, getSelectedModel, modelSupportsCategory, useProviderStore } from '../../stores/useProviderStore';
+import { useCanvasStore } from '../../stores/useCanvasStore';
+import { generateProviderText } from '../../services/providerService';
+import { Button, Select, Textarea } from '../ui';
 
-type TextNode = Node<TextNodeData>;
+type CanvasTextNode = Node<TextNodeData>;
 
-export const TextNode = memo(({ data, selected }: NodeProps<TextNode>) => {
+export const TextNode = memo(({ id, data, selected }: NodeProps<CanvasTextNode>) => {
+  const updateNode = useCanvasStore((state) => state.updateNode);
+  const deleteNode = useCanvasStore((state) => state.deleteNode);
+  const providers = useProviderStore((state) => state.providers);
+  const activeProviderId = useProviderStore((state) => state.activeProviderId);
+  const options = useMemo(() => providers.flatMap((provider) => getConfiguredModels(provider)
+    .filter((model) => modelSupportsCategory(model, 'language'))
+    .map((model) => ({ provider, model: model.id }))), [providers]);
+  const provider = providers.find((item) => item.id === data.providerId) || providers.find((item) => item.id === activeProviderId) || options[0]?.provider;
+  const model = data.model || getSelectedModel(provider, 'language') || options[0]?.model || '';
+  const active = options.find((option) => option.provider.id === provider?.id && option.model === model);
+
+  const generate = async () => {
+    const target = active?.provider || provider;
+    if (!target || !model) return updateNode(id, { error: '请先在设置 → API 与模型中添加文本模型' });
+    if (!data.prompt?.trim()) return;
+    updateNode(id, { isGenerating: true, error: undefined, providerId: target.id, model });
+    try {
+      const result = await generateProviderText({ ...target, model }, data.prompt);
+      updateNode(id, { content: result.content, isGenerating: false });
+    } catch (error) {
+      updateNode(id, { isGenerating: false, error: error instanceof Error ? error.message : '生成失败' });
+    }
+  };
+
   return (
-    <div className="relative">
-      <BaseNode
-        selected={selected}
-        theme="indigo"
-        icon={Type}
-        title="文本"
-        width={320}
-        showSourceHandle
-        showTargetHandle={false}
-      >
-        <div className="p-4 min-h-[120px]">
-          <div className="text-sm text-slate-600 dark:text-slate-300 leading-relaxed whitespace-pre-wrap">
-            {data.content || '请输入描述文本...'}
-          </div>
+    <BaseNode selected={selected} icon={Type} title="文本" width={420} showSourceHandle showTargetHandle onDelete={() => deleteNode(id)}>
+      <div className="px-3 pb-3">
+        <div className="min-h-[150px] w-full rounded-md bg-muted/55 p-4 text-xs leading-6">
+          {data.isGenerating ? <div className="flex h-28 items-center justify-center gap-2 text-muted-foreground"><Loader2 size={16} className="animate-spin" /> 正在生成文本…</div> : <Textarea aria-label="编辑文本内容" value={data.content || ''} onChange={(event) => updateNode(id, { content: event.target.value })} placeholder="双击编辑文本，或在下方输入 Prompt 生成" variant="ghost" className="nodrag nowheel h-32 leading-6" />}
         </div>
-      </BaseNode>
-
-      {/* Quick Actions (Visible when selected) */}
-      {selected && (
-        <div className="absolute left-full top-1/2 -translate-y-1/2 ml-4 flex flex-col gap-3 animate-in fade-in slide-in-from-left-2 duration-300">
-          <QuickActionButton icon={ImageIcon} label="生成图片" />
-          <QuickActionButton icon={Video} label="生成视频" />
-          <QuickActionButton icon={Edit3} label="编辑节点" />
+        <div className="mt-3 flex w-full items-center gap-2 rounded-md border border-border bg-background p-2">
+          <Textarea aria-label="文本生成提示词" value={data.prompt || ''} onChange={(event) => updateNode(id, { prompt: event.target.value })} onKeyDown={(event) => { if ((event.metaKey || event.ctrlKey) && event.key === 'Enter') { event.preventDefault(); void generate(); } }} placeholder="描述你想生成的文本，@ 引用画布素材…" variant="ghost" className="nodrag nowheel h-14 min-h-0 flex-1 text-xs leading-5" />
+          <Button type="button" variant="primary" size="iconSm" onClick={() => void generate()} disabled={data.isGenerating || !data.prompt?.trim()} aria-label="开始生成文本">{data.isGenerating ? <Loader2 size={15} className="animate-spin" /> : <Send size={14} />}</Button>
         </div>
-      )}
-    </div>
+        <Select aria-label="选择文本模型" value={active ? active.provider.id + '::' + active.model : ''} onChange={(event) => { const [providerId, ...parts] = event.target.value.split('::'); updateNode(id, { providerId, model: parts.join('::') }); }} disabled={!options.length} selectSize="sm" className="nodrag mt-2 text-xs" options={options.length ? options.map((option) => ({ value: option.provider.id + '::' + option.model, label: option.model })) : [{ value: '', label: '暂无文本模型' }]} />
+        <div className="mt-2 flex w-full items-center justify-between text-xs font-medium text-muted-foreground"><span>Provider · {active?.provider.name || provider?.name || '未配置'}</span><span className="font-mono">Model · {model || '未选择'}</span></div>
+        {data.error && <p role="alert" className="mt-2 text-xs leading-4 text-red-600 dark:text-red-300">{data.error}</p>}
+      </div>
+    </BaseNode>
   );
 });
-
-function QuickActionButton({
-  icon: Icon,
-  label,
-  onClick,
-}: {
-  icon: React.ElementType;
-  label: string;
-  onClick?: () => void;
-}) {
-  return (
-    <button
-      onClick={onClick}
-      className="w-10 h-10 bg-white dark:bg-zinc-800 rounded-full shadow-lg border border-slate-100 dark:border-zinc-700 flex items-center justify-center text-slate-600 dark:text-slate-300 hover:text-indigo-600 dark:hover:text-indigo-400 hover:scale-110 transition-all group/btn relative"
-    >
-      <Icon size={18} />
-      <span className="absolute left-full ml-2 px-2 py-1 bg-black/80 text-white text-xs rounded opacity-0 group-hover/btn:opacity-100 whitespace-nowrap pointer-events-none transition-opacity">
-        {label}
-      </span>
-    </button>
-  );
-}
 
 TextNode.displayName = 'TextNode';

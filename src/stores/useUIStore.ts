@@ -3,6 +3,8 @@ import { persist } from 'zustand/middleware';
 
 export type PanelType = 'assets' | 'workflow' | 'history' | 'tools' | null;
 export type ModalType = 'workflow' | 'settings' | null;
+export type WorkspaceMode = 'editor' | 'manager';
+export type GenerationMode = 'image' | 'video';
 
 export interface MenuOption {
   label: string;
@@ -17,16 +19,16 @@ export interface ContextMenuState {
 }
 
 export type ModuleType =
-  | 'new-chat'
   | 'magic-canvas'
-  | 'agents'
   | 'assets'
   | 'image-gen'
+  | 'ppt-gen'
   | 'video-gen'
   | 'projects'
-  | 'inspiration'
   | 'tools'
-  | 'ecommerce';
+  | 'ecommerce'
+  | 'sources'
+  | 'exports';
 
 interface UIState {
   activePanel: PanelType;
@@ -37,6 +39,9 @@ interface UIState {
   // Project Sidebar State
   projectSidebarOpen: boolean;
   activeModule: ModuleType;
+  workspaceMode: WorkspaceMode;
+  rightPanelOpen: boolean;
+  generationMode: GenerationMode;
   
   // Actions
   setActivePanel: (panel: PanelType) => void;
@@ -48,6 +53,10 @@ interface UIState {
   toggleProjectSidebar: () => void;
   setProjectSidebarOpen: (open: boolean) => void;
   setActiveModule: (module: ModuleType) => void;
+  setWorkspaceMode: (mode: WorkspaceMode) => void;
+  setGenerationMode: (mode: GenerationMode) => void;
+  setRightPanelOpen: (open: boolean) => void;
+  toggleRightPanel: () => void;
   toggleTheme: () => void;
 }
 
@@ -55,10 +64,13 @@ export const useUIStore = create<UIState>()(persist((set) => ({
   activePanel: null,
   modalOpen: null,
   contextMenu: null,
-  theme: 'light',
+  theme: 'dark',
   
   projectSidebarOpen: true,
-  activeModule: 'new-chat',
+  activeModule: 'assets',
+  workspaceMode: 'editor',
+  rightPanelOpen: true,
+  generationMode: 'image',
 
   setActivePanel: (panel) => set({ activePanel: panel }),
   openModal: (modal) => set({ modalOpen: modal }),
@@ -69,6 +81,10 @@ export const useUIStore = create<UIState>()(persist((set) => ({
   toggleProjectSidebar: () => set((state) => ({ projectSidebarOpen: !state.projectSidebarOpen })),
   setProjectSidebarOpen: (open) => set({ projectSidebarOpen: open }),
   setActiveModule: (module) => set({ activeModule: module }),
+  setWorkspaceMode: (mode) => set({ workspaceMode: mode }),
+  setGenerationMode: (mode) => set({ generationMode: mode }),
+  setRightPanelOpen: (open) => set({ rightPanelOpen: open }),
+  toggleRightPanel: () => set((state) => ({ rightPanelOpen: !state.rightPanelOpen })),
   
   toggleTheme: () => set((state) => {
     const newTheme = state.theme === 'dark' ? 'light' : 'dark';
@@ -81,19 +97,23 @@ export const useUIStore = create<UIState>()(persist((set) => ({
   }),
 }), {
   name: 'mboard-ui',
-  version: 1,
+  version: 4,
   migrate: (persistedState) => {
     const previous = persistedState as Partial<UIState> | undefined;
     return {
-    theme: previous?.theme || 'light',
+    // The visual system now uses a dark spatial canvas by default. Users can still
+    // switch appearance after the migration from the sidebar.
+    theme: 'dark' as const,
     projectSidebarOpen: previous?.projectSidebarOpen ?? true,
-    activeModule: 'new-chat',
+    activeModule: 'assets' as ModuleType,
+    workspaceMode: 'editor' as WorkspaceMode,
+    rightPanelOpen: previous?.rightPanelOpen ?? true,
   };
   },
   partialize: (state) => ({
     theme: state.theme,
     projectSidebarOpen: state.projectSidebarOpen,
-    activeModule: state.activeModule,
+    rightPanelOpen: state.rightPanelOpen,
   }),
   onRehydrateStorage: () => (state) => {
     document.documentElement.classList.toggle('dark', state?.theme === 'dark');

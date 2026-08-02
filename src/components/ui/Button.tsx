@@ -3,23 +3,24 @@ import { cva, type VariantProps } from 'class-variance-authority';
 import { cn } from '../../lib/utils';
 
 const buttonVariants = cva(
-  'inline-flex items-center justify-center gap-2 rounded-lg font-medium transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-background disabled:pointer-events-none disabled:opacity-50',
+  'inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50',
   {
     variants: {
       variant: {
-        primary: 'bg-white text-black hover:bg-zinc-200 focus:ring-white',
-        secondary: 'bg-zinc-800 text-white hover:bg-zinc-700 border border-white/10 focus:ring-zinc-500',
-        ghost: 'text-zinc-400 hover:text-white hover:bg-white/10 focus:ring-white/20',
-        accent: 'bg-accent-cyan text-white hover:bg-accent-cyan/80 focus:ring-accent-cyan',
-        danger: 'bg-red-600 text-white hover:bg-red-700 focus:ring-red-500',
+        primary: 'bg-primary text-primary-foreground hover:bg-primary/90',
+        secondary: 'border border-input bg-background hover:bg-accent hover:text-accent-foreground',
+        ghost: 'hover:bg-accent hover:text-accent-foreground',
+        link: 'h-auto rounded-none p-0 text-foreground underline-offset-4 hover:underline',
+        accent: 'bg-primary text-primary-foreground hover:bg-primary/90',
+        danger: 'bg-destructive text-destructive-foreground hover:bg-destructive/90',
       },
       size: {
-        sm: 'h-8 px-3 text-xs',
-        md: 'h-10 px-4 text-sm',
-        lg: 'h-12 px-6 text-base',
-        icon: 'h-10 w-10 p-0',
-        iconSm: 'h-8 w-8 p-0',
-        iconLg: 'h-12 w-12 p-0',
+        sm: 'h-9 rounded-md px-3 text-xs',
+        md: 'h-10 px-4 py-2',
+        lg: 'h-11 rounded-md px-8',
+        icon: 'h-10 w-10',
+        iconSm: 'h-9 w-9',
+        iconLg: 'h-11 w-11',
       },
     },
     defaultVariants: {

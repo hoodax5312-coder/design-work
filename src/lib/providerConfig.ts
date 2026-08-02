@@ -7,7 +7,7 @@ export const normalizeProviderBaseUrl = (
   value: string,
 ) => {
   const normalized = withoutTrailingSlash(value);
-  if (protocol !== 'openai' || !normalized) return normalized;
+  if (protocol === 'anthropic-messages' || !normalized) return normalized;
 
   try {
     const url = new URL(normalized);

@@ -10,7 +10,7 @@ import { detectScenesAndCapture } from '../../lib/videoUtils';
 import { useCanvasStore } from '../../stores/useCanvasStore';
 import { Loader2, FileText, Image as ImageIcon, Sparkles } from 'lucide-react';
 import { BaseNode } from './BaseNode';
-import { cn } from '../../lib/utils';
+import { Button } from '../ui';
 
 type VideoAnalyzeNode = Node<VideoAnalyzeNodeData>;
 
@@ -70,20 +70,16 @@ export const VideoAnalyzeNode = memo(({ id, data, selected }: NodeProps<VideoAna
             <video src={videoUrl} controls className="w-full h-full object-contain" />
           </div>
         ) : (
-          <div className="text-slate-500 dark:text-slate-400 text-xs text-center py-8 bg-slate-50 dark:bg-slate-800/50 rounded-lg border border-dashed border-slate-300 dark:border-zinc-700">
+          <div className="rounded-md border border-dashed border-border bg-muted/55 py-8 text-center text-xs text-muted-foreground">
             连接视频节点以开始分析
           </div>
         )}
 
         <div className="flex gap-2">
-          <button
+          <Button variant="primary" size="sm"
             onClick={handleExtract}
             disabled={!videoUrl || data.isExtracting}
-            className={cn(
-              'flex-1 text-white text-xs py-2 px-3 rounded-lg flex items-center justify-center gap-2 transition-colors',
-              'bg-indigo-600 hover:bg-indigo-700 dark:bg-indigo-600 dark:hover:bg-indigo-700',
-              'disabled:opacity-50 disabled:cursor-not-allowed'
-            )}
+            className="flex-1 text-xs"
           >
             {data.isExtracting ? (
               <Loader2 className="animate-spin w-3 h-3" />
@@ -91,47 +87,43 @@ export const VideoAnalyzeNode = memo(({ id, data, selected }: NodeProps<VideoAna
               <ImageIcon className="w-3 h-3" />
             )}
             智能分镜
-          </button>
-          <button
+          </Button>
+          <Button variant="primary" size="sm"
             onClick={handleExtractVoiceover}
             disabled={!videoUrl || data.isExtractingVoiceover}
-            className={cn(
-              'flex-1 text-white text-xs py-2 px-3 rounded-lg flex items-center justify-center gap-2 transition-colors',
-              'bg-purple-600 hover:bg-purple-700',
-              'disabled:opacity-50 disabled:cursor-not-allowed'
-            )}
+            className="flex-1 text-xs"
           >
             {data.isExtractingVoiceover ? <Loader2 className="animate-spin w-3 h-3" /> : <FileText className="w-3 h-3" />}
             提取台词
-          </button>
+          </Button>
         </div>
 
         {data.voiceover && (
-          <pre className="whitespace-pre-wrap rounded-lg bg-slate-50 p-3 text-[11px] leading-5 text-slate-600 dark:bg-zinc-800/60 dark:text-zinc-300">
+          <pre className="whitespace-pre-wrap rounded-md bg-muted p-3 text-xs leading-5 text-muted-foreground">
             {data.voiceover}
           </pre>
         )}
 
         {data.keyframes && data.keyframes.length > 0 && (
           <div className="mt-1">
-            <div className="text-xs text-slate-500 dark:text-slate-400 mb-2 flex justify-between">
+            <div className="mb-2 flex justify-between text-xs text-muted-foreground">
               <span>关键帧 ({data.keyframes.length})</span>
-              <button className="text-indigo-600 dark:text-indigo-400 hover:underline">
+              <Button variant="link" size="sm" className="text-xs">
                 下载全部
-              </button>
+              </Button>
             </div>
             <div className="grid grid-cols-3 gap-2 max-h-[240px] overflow-y-auto pr-1 custom-scrollbar">
               {data.keyframes.map((frame, i) => (
                 <div
                   key={i}
-                  className="relative group cursor-pointer hover:ring-2 ring-indigo-500 dark:ring-indigo-400 rounded-lg overflow-hidden"
+                  className="group relative cursor-pointer overflow-hidden rounded-md ring-primary hover:ring-2"
                 >
                   <img
                     src={frame.url}
                     alt={`Frame at ${frame.time}s`}
                     className="w-full h-20 object-cover"
                   />
-                  <div className="absolute bottom-0 right-0 bg-black/70 text-white text-[10px] px-1.5 py-0.5 rounded-tl">
+                  <div className="absolute bottom-0 right-0 bg-black/70 text-white text-xs px-1.5 py-0.5 rounded-tl">
                     {frame.time}s
                   </div>
                 </div>

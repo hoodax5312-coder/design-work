@@ -1,6 +1,7 @@
 import { type ButtonHTMLAttributes } from 'react';
-import { Sparkles, Loader2 } from 'lucide-react';
+import { Sparkles } from 'lucide-react';
 import { cn } from '../../lib/utils';
+import { Button } from '../ui';
 
 interface GenerateButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   loading?: boolean;
@@ -16,21 +17,19 @@ export function GenerateButton({
   ...props
 }: GenerateButtonProps) {
   return (
-    <button
+    <Button
+      type="button"
+      variant="primary"
+      size="lg"
       disabled={disabled || loading}
-      className={cn(
-        'mt-auto flex items-center justify-center gap-2 w-full py-2.5 bg-[#551db0] hover:bg-[#451690] text-white rounded-lg transition-colors font-medium',
-        'disabled:opacity-50 disabled:cursor-not-allowed',
-        className
-      )}
+      loading={loading}
+      className={cn('mt-auto w-full font-medium', className)}
       {...props}
     >
-      {loading ? (
-        <Loader2 size={18} className="animate-spin" />
-      ) : (
+      {!loading && (
         <Icon size={18} />
       )}
       {children}
-    </button>
+    </Button>
   );
 }

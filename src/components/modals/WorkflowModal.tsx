@@ -1,8 +1,16 @@
 import React from 'react';
-import * as Dialog from '@radix-ui/react-dialog';
 import { useUIStore } from '../../stores/useUIStore';
-import { X, Layout, Video, Music, Image as ImageIcon } from 'lucide-react';
+import { Layout, Video, Music, Image as ImageIcon } from 'lucide-react';
 import { cn } from '../../lib/utils';
+import {
+  Button,
+  Card,
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '../ui';
 
 const categories = [
   { id: 'all', label: '所有模版', icon: Layout },
@@ -12,12 +20,12 @@ const categories = [
 ];
 
 const templates = [
-  { id: 1, title: '文本转视频故事', category: 'video', image: 'bg-gradient-to-br from-purple-500 to-indigo-600' },
+  { id: 1, title: '文本转视频故事', category: 'video', image: 'bg-gradient-to-br from-[#c8ff00]/35 to-[#c8ff00]' },
   { id: 2, title: '音乐视频生成', category: 'audio', image: 'bg-gradient-to-br from-cyan-500 to-blue-600' },
   { id: 3, title: '角色设计', category: 'image', image: 'bg-gradient-to-br from-emerald-500 to-teal-600' },
   { id: 4, title: '社交媒体帖子', category: 'video', image: 'bg-gradient-to-br from-pink-500 to-rose-600' },
   { id: 5, title: '播客封面', category: 'image', image: 'bg-gradient-to-br from-orange-500 to-red-600' },
-  { id: 6, title: '环境音效', category: 'audio', image: 'bg-gradient-to-br from-indigo-500 to-violet-600' },
+  { id: 6, title: '环境音效', category: 'audio', image: 'bg-gradient-to-br from-[#c8ff00]/35 to-[#c8ff00]' },
 ];
 
 export const WorkflowModal = () => {
@@ -29,64 +37,62 @@ export const WorkflowModal = () => {
     : templates.filter(t => t.category === activeCategory);
 
   return (
-    <Dialog.Root open={modalOpen === 'workflow'} onOpenChange={(open) => !open && closeModal()}>
-      <Dialog.Portal>
-        <Dialog.Overlay className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 animate-fade-in" />
-        <Dialog.Content className="fixed top-[50%] left-[50%] translate-x-[-50%] translate-y-[-50%] w-[900px] h-[600px] glass-panel z-50 p-0 flex overflow-hidden outline-none animate-fade-in">
+    <Dialog open={modalOpen === 'workflow'} onOpenChange={(open) => !open && closeModal()}>
+        <DialogContent className="flex h-[min(680px,calc(100dvh-32px))] w-[min(960px,calc(100vw-32px))] max-w-none gap-0 overflow-hidden p-0">
           
           {/* Left Sidebar */}
-          <div className="w-64 bg-zinc-900/50 border-r border-white/10 p-6 flex flex-col">
-            <h2 className="text-xl font-bold text-white mb-6">新建工作流</h2>
+          <div className="flex w-60 shrink-0 flex-col border-r bg-muted/30 p-5">
+            <DialogHeader className="mb-6 text-left">
+              <DialogTitle>新建工作流</DialogTitle>
+              <DialogDescription>从一个结构化模板开始创作。</DialogDescription>
+            </DialogHeader>
             <div className="space-y-2">
               {categories.map((cat) => (
-                <button
+                <Button
+                  type="button"
                   key={cat.id}
                   onClick={() => setActiveCategory(cat.id)}
+                  variant="ghost"
                   className={cn(
-                    "w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-colors text-sm font-medium",
+                    'w-full justify-start',
                     activeCategory === cat.id 
-                      ? "bg-accent-cyan/10 text-accent-cyan" 
-                      : "text-zinc-400 hover:text-white hover:bg-white/5"
+                      ? 'bg-primary text-primary-foreground hover:bg-primary/90 hover:text-primary-foreground'
+                      : 'text-muted-foreground',
                   )}
                 >
                   <cat.icon size={18} />
                   {cat.label}
-                </button>
+                </Button>
               ))}
             </div>
           </div>
 
           {/* Right Content */}
-          <div className="flex-1 p-8 bg-zinc-950/50">
-            <div className="flex items-center justify-between mb-6">
-              <h3 className="text-lg font-medium text-white">选择模版</h3>
-              <Dialog.Close asChild>
-                <button className="p-2 rounded-lg hover:bg-white/10 text-zinc-400 hover:text-white transition-colors">
-                  <X size={20} />
-                </button>
-              </Dialog.Close>
-            </div>
+          <div className="min-w-0 flex-1 bg-background p-7">
+            <div className="mb-6"><h3 className="text-lg font-semibold tracking-tight">选择模版</h3><p className="mt-1 text-sm text-muted-foreground">选择后可继续修改节点和生成参数。</p></div>
 
-            <div className="grid grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
               {filteredTemplates.map((template) => (
-                <button 
+                <Card
+                  role="button"
+                  tabIndex={0}
                   key={template.id}
                   onClick={closeModal}
-                  className="group relative aspect-[4/3] rounded-xl overflow-hidden border border-white/10 hover:border-accent-cyan/50 transition-all text-left"
+                  onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') closeModal(); }}
+                  padding="none"
+                  className="group relative aspect-[4/3] overflow-hidden rounded-md border bg-card text-left transition-all hover:border-primary hover:shadow-md"
                 >
                   <div className={cn("absolute inset-0 opacity-40 group-hover:opacity-60 transition-opacity", template.image)} />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/90 to-transparent" />
-                  <div className="absolute bottom-0 left-0 right-0 p-4">
-                    <h4 className="text-white font-medium group-hover:text-accent-cyan transition-colors">{template.title}</h4>
-                    <p className="text-xs text-zinc-400 mt-1">从模版开始</p>
+                  <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/90 to-transparent p-4 pt-12">
+                    <h4 className="font-medium text-white transition-colors group-hover:text-primary">{template.title}</h4>
+                    <p className="mt-1 text-xs text-white/60">从模版开始</p>
                   </div>
-                </button>
+                </Card>
               ))}
             </div>
           </div>
 
-        </Dialog.Content>
-      </Dialog.Portal>
-    </Dialog.Root>
+        </DialogContent>
+    </Dialog>
   );
 };

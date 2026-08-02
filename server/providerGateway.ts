@@ -1,7 +1,7 @@
 import type { NextFunction, Request, Response } from 'express';
 import { Router } from 'express';
 
-export type ProviderProtocol = 'openai' | 'gemini' | 'anthropic';
+export type ProviderProtocol = 'responses' | 'chat-completions' | 'anthropic-messages';
 
 export interface ProviderRequestConfig {
   protocol: ProviderProtocol;
@@ -35,15 +35,14 @@ export const normalizeOpenAiBaseUrl = (value: string) => {
 };
 
 const defaultBaseUrl = (protocol: ProviderProtocol) => {
-  if (protocol === 'gemini') return 'https://generativelanguage.googleapis.com/v1beta';
-  if (protocol === 'anthropic') return 'https://api.anthropic.com/v1';
+  if (protocol === 'anthropic-messages') return 'https://api.anthropic.com/v1';
   return 'https://api.openai.com/v1';
 };
 
 const normalizeConfig = (input: ProviderRequestConfig): ProviderRequestConfig => ({
   protocol: input.protocol,
   baseUrl:
-    input.protocol === 'openai'
+    input.protocol !== 'anthropic-messages'
       ? normalizeOpenAiBaseUrl(input.baseUrl || defaultBaseUrl(input.protocol))
       : withoutTrailingSlash(input.baseUrl || defaultBaseUrl(input.protocol)),
   apiKey: input.apiKey?.trim(),
@@ -111,22 +110,6 @@ export const testOpenAi = async (config: ProviderRequestConfig) => {
     .sort();
 };
 
-const testGemini = async (config: ProviderRequestConfig) => {
-  const response = await fetch(
-    `${config.baseUrl}/models?key=${encodeURIComponent(config.apiKey)}`,
-  );
-  const payload = await readJson(response);
-  if (!response.ok) throw providerError(response.status, payload);
-
-  return (payload?.models || [])
-    .filter((item: { supportedGenerationMethods?: string[] }) =>
-      item.supportedGenerationMethods?.includes('generateContent'),
-    )
-    .map((item: { name?: string }) => item.name?.replace(/^models\//, ''))
-    .filter(Boolean)
-    .sort();
-};
-
 const testAnthropic = async (config: ProviderRequestConfig) => {
   const response = await fetch(`${config.baseUrl}/messages`, {
     method: 'POST',
@@ -171,39 +154,30 @@ const chatOpenAi = async (
   };
 };
 
-const chatGemini = async (config: ProviderRequestConfig, messages: ChatMessage[]) => {
-  const system = messages
-    .filter((message) => message.role === 'system')
-    .map((message) => message.content)
-    .join('\n\n');
-  const contents = messages
-    .filter((message) => message.role !== 'system')
-    .map((message) => ({
-      role: message.role === 'assistant' ? 'model' : 'user',
-      parts: [{ text: message.content }],
-    }));
-
-  const response = await fetch(
-    `${config.baseUrl}/models/${encodeURIComponent(config.model)}:generateContent?key=${encodeURIComponent(config.apiKey)}`,
-    {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        contents,
-        ...(system ? { systemInstruction: { parts: [{ text: system }] } } : {}),
-        generationConfig: { temperature: 0.7 },
-      }),
-    },
-  );
+const chatResponses = async (
+  config: ProviderRequestConfig,
+  messages: ChatMessage[],
+  options: { maxTokens?: number; temperature?: number } = {},
+) => {
+  const response = await fetch(`${config.baseUrl}/responses`, {
+    method: 'POST',
+    headers: openAiHeaders(config),
+    body: JSON.stringify({
+      model: config.model,
+      input: messages.map(({ role, content }) => ({ role, content })),
+      ...(options.maxTokens ? { max_output_tokens: options.maxTokens } : {}),
+      ...(options.temperature === undefined ? {} : { temperature: options.temperature }),
+    }),
+  });
   const payload = await readJson(response);
   if (!response.ok) throw providerError(response.status, payload);
+  assertJsonPayload(response, payload);
 
-  return {
-    content: (payload?.candidates?.[0]?.content?.parts || [])
-      .map((part: { text?: string }) => part.text || '')
-      .join(''),
-    usage: payload?.usageMetadata,
-  };
+  const content = payload?.output_text || (payload?.output || [])
+    .flatMap((item: { content?: Array<{ text?: string }> }) => item.content || [])
+    .map((item: { text?: string }) => item.text || '')
+    .join('');
+  return { content, usage: payload?.usage };
 };
 
 const chatAnthropic = async (config: ProviderRequestConfig, messages: ChatMessage[]) => {
@@ -255,18 +229,16 @@ export const createProviderRouter = () => {
       assertConfig(config);
       const startedAt = Date.now();
       const models =
-        config.protocol === 'gemini'
-          ? await testGemini(config)
-          : config.protocol === 'anthropic'
+        config.protocol === 'anthropic-messages'
             ? await testAnthropic(config)
             : await testOpenAi(config);
-      let chatVerified = config.protocol === 'anthropic';
+      let chatVerified = config.protocol === 'anthropic-messages';
 
-      if (config.protocol === 'openai') {
+      if (config.protocol !== 'anthropic-messages') {
         if (!models.includes(config.model)) {
           throw new Error(`模型 ${config.model} 不在供应商返回的可用模型列表中`);
         }
-        const verification = await chatOpenAi(
+        const verification = await (config.protocol === 'responses' ? chatResponses : chatOpenAi)(
           config,
           [{ role: 'user', content: 'Reply with OK only.' }],
           { maxTokens: 8, temperature: 0 },
@@ -298,11 +270,11 @@ export const createProviderRouter = () => {
       }
 
       const result =
-        config.protocol === 'gemini'
-          ? await chatGemini(config, messages)
-          : config.protocol === 'anthropic'
+        config.protocol === 'anthropic-messages'
             ? await chatAnthropic(config, messages)
-            : await chatOpenAi(config, messages);
+            : config.protocol === 'responses'
+              ? await chatResponses(config, messages)
+              : await chatOpenAi(config, messages);
 
       if (!result.content) throw new Error('模型返回了空内容');
       response.json(result);
@@ -314,8 +286,8 @@ export const createProviderRouter = () => {
     asyncRoute(async (request, response) => {
       const config = normalizeConfig(request.body?.config || {});
       assertConfig(config);
-      if (config.protocol !== 'openai') {
-        throw new Error('当前图像工具支持 OpenAI 兼容协议，请选择支持 /images/generations 的 Provider');
+      if (config.protocol === 'anthropic-messages') {
+        throw new Error('当前图像工具支持 OpenAI 的 Responses 或 Chat Completions 格式，请选择支持 /images/generations 的 Provider');
       }
 
       const upstream = await fetch(`${config.baseUrl}/images/generations`, {

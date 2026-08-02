@@ -27,7 +27,7 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(
     return (
       <div className="w-full">
         {label && (
-          <label className="block text-sm font-medium text-zinc-300 mb-1.5">
+          <label className="mb-1.5 block text-sm font-medium text-foreground">
             {label}
           </label>
         )}
@@ -35,9 +35,7 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(
           <select
             ref={ref}
             className={cn(
-              'w-full appearance-none bg-zinc-900 text-white border border-white/10 rounded-lg pr-10 transition-all duration-200',
-              'focus:outline-none focus:border-accent-cyan focus:ring-1 focus:ring-accent-cyan',
-              'disabled:pointer-events-none disabled:opacity-50',
+              'flex w-full appearance-none rounded-md border border-input bg-background px-3 pr-10 text-sm ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50',
               sizeClasses[selectSize],
               error && 'border-red-500 focus:border-red-500 focus:ring-red-500',
               className
@@ -55,7 +53,7 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(
             ))}
           </select>
           <ChevronDown
-            className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400 pointer-events-none"
+            className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground"
             size={16}
           />
         </div>

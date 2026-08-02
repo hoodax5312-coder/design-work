@@ -1,53 +1,40 @@
 import { Monitor } from 'lucide-react';
 import { useUIStore } from '../../../stores/useUIStore';
-import { cn } from '../../../lib/utils';
+import { Tabs, TabsList, TabsTrigger } from '../../ui/Tabs';
+import { Card, CardDescription, CardHeader, CardTitle } from '../../ui/Card';
 
 export function GeneralSettings() {
   const { theme, toggleTheme } = useUIStore();
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       {/* Interface Preferences */}
       <div className="space-y-4">
-        <h4 className="text-sm font-medium text-slate-900 dark:text-white flex items-center gap-2">
+        <h4 className="flex items-center gap-2 text-[12px] font-semibold text-slate-900 dark:text-white">
           <Monitor size={16} /> 界面偏好
         </h4>
-        <div className="bg-slate-50 dark:bg-zinc-800/50 rounded-lg p-4 border border-slate-200 dark:border-zinc-800">
-          <div className="flex items-center justify-between">
+        <Card
+          variant="solid"
+          padding="none"
+          className="border-0 bg-[#fafaf8] shadow-none dark:bg-white/[0.025]"
+        >
+          <CardHeader className="w-full justify-between border-b-0 px-4 py-4">
             <div>
-              <div className="text-sm font-medium text-slate-700 dark:text-slate-200">
-                外观主题
-              </div>
-              <div className="text-xs text-slate-500 dark:text-slate-400">
-                切换系统的明亮/暗黑模式
-              </div>
+              <CardTitle>外观主题</CardTitle>
+              <CardDescription className="mt-1 text-xs">切换系统的明亮/暗黑模式</CardDescription>
             </div>
-            <div className="flex bg-slate-200 dark:bg-zinc-900 p-1 rounded-lg">
-              <button
-                onClick={() => theme === 'dark' && toggleTheme()}
-                className={cn(
-                  'px-3 py-1.5 rounded-md text-xs font-medium transition-all',
-                  theme === 'light'
-                    ? 'bg-white text-slate-900 shadow-sm'
-                    : 'text-slate-500 hover:text-slate-700'
-                )}
-              >
-                明亮
-              </button>
-              <button
-                onClick={() => theme === 'light' && toggleTheme()}
-                className={cn(
-                  'px-3 py-1.5 rounded-md text-xs font-medium transition-all',
-                  theme === 'dark'
-                    ? 'bg-zinc-800 text-white shadow-sm'
-                    : 'text-slate-500 hover:text-slate-700'
-                )}
-              >
-                暗黑
-              </button>
-            </div>
-          </div>
-        </div>
+            <Tabs
+              value={theme}
+              onValueChange={(value) => value !== theme && toggleTheme()}
+              className="ml-auto shrink-0"
+            >
+              <TabsList>
+                <TabsTrigger value="light">明亮</TabsTrigger>
+                <TabsTrigger value="dark">暗黑</TabsTrigger>
+              </TabsList>
+            </Tabs>
+          </CardHeader>
+        </Card>
       </div>
     </div>
   );

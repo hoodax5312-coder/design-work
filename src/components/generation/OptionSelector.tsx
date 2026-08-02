@@ -1,4 +1,5 @@
 import { cn } from '../../lib/utils';
+import { Button, Label } from '../ui';
 
 interface OptionSelectorProps<T extends string> {
   options: T[];
@@ -22,12 +23,12 @@ export function OptionSelector<T extends string>({
   return (
     <div className="flex flex-col gap-2">
       {label && (
-        <label className="text-sm font-medium text-[#1d2531] dark:text-slate-200">
+        <Label className="text-sm font-medium text-foreground">
           {label}
-        </label>
+        </Label>
       )}
       <div
-        className={cn('bg-[#edf1f5] dark:bg-zinc-800 p-1 rounded-lg', {
+        className={cn('rounded-lg bg-muted p-1', {
           'grid gap-1': true,
         })}
         style={{ gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))` }}
@@ -35,19 +36,16 @@ export function OptionSelector<T extends string>({
         {options.map((option) => {
           const isActive = value === option;
           return (
-            <button
+            <Button
+              type="button"
+              variant="ghost"
               key={option}
               onClick={() => onChange(option)}
-              className={cn(
-                'rounded transition-all font-medium',
-                size === 'sm' ? 'py-1 text-xs' : 'py-1.5 text-sm',
-                isActive
-                  ? 'bg-white dark:bg-zinc-700 text-[#1d2531] dark:text-white shadow-sm'
-                  : 'text-[#1d2531] dark:text-slate-400 hover:bg-white/50 dark:hover:bg-zinc-700/50'
-              )}
+              aria-pressed={isActive}
+              className={cn('rounded font-medium', size === 'sm' ? 'h-7 py-1 text-xs' : 'h-9 py-1.5 text-sm', isActive ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground')}
             >
               {renderOption ? renderOption(option, isActive) : option}
-            </button>
+            </Button>
           );
         })}
       </div>
@@ -65,24 +63,22 @@ export function InlineOptionSelector<T extends string>({
   return (
     <div className="flex items-center justify-between">
       {label && (
-        <label className="text-sm text-slate-600 dark:text-slate-400">{label}</label>
+        <Label className="text-sm text-muted-foreground">{label}</Label>
       )}
-      <div className="flex bg-[#f7f9fa] dark:bg-zinc-800 p-1 rounded-lg">
+      <div className="flex rounded-lg bg-muted p-1">
         {options.map((option) => {
           const isActive = value === option;
           return (
-            <button
+            <Button
+              type="button"
+              variant="ghost"
               key={option}
               onClick={() => onChange(option)}
-              className={cn(
-                'px-3 py-1 text-xs font-medium rounded transition-all',
-                isActive
-                  ? 'bg-white dark:bg-zinc-700 text-[#1d2531] dark:text-white shadow-sm'
-                  : 'text-slate-500 dark:text-slate-400 hover:text-slate-700'
-              )}
+              aria-pressed={isActive}
+              className={cn('h-7 rounded px-3 py-1 text-xs font-medium', isActive ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground')}
             >
               {option}
-            </button>
+            </Button>
           );
         })}
       </div>

@@ -7,7 +7,7 @@ import {
 } from './providerGateway';
 
 const config: ProviderRequestConfig = {
-  protocol: 'openai',
+  protocol: 'chat-completions',
   baseUrl: 'https://example.com',
   apiKey: 'test-key',
   model: 'test-model',

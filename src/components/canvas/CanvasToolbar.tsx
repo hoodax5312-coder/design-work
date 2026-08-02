@@ -20,6 +20,7 @@ import {
 import { cn } from '../../lib/utils';
 import { useCanvasStore } from '../../stores/useCanvasStore';
 import { nanoid } from 'nanoid';
+import { Button, Card } from '../ui';
 
 interface ToolbarItemProps {
   icon: React.ElementType;
@@ -38,24 +39,22 @@ const ToolbarItem = ({ icon: Icon, label, active, onClick, children }: ToolbarIt
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
     >
-      <button
+      <Button
+        variant={active ? 'primary' : 'secondary'}
+        size="iconLg"
         onClick={onClick}
-        className={cn(
-          "p-3 rounded-xl transition-all flex items-center justify-center relative group z-20",
-          active
-            ? "text-indigo-600 bg-indigo-50 dark:text-indigo-400 dark:bg-indigo-500/20"
-            : "text-slate-500 dark:text-zinc-400 hover:text-indigo-600 dark:hover:text-white hover:bg-slate-50 dark:hover:bg-zinc-700/50 bg-white dark:bg-zinc-800 shadow-sm border border-slate-100 dark:border-zinc-700"
-        )}
+        className="group relative z-20"
+        aria-label={label}
       >
         <Icon size={20} strokeWidth={2} />
         
         {/* Tooltip Label (Only if no children/submenu) */}
         {!children && isHovered && label && (
-          <div className="absolute left-full ml-3 px-3 py-1.5 bg-slate-800 text-white text-xs rounded-lg shadow-xl whitespace-nowrap z-50 animate-in fade-in slide-in-from-left-2">
+          <div className="absolute left-full z-50 ml-3 whitespace-nowrap rounded-md bg-popover px-3 py-1.5 text-xs text-popover-foreground shadow-md animate-in fade-in slide-in-from-left-2">
             {label}
           </div>
         )}
-      </button>
+      </Button>
 
       {/* Hover Menu / Submenu */}
       {children && (
@@ -67,9 +66,9 @@ const ToolbarItem = ({ icon: Icon, label, active, onClick, children }: ToolbarIt
               : "opacity-0 -translate-x-2 pointer-events-none"
           )}
         >
-          <div className="bg-white dark:bg-zinc-800 rounded-xl shadow-xl border border-slate-100 dark:border-zinc-700 p-1.5 min-w-[140px] flex flex-col gap-0.5">
+          <Card padding="sm" className="flex min-w-[140px] flex-col gap-0.5 p-1.5 shadow-lg">
              {children}
-          </div>
+          </Card>
         </div>
       )}
     </div>
@@ -77,13 +76,15 @@ const ToolbarItem = ({ icon: Icon, label, active, onClick, children }: ToolbarIt
 };
 
 const SubMenuItem = ({ icon: Icon, label, onClick }: { icon: React.ElementType; label: string; onClick: () => void }) => (
-  <button 
+  <Button
+    variant="ghost"
+    size="sm"
     onClick={onClick}
-    className="flex items-center gap-2 px-3 py-2 text-xs text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-zinc-700/50 hover:text-indigo-600 dark:hover:text-white rounded-lg transition-colors w-full text-left"
+    className="w-full justify-start text-xs"
   >
     <Icon size={14} />
     {label}
-  </button>
+  </Button>
 );
 
 export const CanvasToolbar = () => {

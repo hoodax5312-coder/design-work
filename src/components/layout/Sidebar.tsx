@@ -1,32 +1,56 @@
-import { Plus, Library, User, Grid, Phone, LayoutPanelTop, Upload, HelpCircle, ZoomIn, ZoomOut, Maximize, MousePointer2, Code, Eye, Type, Image as ImageIcon, Link, Sparkles, Map as MapIcon } from 'lucide-react';
-import { useUIStore, PanelType } from '../../stores/useUIStore';
-import { useCanvasStore } from '../../stores/useCanvasStore';
+import {
+  Code,
+  Eye,
+  Grid,
+  HelpCircle,
+  Image as ImageIcon,
+  LayoutPanelTop,
+  Library,
+  Link,
+  Map as MapIcon,
+  Maximize,
+  MousePointer2,
+  Phone,
+  Plus,
+  Sparkles,
+  Type,
+  Upload,
+  User,
+  ZoomIn,
+  ZoomOut,
+} from 'lucide-react';
 import { useReactFlow } from '@xyflow/react';
+import { useUIStore, type PanelType } from '../../stores/useUIStore';
+import { useCanvasStore } from '../../stores/useCanvasStore';
 import { cn } from '../../lib/utils';
+import { Button, Card, Separator } from '../ui';
 
 const SidebarIcon = ({
   icon: Icon,
   label,
   isActive,
-  onClick
+  onClick,
 }: {
   icon: React.ElementType;
   label: string;
   isActive: boolean;
   onClick: () => void;
 }) => (
-  <button
+  <Button
+    type="button"
+    variant="ghost"
+    size="iconSm"
     onClick={onClick}
-    className={cn(
-      "w-10 h-10 rounded-full flex items-center justify-center transition-all duration-200 group relative pointer-events-auto",
-      isActive 
-        ? "bg-accent-cyan text-white shadow-lg shadow-accent-cyan/20" 
-        : "text-zinc-400 hover:text-white hover:bg-white/10"
-    )}
+    aria-label={label}
+    aria-pressed={isActive}
     title={label}
+    className={cn(
+      'pointer-events-auto h-9 w-9 rounded-md',
+      isActive && 'bg-muted text-foreground hover:bg-muted hover:text-foreground',
+    )}
   >
-    <Icon size={20} strokeWidth={isActive ? 2.5 : 2} />
-  </button>
+    <Icon size={17} strokeWidth={isActive ? 2.4 : 1.9} />
+  </Button>
 );
 
 export const Sidebar = () => {
@@ -38,140 +62,60 @@ export const Sidebar = () => {
     setActivePanel(activePanel === panel ? null : panel);
   };
 
+  const primaryItems = [
+    { icon: Grid, label: '画布', active: false, onClick: () => undefined },
+    { icon: Phone, label: '工作流', active: activePanel === 'workflow', onClick: () => togglePanel('workflow') },
+    { icon: User, label: '角色', active: false, onClick: () => undefined },
+    { icon: LayoutPanelTop, label: '面板', active: activePanel === 'assets', onClick: () => togglePanel('assets') },
+    { icon: Library, label: '资产库', active: false, onClick: () => undefined },
+    { icon: Upload, label: '上传', active: false, onClick: () => undefined },
+  ];
+  const creationItems = [
+    { icon: MousePointer2, label: '选择' },
+    { icon: Code, label: '代码' },
+    { icon: Eye, label: '预览' },
+    { icon: Type, label: '文本' },
+    { icon: ImageIcon, label: '图片' },
+    { icon: Link, label: '连接' },
+    { icon: Sparkles, label: 'AI 助手' },
+  ];
+
   return (
     <>
-      <div className="absolute left-4 top-1/2 -translate-y-1/2 flex flex-col gap-3 z-50 pointer-events-none">
-        <div className="bg-zinc-900 border border-white/10 rounded-full p-1.5 flex flex-col gap-2 shadow-2xl pointer-events-auto">
-          <SidebarIcon 
-            icon={Grid} 
-            label="画布" 
-            isActive={false}
-            onClick={() => {}} 
-          />
-          <SidebarIcon 
-            icon={Phone} 
-            label="工作流" 
-            isActive={activePanel === 'workflow'} 
-            onClick={() => togglePanel('workflow')} 
-          />
-          <SidebarIcon 
-            icon={User} 
-            label="角色" 
-            isActive={false}
-            onClick={() => {}} 
-          />
-          <SidebarIcon 
-            icon={LayoutPanelTop} 
-            label="面板" 
-            isActive={activePanel === 'assets'} 
-            onClick={() => togglePanel('assets')} 
-          />
-          <SidebarIcon 
-            icon={Library} 
-            label="资产库" 
-            isActive={false}
-            onClick={() => {}} 
-          />
-          <SidebarIcon 
-            icon={Upload} 
-            label="上传" 
-            isActive={false}
-            onClick={() => {}} 
-          />
+      <div className="pointer-events-none absolute left-4 top-1/2 z-50 flex -translate-y-1/2 flex-col gap-3">
+        <Card padding="sm" className="pointer-events-auto flex flex-col gap-1 shadow-lg">
+          {primaryItems.map((item) => (
+            <SidebarIcon key={item.label} icon={item.icon} label={item.label} isActive={item.active} onClick={item.onClick} />
+          ))}
+          <Separator className="my-1" />
+          {creationItems.map((item) => (
+            <SidebarIcon key={item.label} icon={item.icon} label={item.label} isActive={false} onClick={() => undefined} />
+          ))}
+        </Card>
 
-          <div className="h-px w-8 bg-white/10 my-1 self-center" />
-
-          <SidebarIcon 
-            icon={MousePointer2} 
-            label="选择" 
-            isActive={false}
-            onClick={() => {}} 
-          />
-          <SidebarIcon 
-            icon={Code} 
-            label="代码" 
-            isActive={false}
-            onClick={() => {}} 
-          />
-          <SidebarIcon 
-            icon={Eye} 
-            label="预览" 
-            isActive={false}
-            onClick={() => {}} 
-          />
-          <SidebarIcon 
-            icon={Type} 
-            label="文本" 
-            isActive={false}
-            onClick={() => {}} 
-          />
-          <SidebarIcon 
-            icon={ImageIcon} 
-            label="图片" 
-            isActive={false}
-            onClick={() => {}} 
-          />
-          <SidebarIcon 
-            icon={Link} 
-            label="连接" 
-            isActive={false}
-            onClick={() => {}} 
-          />
-          <button className="w-10 h-10 rounded-full flex items-center justify-center transition-all duration-200 group relative pointer-events-auto bg-accent-purple/20 text-accent-purple hover:bg-accent-purple/30" title="AI 助手">
-            <Sparkles size={20} />
-          </button>
-        </div>
-
-        <button 
+        <Button
+          type="button"
+          variant="primary"
+          size="iconLg"
           onClick={() => openModal('workflow')}
-          className="w-12 h-12 rounded-full bg-white text-black flex items-center justify-center hover:bg-zinc-200 transition-colors shadow-xl pointer-events-auto"
+          aria-label="新建工作流"
+          className="pointer-events-auto rounded-md shadow-lg"
         >
-          <Plus size={24} />
-        </button>
+          <Plus size={20} />
+        </Button>
       </div>
 
-      {/* Bottom Left Controls */}
-      <div className="absolute left-4 bottom-4 z-50 pointer-events-auto flex items-center gap-2">
-        <div className="flex items-center bg-zinc-900 border border-white/10 rounded-full p-1 shadow-xl">
-          <button onClick={() => zoomOut({ duration: 300 })} className="p-2 text-zinc-400 hover:text-white transition-colors">
-            <ZoomOut size={16} />
-          </button>
-          
-          <div className="flex items-center gap-2 px-2 min-w-[60px] justify-center">
-            <span className="text-xs font-mono text-zinc-300">{Math.round(zoomLevel * 100)}%</span>
-          </div>
-
-          <button onClick={() => zoomIn({ duration: 300 })} className="p-2 text-zinc-400 hover:text-white transition-colors">
-            <ZoomIn size={16} />
-          </button>
-
-          <div className="w-px h-5 bg-white/10 mx-1" />
-
-          <button 
-            onClick={toggleMinimap}
-            className={cn(
-              "p-2 transition-colors",
-              showMinimap ? "text-accent-cyan" : "text-zinc-400 hover:text-white"
-            )}
-            title="小地图"
-          >
-            <MapIcon size={16} />
-          </button>
-
-          <div className="w-px h-5 bg-white/10 mx-1" />
-
-          <button 
-            onClick={() => fitView({ duration: 800 })}
-            className="p-2 text-zinc-400 hover:text-white transition-colors"
-            title="适应屏幕"
-          >
-            <Maximize size={16} />
-          </button>
-        </div>
-
-        <button className="w-9 h-9 bg-zinc-900 border border-white/10 rounded-full flex items-center justify-center text-zinc-400 hover:text-white transition-colors shadow-xl" title="帮助">
-          <HelpCircle size={16} />
-        </button>
+      <div className="pointer-events-auto absolute bottom-4 left-4 z-50 flex items-center gap-2">
+        <Card padding="none" className="flex h-10 items-center px-1 shadow-lg">
+          <Button type="button" variant="ghost" size="iconSm" onClick={() => zoomOut({ duration: 300 })} aria-label="缩小画布"><ZoomOut size={15} /></Button>
+          <span className="min-w-12 px-1 text-center font-mono text-xs tabular-nums text-muted-foreground">{Math.round(zoomLevel * 100)}%</span>
+          <Button type="button" variant="ghost" size="iconSm" onClick={() => zoomIn({ duration: 300 })} aria-label="放大画布"><ZoomIn size={15} /></Button>
+          <Separator orientation="vertical" className="mx-1 h-5" />
+          <Button type="button" variant="ghost" size="iconSm" onClick={toggleMinimap} aria-label="切换小地图" aria-pressed={showMinimap} className={showMinimap ? 'bg-accent text-accent-foreground' : undefined}><MapIcon size={15} /></Button>
+          <Separator orientation="vertical" className="mx-1 h-5" />
+          <Button type="button" variant="ghost" size="iconSm" onClick={() => fitView({ duration: 800 })} aria-label="适应屏幕"><Maximize size={15} /></Button>
+        </Card>
+        <Button type="button" variant="secondary" size="iconSm" aria-label="帮助" className="shadow-lg"><HelpCircle size={15} /></Button>
       </div>
     </>
   );
