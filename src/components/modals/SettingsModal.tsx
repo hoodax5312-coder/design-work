@@ -1,75 +1,85 @@
-import { useState } from 'react';
-import { X, Settings, Key, Cpu, Database } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { X, Settings, Key, Database, Check } from 'lucide-react';
 import { useUIStore } from '../../stores/useUIStore';
 import { cn } from '../../lib/utils';
-import { GeneralSettings, ApiSettings, ModelsSettings, StorageSettings } from './settings';
+import { Button } from '../ui/Button';
+import { GeneralSettings, ApiSettings, StorageSettings } from './settings';
 
-type TabType = 'general' | 'storage' | 'api' | 'models';
+type TabType = 'general' | 'storage' | 'api';
 
 const TABS: { id: TabType; label: string; icon: React.ElementType }[] = [
   { id: 'general', label: '通用', icon: Settings },
   { id: 'storage', label: '数据存储', icon: Database },
-  { id: 'api', label: 'API 配置', icon: Key },
-  { id: 'models', label: '模型管理', icon: Cpu },
+  { id: 'api', label: 'API 与模型', icon: Key },
 ];
 
 export const SettingsModal = () => {
   const { modalOpen, closeModal } = useUIStore();
   const [activeTab, setActiveTab] = useState<TabType>('general');
 
+  useEffect(() => {
+    if (modalOpen !== 'settings') return;
+    setActiveTab('general');
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') closeModal();
+    };
+    window.addEventListener('keydown', closeOnEscape);
+    return () => window.removeEventListener('keydown', closeOnEscape);
+  }, [closeModal, modalOpen]);
+
   if (modalOpen !== 'settings') return null;
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center">
-      {/* Backdrop */}
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-0 sm:p-4">
       <div
-        className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+        className="absolute inset-0 bg-[#090a0b]/55 backdrop-blur-[3px]"
         onClick={closeModal}
       />
 
-      {/* Modal */}
-      <div className="relative w-[700px] max-h-[85vh] bg-white dark:bg-zinc-900 rounded-2xl shadow-2xl overflow-hidden flex">
-        {/* Sidebar */}
-        <div className="w-48 bg-slate-50 dark:bg-zinc-950 border-r border-slate-200 dark:border-zinc-800 p-4 flex flex-col">
-          <h2 className="text-lg font-semibold text-slate-900 dark:text-white mb-6">
-            设置
-          </h2>
-          <nav className="space-y-1">
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="settings-title"
+        className="relative flex h-[100dvh] w-screen flex-col overflow-hidden rounded-none border border-black/[0.05] bg-background text-foreground shadow-lg dark:border-white/[0.07] sm:h-[min(760px,calc(100dvh-32px))] sm:w-[min(1200px,calc(100vw-32px))] sm:flex-row sm:rounded-lg"
+      >
+        <h2 id="settings-title" className="sr-only">工作台设置</h2>
+        <div className="flex w-full shrink-0 flex-col border-b border-black/[0.045] bg-muted/30 p-3 dark:border-white/[0.06] sm:w-[240px] sm:border-b-0 sm:border-r sm:p-4">
+          <nav aria-label="设置分类" className="grid grid-cols-3 gap-1 sm:block sm:space-y-1">
             {TABS.map(({ id, label, icon: Icon }) => (
-              <button
+              <Button type="button" variant="ghost"
                 key={id}
                 onClick={() => setActiveTab(id)}
+                aria-current={activeTab === id ? 'page' : undefined}
                 className={cn(
-                  'w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-all',
+                  'group h-10 w-full justify-center gap-1.5 px-2 text-left text-xs sm:justify-start sm:gap-3 sm:px-3 sm:text-[12px]',
                   activeTab === id
-                    ? 'bg-indigo-100 dark:bg-indigo-500/20 text-indigo-700 dark:text-indigo-300'
-                    : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-zinc-800'
+                    ? 'bg-black/[0.055] text-foreground shadow-none dark:bg-white/[0.08]'
+                    : 'text-muted-foreground hover:bg-black/[0.035] hover:text-foreground dark:hover:bg-white/[0.055]'
                 )}
               >
-                <Icon size={18} />
-                {label}
-              </button>
+                <Icon size={16} strokeWidth={activeTab === id ? 2.2 : 1.8} />
+                <span className="truncate sm:flex-1">{label}</span>
+              </Button>
             ))}
           </nav>
         </div>
 
-        {/* Content */}
-        <div className="flex-1 flex flex-col">
-          {/* Header */}
-          <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 dark:border-zinc-800">
-            <h3 className="text-base font-semibold text-slate-900 dark:text-white">
-              {TABS.find((t) => t.id === activeTab)?.label}
-            </h3>
-            <button
+        <div className="flex min-w-0 flex-1 flex-col bg-background">
+          <div className="flex h-14 shrink-0 items-center justify-between border-b border-black/[0.045] px-5 dark:border-white/[0.06]">
+            <div>
+              <h3 className="text-[14px] font-semibold tracking-[-0.015em]">{TABS.find((t) => t.id === activeTab)?.label}</h3>
+              <p className="mt-0.5 text-xs text-muted-foreground">修改后将自动保存在本机工作区</p>
+            </div>
+            <Button type="button" variant="ghost" size="iconSm"
               onClick={closeModal}
-              className="p-1.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-zinc-800 rounded-lg transition-colors"
+              aria-label="关闭设置"
+              className="h-8 w-8 text-muted-foreground"
             >
-              <X size={20} />
-            </button>
+              <X size={16} />
+            </Button>
           </div>
 
-          {/* Tab Content */}
-          <div className="flex-1 overflow-y-auto p-6">
+          <div className="min-h-0 flex-1 overflow-y-auto bg-background p-4 sm:p-8">
             {activeTab === 'general' && (
               <GeneralSettings />
             )}
@@ -77,20 +87,16 @@ export const SettingsModal = () => {
               <ApiSettings />
             )}
             {activeTab === 'storage' && <StorageSettings />}
-            {activeTab === 'models' && <ModelsSettings />}
           </div>
 
-          {/* Footer */}
-          <div className="px-6 py-4 border-t border-slate-200 dark:border-zinc-800 flex justify-end gap-3">
-            <button
-              onClick={closeModal}
-              className="px-4 py-2 text-sm font-medium text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-zinc-800 rounded-lg transition-colors"
-            >
+          <div className="flex h-[60px] shrink-0 items-center justify-between border-t border-black/[0.045] bg-background px-5 dark:border-white/[0.06]">
+            <span className="text-xs text-muted-foreground">按 Esc 可关闭</span>
+            <div className="flex gap-2">
+            <Button variant="ghost" size="sm" onClick={closeModal}>
               取消
-            </button>
-            <button onClick={closeModal} className="px-4 py-2 text-sm font-medium bg-slate-950 hover:bg-slate-800 text-white rounded-lg transition-colors">
-              完成
-            </button>
+            </Button>
+            <Button variant="primary" size="sm" onClick={closeModal} className="bg-foreground text-background hover:bg-foreground/85"><Check size={13} strokeWidth={2.5} /> 完成</Button>
+            </div>
           </div>
         </div>
       </div>

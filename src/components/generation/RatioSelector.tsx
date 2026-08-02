@@ -1,5 +1,6 @@
 import { Square, Smartphone, Monitor, LayoutTemplate } from 'lucide-react';
 import { cn } from '../../lib/utils';
+import { Button, Label } from '../ui';
 
 export type AspectRatio = '自适应' | '1:1' | '9:16' | '16:9' | '2:3' | '3:2' | '3:4' | '4:3' | '21:9';
 
@@ -60,26 +61,25 @@ export function RatioSelector({
     return (
       <div className="flex flex-col gap-2">
         <div className="flex items-center justify-between">
-          <label className="text-sm text-slate-600 dark:text-slate-400">{label}</label>
-          <span className="text-xs text-slate-400">{value}</span>
+          <Label className="text-sm text-muted-foreground">{label}</Label>
+          <span className="text-xs text-muted-foreground">{value}</span>
         </div>
         <div
           className="grid gap-1"
           style={{ gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))` }}
         >
           {options.map((r) => (
-            <button
+            <Button
+              type="button"
+              variant="secondary"
+              size="sm"
               key={r}
               onClick={() => onChange(r)}
-              className={cn(
-                'flex flex-col items-center justify-center gap-1 py-2 rounded-lg border transition-all',
-                value === r
-                  ? 'border-[#551db0] bg-indigo-50/50 dark:bg-indigo-500/10 text-[#551db0] dark:text-indigo-400'
-                  : 'border-transparent bg-[#f7f9fa] dark:bg-zinc-800 text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-zinc-700'
-              )}
+              aria-pressed={value === r}
+              className={cn('h-auto flex-col gap-1 py-2', value === r && 'border-primary bg-primary/10')}
             >
               <RatioIcon ratio={r} />
-            </button>
+            </Button>
           ))}
         </div>
       </div>
@@ -88,28 +88,26 @@ export function RatioSelector({
 
   return (
     <div className="flex flex-col gap-2">
-      <label className="text-sm font-medium text-[#1d2531] dark:text-slate-200">
+      <Label className="text-sm font-medium text-foreground">
         {label}
-      </label>
-      <div className="bg-[#edf1f5] dark:bg-zinc-800 p-1 rounded-lg">
+      </Label>
+      <div className="rounded-lg bg-muted p-1">
         <div
           className="grid gap-1"
           style={{ gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))` }}
         >
           {options.map((r) => (
-            <button
+            <Button
+              type="button"
+              variant="ghost"
               key={r}
               onClick={() => onChange(r)}
-              className={cn(
-                'flex items-center justify-center gap-1.5 py-2 px-1 rounded transition-all',
-                value === r
-                  ? 'bg-white dark:bg-zinc-700 text-[#1d2531] dark:text-white shadow-sm'
-                  : 'text-[#1d2531] dark:text-slate-400 hover:bg-white/50 dark:hover:bg-zinc-700/50'
-              )}
+              aria-pressed={value === r}
+              className={cn('h-auto rounded px-1 py-2 text-foreground', value === r && 'bg-background shadow-sm')}
             >
               <RatioIcon ratio={r} />
               <span className="text-xs scale-90 origin-left whitespace-nowrap">{r}</span>
-            </button>
+            </Button>
           ))}
         </div>
       </div>

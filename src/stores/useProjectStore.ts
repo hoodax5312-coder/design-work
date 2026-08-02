@@ -1,5 +1,11 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
+import type { Edge, Node } from '@xyflow/react';
+
+export interface ProjectCanvasSnapshot {
+  nodes: Node[];
+  edges: Edge[];
+}
 
 export interface Project {
   id: string;
@@ -7,6 +13,7 @@ export interface Project {
   createdAt: number;
   updatedAt: number;
   pinned?: boolean;
+  canvas?: ProjectCanvasSnapshot;
 }
 
 interface ProjectState {
@@ -16,6 +23,7 @@ interface ProjectState {
   setActiveProject: (id: string | null) => void;
   renameProject: (id: string, name: string) => void;
   toggleProjectPinned: (id: string) => void;
+  saveProjectCanvas: (id: string, canvas: ProjectCanvasSnapshot) => void;
   removeProject: (id: string) => void;
 }
 
@@ -30,9 +38,10 @@ export const useProjectStore = create<ProjectState>()(
         const projectNumber = get().projects.length + 1;
         const project: Project = {
           id,
-          name: name?.trim() || `未命名项目 ${projectNumber}`,
+          name: name?.trim() || (projectNumber === 1 ? '未命名项目' : `未命名项目 ${projectNumber}`),
           createdAt: now,
           updatedAt: now,
+          canvas: { nodes: [], edges: [] },
         };
         set((state) => ({
           projects: [project, ...state.projects],
@@ -54,6 +63,14 @@ export const useProjectStore = create<ProjectState>()(
           projects: state.projects.map((project) =>
             project.id === id
               ? { ...project, pinned: !project.pinned, updatedAt: Date.now() }
+              : project,
+          ),
+        })),
+      saveProjectCanvas: (id, canvas) =>
+        set((state) => ({
+          projects: state.projects.map((project) =>
+            project.id === id
+              ? { ...project, canvas, updatedAt: Date.now() }
               : project,
           ),
         })),

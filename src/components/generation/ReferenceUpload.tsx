@@ -1,5 +1,6 @@
 import { Image as ImageIcon } from 'lucide-react';
 import { cn } from '../../lib/utils';
+import { Label } from '../ui';
 
 interface ReferenceUploadProps {
   label?: string;
@@ -31,15 +32,15 @@ export function ReferenceUpload({
 
   return (
     <div className="flex flex-col gap-2">
-      <label className="text-sm font-medium text-[#1d2531] dark:text-slate-200">
+      <Label className="text-sm font-medium text-foreground">
         {label}
-      </label>
+      </Label>
       <label
         onDrop={handleDrop}
         onDragOver={(e) => e.preventDefault()}
         className={cn(
-          'flex flex-col items-center justify-center h-32 bg-[#f7f9fa] dark:bg-zinc-800/50 border border-[#e1e7ed] dark:border-zinc-700 rounded-lg cursor-pointer',
-          'hover:bg-slate-50 dark:hover:bg-zinc-800 transition-colors',
+          'flex h-32 cursor-pointer flex-col items-center justify-center rounded-md border border-dashed bg-muted/35',
+          'transition-colors hover:border-primary hover:bg-primary/5',
           className
         )}
       >
@@ -50,10 +51,10 @@ export function ReferenceUpload({
           onChange={handleChange}
           multiple
         />
-        <div className="w-8 h-8 mb-2 text-slate-400">
+        <div className="mb-2 h-8 w-8 text-muted-foreground">
           <ImageIcon size={32} strokeWidth={1} />
         </div>
-        <p className="text-xs text-[#657083] dark:text-slate-400 text-center px-4 whitespace-pre-line">
+        <p className="whitespace-pre-line px-4 text-center text-xs text-muted-foreground">
           {description}
         </p>
       </label>

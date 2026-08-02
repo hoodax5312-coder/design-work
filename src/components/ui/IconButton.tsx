@@ -3,15 +3,15 @@ import { cva, type VariantProps } from 'class-variance-authority';
 import { cn } from '../../lib/utils';
 
 const iconButtonVariants = cva(
-  'inline-flex items-center justify-center rounded-full transition-all duration-200 focus:outline-none disabled:pointer-events-none disabled:opacity-50 relative group',
+  'relative inline-flex items-center justify-center rounded-md ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 group',
   {
     variants: {
       variant: {
-        default: 'text-zinc-400 hover:text-white hover:bg-white/10',
-        active: 'bg-accent-cyan text-white shadow-lg shadow-accent-cyan/20',
-        ghost: 'text-zinc-400 hover:text-white',
-        subtle: 'bg-zinc-900 text-zinc-400 hover:text-white border border-white/10',
-        accent: 'bg-accent-purple/20 text-accent-purple hover:bg-accent-purple/30',
+        default: 'text-muted-foreground hover:bg-accent hover:text-accent-foreground',
+        active: 'bg-primary text-primary-foreground',
+        ghost: 'text-muted-foreground hover:bg-accent hover:text-accent-foreground',
+        subtle: 'border border-input bg-background text-muted-foreground hover:bg-accent hover:text-accent-foreground',
+        accent: 'bg-primary/15 text-foreground hover:bg-primary/25',
       },
       size: {
         sm: 'w-8 h-8',
@@ -58,7 +58,7 @@ export const IconButton = forwardRef<HTMLButtonElement, IconButtonProps>(
       >
         <Icon size={iconSize} strokeWidth={variant === 'active' ? 2.5 : 2} />
         {showTooltip && label && (
-          <span className="absolute left-full ml-2 bg-black/90 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none z-50">
+          <span className="pointer-events-none absolute left-full z-50 ml-2 whitespace-nowrap rounded-md bg-popover px-2 py-1 text-xs text-popover-foreground opacity-0 shadow-md transition-opacity group-hover:opacity-100">
             {label}
           </span>
         )}

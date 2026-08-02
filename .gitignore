@@ -32,6 +32,7 @@ dist-ssr
 # Build outputs
 build
 out
+output/
 
 # Vercel
 .vercel
@@ -46,3 +47,20 @@ out
 
 # Local app settings
 .mboard/
+.gstack/
+
+# Embedded Infinite Canvas local runtime
+vendor/infinite-canvas/.venv/
+vendor/infinite-canvas/assets/
+vendor/infinite-canvas/output/
+vendor/infinite-canvas/API/
+vendor/infinite-canvas/data/canvases/
+vendor/infinite-canvas/data/conversations/
+vendor/infinite-canvas/data/media_previews/
+vendor/infinite-canvas/data/api_providers.json
+vendor/infinite-canvas/data/prompt_libraries.json
+vendor/infinite-canvas/data/projects.json
+vendor/infinite-canvas/data/shared_folders.json
+vendor/infinite-canvas/data/storage_settings.json
+vendor/infinite-canvas/global_config.json
+vendor/infinite-canvas/history.json

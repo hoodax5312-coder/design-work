@@ -2,17 +2,24 @@ export interface TextNodeData extends Record<string, unknown> {
   content: string;
   mode: 'ai' | 'edit';
   prompt?: string;
-  model?: 'gemini-pro' | 'gemini-ultra';
+  model?: string;
+  providerId?: string;
+  isGenerating?: boolean;
+  error?: string;
   connectedImage?: string; // Node ID of connected image
 }
 
 export interface VideoNodeData extends Record<string, unknown> {
   prompt: string;
-  model: 'kling' | 'wan-2.6';
+  model: string;
+  providerId?: string;
   aspectRatio: '16:9' | '21:9' | '9:16' | '1:1';
   resolution: '1080p' | '4k';
   duration: 5 | 10 | 15 | 30;
   previewUrl?: string;
+  isGenerating?: boolean;
+  status?: string;
+  error?: string;
 }
 
 export interface AudioNodeData extends Record<string, unknown> {
@@ -26,7 +33,8 @@ export interface AudioNodeData extends Record<string, unknown> {
 
 export interface ImageGenNodeData extends Record<string, unknown> {
   prompt: string;
-  model: 'banana-pro' | 'mj-v7' | 'sd-xl';
+  model: string;
+  providerId?: string;
   style: string;
   cameraControl: {
     film: string;
@@ -37,6 +45,9 @@ export interface ImageGenNodeData extends Record<string, unknown> {
   aspectRatio: '1:1' | '16:9' | '9:16' | '21:9';
   imageUrl?: string;
   isFocusMode: boolean;
+  quality?: 'standard' | 'hd';
+  isGenerating?: boolean;
+  error?: string;
 }
 
 export interface VideoAnalyzeNodeData extends Record<string, unknown> {

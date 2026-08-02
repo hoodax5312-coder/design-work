@@ -1,5 +1,6 @@
 import { type ReactNode } from 'react';
-import { RefreshCw, Download, Sparkles } from 'lucide-react';
+import { RefreshCw, Download, Sparkles, BookmarkPlus } from 'lucide-react';
+import { Button } from '../ui';
 
 interface PreviewPanelProps {
   title?: string;
@@ -8,6 +9,7 @@ interface PreviewPanelProps {
   historyItems?: ReactNode;
   onRefresh?: () => void;
   onDownload?: () => void;
+  onAddToAssets?: () => void;
   headerTabs?: ReactNode;
 }
 
@@ -18,6 +20,7 @@ export function PreviewPanel({
   historyItems,
   onRefresh,
   onDownload,
+  onAddToAssets,
   headerTabs,
 }: PreviewPanelProps) {
   const hasContent = !!previewContent;
@@ -27,41 +30,50 @@ export function PreviewPanel({
       {/* Header */}
       <div className="flex items-center justify-between mb-4">
         {headerTabs || (
-          <h2 className="text-base font-medium text-[#1d2531] dark:text-white">
+          <h2 className="text-base font-medium text-foreground">
             {title}
           </h2>
         )}
         {hasContent && (
           <div className="flex gap-2">
             {onRefresh && (
-              <button
+              <Button type="button" variant="ghost" size="iconSm"
                 onClick={onRefresh}
-                className="p-1.5 text-slate-500 hover:bg-slate-100 dark:hover:bg-zinc-800 rounded-lg transition-colors"
+                className="h-8 w-8"
               >
                 <RefreshCw size={18} />
-              </button>
+              </Button>
             )}
             {onDownload && (
-              <button
+              <Button type="button" variant="ghost" size="iconSm"
                 onClick={onDownload}
-                className="p-1.5 text-slate-500 hover:bg-slate-100 dark:hover:bg-zinc-800 rounded-lg transition-colors"
+                className="h-8 w-8"
               >
                 <Download size={18} />
-              </button>
+              </Button>
+            )}
+            {onAddToAssets && (
+              <Button type="button" variant="ghost" size="iconSm"
+                onClick={onAddToAssets}
+                title="添加到资产"
+                className="h-8 w-8"
+              >
+                <BookmarkPlus size={18} />
+              </Button>
             )}
           </div>
         )}
       </div>
 
       {/* Main Preview */}
-      <div className="flex-1 bg-[#f7f9fa] dark:bg-black/20 rounded-lg flex items-center justify-center mb-4 overflow-hidden relative group">
+      <div className="mb-4 flex-1 rounded-md bg-muted/45 flex items-center justify-center overflow-hidden relative group">
         {hasContent ? (
           previewContent
         ) : (
           emptyState || (
             <div className="text-center">
-              <Sparkles className="w-8 h-8 text-slate-600 mx-auto mb-3" />
-              <p className="text-slate-500 text-sm">快去开启你的创作之旅吧~</p>
+              <Sparkles className="mx-auto mb-3 h-8 w-8 text-muted-foreground" />
+              <p className="text-muted-foreground text-sm">快去开启你的创作之旅吧~</p>
             </div>
           )
         )}
@@ -70,7 +82,7 @@ export function PreviewPanel({
       {/* History */}
       {historyItems && (
         <div className="flex flex-col gap-2">
-          <div className="text-sm font-medium text-[#1d2531] dark:text-slate-200">
+          <div className="text-sm font-medium text-foreground">
             生成记录
           </div>
           <div className="flex gap-2 overflow-x-auto pb-2">{historyItems}</div>
@@ -94,15 +106,11 @@ export function HistoryThumbnail({
   onClick,
 }: HistoryThumbnailProps) {
   return (
-    <div
+    <Button type="button" variant="secondary"
       onClick={onClick}
-      className={`w-20 h-20 rounded-lg overflow-hidden flex-shrink-0 cursor-pointer transition-colors ${
-        isActive
-          ? 'border-2 border-[#551db0]'
-          : 'border border-slate-200 dark:border-zinc-700 hover:border-[#551db0]'
-      }`}
+      className={`h-20 w-20 shrink-0 overflow-hidden rounded-md p-0 ${isActive ? 'border-2 border-primary' : ''}`}
     >
       <img src={src} className="w-full h-full object-cover" alt={alt} />
-    </div>
+    </Button>
   );
 }

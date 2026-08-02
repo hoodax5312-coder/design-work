@@ -1,190 +1,142 @@
-import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
-  Archive,
-  Bot,
-  ChevronDown,
-  Folder,
+  Boxes,
+  Clapperboard,
+  Command,
+  Database,
+  FileText,
+  FolderKanban,
   FolderOpen,
-  GalleryHorizontalEnd,
   GitBranch,
-  Hammer,
-  MessageSquarePlus,
-  MoreHorizontal,
+  Image as ImageIcon,
+  Layers3,
+  LayoutDashboard,
+  Moon,
+  PackageCheck,
   Pencil,
   Pin,
-  Plus,
+  Presentation,
   Settings,
+  Sun,
   Trash2,
-  UserCircle
 } from 'lucide-react';
-import { useUIStore, ModuleType } from '../../stores/useUIStore';
 import { cn } from '../../lib/utils';
-import { useChatStore } from '../../stores/useChatStore';
 import { useProjectStore } from '../../stores/useProjectStore';
+import { useCanvasStore } from '../../stores/useCanvasStore';
+import { ModuleType, type WorkspaceMode, useUIStore } from '../../stores/useUIStore';
+import { Button, Card, Separator } from '../ui';
 
-interface FunctionEntry {
-  icon: React.ElementType;
-  label: string;
-  module: ModuleType;
-}
-
-interface HistoryEntry {
-  title: string;
-  time: string;
-  active?: boolean;
-  module?: ModuleType;
-}
-
-const functionEntries: FunctionEntry[] = [
-  { icon: MessageSquarePlus, label: '新建对话', module: 'new-chat' },
-  { icon: Bot, label: 'Agent 广场', module: 'agents' },
-  { icon: Hammer, label: '使用工具', module: 'tools' },
-  { icon: GalleryHorizontalEnd, label: '素材库', module: 'assets' }
+const navigationGroups: Array<{ title: string; items: Array<{ module: ModuleType; label: string; icon: React.ElementType; workspaceMode?: WorkspaceMode }> }> = [
+  {
+    title: '资产',
+    items: [
+      { module: 'image-gen', label: '创作', icon: LayoutDashboard, workspaceMode: 'manager' },
+      { module: 'assets', label: '图片', icon: ImageIcon },
+      { module: 'video-gen', label: '视频', icon: Clapperboard },
+      { module: 'sources', label: '知识', icon: Database },
+      { module: 'projects', label: '空间', icon: FolderKanban },
+      { module: 'tools', label: '工具', icon: Command },
+    ],
+  },
 ];
 
-const formatRelativeTime = (timestamp: number) => {
-  const elapsed = Date.now() - timestamp;
-  const minute = 60_000;
-  const hour = 60 * minute;
-  const day = 24 * hour;
-  if (elapsed < hour) return `${Math.max(1, Math.floor(elapsed / minute))}分`;
-  if (elapsed < day) return `${Math.floor(elapsed / hour)}时`;
-  if (elapsed < 7 * day) return `${Math.floor(elapsed / day)}天`;
-  return new Date(timestamp).toLocaleDateString('zh-CN', { month: 'numeric', day: 'numeric' });
+/* Module-specific explorers remain available for future contextual panels. */
+const explorerContent: Record<ModuleType, { title: string; section: string; entries: Array<{ label: string; meta?: string; icon: React.ElementType }> }> = {
+  tools: {
+    title: 'AI 应用',
+    section: '最近使用',
+    entries: [
+      { label: '智能整理', meta: '6', icon: FolderKanban },
+      { label: '素材分析', meta: '3', icon: PackageCheck },
+      { label: '共享资产', meta: '24', icon: Boxes },
+    ],
+  },
+  'magic-canvas': {
+    title: '画板结构',
+    section: '当前画板',
+    entries: [
+      { label: '页面与画板', meta: '4', icon: Layers3 },
+      { label: '引用资产', meta: '12', icon: ImageIcon },
+      { label: '生成节点', meta: '8', icon: GitBranch },
+    ],
+  },
+  'image-gen': {
+    title: '图像资源',
+    section: '当前任务',
+    entries: [
+      { label: '生成批次', meta: '5', icon: ImageIcon },
+      { label: '参考图', meta: '8', icon: Boxes },
+      { label: '提示词版本', meta: '3', icon: FileText },
+    ],
+  },
+  'ppt-gen': {
+    title: '演示结构',
+    section: '品牌发布提案',
+    entries: [
+      { label: '页面大纲', meta: '8', icon: Presentation },
+      { label: '母版与规范', meta: '1', icon: Layers3 },
+      { label: '演示素材', meta: '16', icon: ImageIcon },
+    ],
+  },
+  'video-gen': {
+    title: '视频结构',
+    section: '品牌发布片',
+    entries: [
+      { label: '情节与序列', meta: '3', icon: Clapperboard },
+      { label: '镜头片段', meta: '18', icon: Clapperboard },
+      { label: '旁白与字幕', meta: '2', icon: FileText },
+    ],
+  },
+  assets: { title: '资产', section: '资料库', entries: [] },
+  sources: {
+    title: '资源来源',
+    section: '存储与连接',
+    entries: [
+      { label: '本地资产库', meta: '在线', icon: Database },
+      { label: 'Higgsfield', meta: '远程', icon: Database },
+      { label: '缺失资产', meta: '3', icon: FolderOpen },
+    ],
+  },
+  exports: {
+    title: '导出任务',
+    section: '交付队列',
+    entries: [
+      { label: '准备导出', meta: '1', icon: PackageCheck },
+      { label: '存在阻塞', meta: '1', icon: Clapperboard },
+      { label: '最近导出', meta: '2', icon: FolderOpen },
+    ],
+  },
+  projects: {
+    title: '个人空间',
+    section: '文件库',
+    entries: [
+      { label: '公开工程', meta: '同步', icon: FolderKanban },
+      { label: '归档清单', meta: '最新', icon: FileText },
+      { label: '容量审计', meta: '可用', icon: Database },
+    ],
+  },
+  ecommerce: {
+    title: '电商设计',
+    section: '当前商品',
+    entries: [
+      { label: '商品主图', meta: '6', icon: ImageIcon },
+      { label: '详情页面', meta: '3', icon: Layers3 },
+      { label: '发布版本', meta: '2', icon: PackageCheck },
+    ],
+  },
 };
-
-const SidebarSection = ({ title }: { title: string }) => (
-  <div className="px-3 pb-1 pt-5 text-[13px] font-semibold leading-none text-slate-400">
-    {title}
-  </div>
-);
-
-const FunctionButton = ({
-  icon: Icon,
-  label,
-  isActive,
-  onClick
-}: {
-  icon: React.ElementType;
-  label: string;
-  isActive: boolean;
-  onClick: () => void;
-}) => (
-  <button
-    onClick={onClick}
-    className={cn(
-      'flex h-10 w-full items-center gap-3 rounded-lg px-3 text-left text-[15px] font-medium transition-colors',
-      isActive
-        ? 'bg-slate-200/75 text-slate-950 dark:bg-zinc-800 dark:text-white'
-        : 'text-slate-700 hover:bg-slate-200/55 hover:text-slate-950 dark:text-zinc-300 dark:hover:bg-zinc-800 dark:hover:text-white'
-    )}
-  >
-    <Icon size={19} strokeWidth={2} className="shrink-0" />
-    <span className="truncate">{label}</span>
-  </button>
-);
-
-const HistoryRow = ({
-  title,
-  time,
-  active,
-  inset = false,
-  onClick
-}: HistoryEntry & { inset?: boolean; onClick?: () => void }) => (
-  <button
-    onClick={onClick}
-    className={cn(
-      'grid h-9 w-full grid-cols-[minmax(0,1fr)_auto] items-center gap-3 rounded-lg px-3 text-left text-[14px] transition-colors',
-      active
-        ? 'bg-slate-200/80 font-semibold text-slate-950 dark:bg-zinc-800 dark:text-white'
-        : 'text-slate-700 hover:bg-slate-200/50 hover:text-slate-950 dark:text-zinc-300 dark:hover:bg-zinc-800 dark:hover:text-white',
-      inset && 'pl-10'
-    )}
-  >
-    <span className="truncate">{title}</span>
-    <span className="text-[13px] tabular-nums text-slate-400">{time}</span>
-  </button>
-);
-
-const FolderRow = ({
-  id,
-  label,
-  expanded = false,
-  onClick,
-  onCreateConversation,
-  onContextMenu,
-  onOpenMenu,
-}: {
-  id: string;
-  label: string;
-  expanded?: boolean;
-  onClick?: () => void;
-  onCreateConversation?: () => void;
-  onContextMenu?: (event: React.MouseEvent<HTMLElement>) => void;
-  onOpenMenu?: (event: React.MouseEvent<HTMLButtonElement>) => void;
-}) => (
-  <div
-    data-project-id={id}
-    onContextMenu={onContextMenu}
-    className="group flex h-9 items-center rounded-lg pr-1 transition-colors hover:bg-slate-200/50 dark:hover:bg-zinc-800"
-  >
-    <button
-      onClick={onClick}
-      onContextMenu={(event) => {
-        event.preventDefault();
-        event.stopPropagation();
-        onContextMenu?.(event);
-      }}
-      className="flex min-w-0 flex-1 items-center gap-3 px-3 text-left text-[15px] font-medium text-slate-700 hover:text-slate-950 dark:text-zinc-300 dark:hover:text-white"
-    >
-      <Folder size={18} strokeWidth={2} className="shrink-0" />
-      <span className="min-w-0 flex-1 truncate">{label}</span>
-      {expanded && <ChevronDown size={15} className="text-slate-400" />}
-    </button>
-    {onCreateConversation && (
-      <button
-        onClick={(event) => {
-          event.stopPropagation();
-          onCreateConversation();
-        }}
-        aria-label={`在 ${label} 中新建对话`}
-        title="新建对话"
-        className="grid h-7 w-7 shrink-0 place-items-center rounded-md text-slate-400 opacity-0 transition-opacity hover:bg-white hover:text-slate-800 group-hover:opacity-100 focus:opacity-100 dark:hover:bg-zinc-700 dark:hover:text-white"
-      >
-        <Pencil size={14} />
-      </button>
-    )}
-    {onOpenMenu && (
-      <button
-        onClick={(event) => {
-          event.stopPropagation();
-          onOpenMenu(event);
-        }}
-        onContextMenu={(event) => {
-          event.preventDefault();
-          event.stopPropagation();
-          onOpenMenu(event);
-        }}
-        aria-label={`${label} 更多操作`}
-        title="更多操作"
-        className="grid h-7 w-7 shrink-0 place-items-center rounded-md text-slate-400 opacity-0 transition-opacity hover:bg-white hover:text-slate-800 group-hover:opacity-100 focus:opacity-100 dark:hover:bg-zinc-700 dark:hover:text-white"
-      >
-        <MoreHorizontal size={15} />
-      </button>
-    )}
-  </div>
-);
+void explorerContent;
 
 export const ProjectSidebar = () => {
-  const { projectSidebarOpen, activeModule, setActiveModule, openModal } = useUIStore();
   const {
-    conversations,
-    activeConversationId,
-    createConversation,
-    setActiveConversation,
-    archiveProjectConversations,
-    removeProjectConversations,
-  } = useChatStore();
+    activeModule,
+    workspaceMode,
+    theme,
+    setActiveModule,
+    setWorkspaceMode,
+    toggleTheme,
+    openModal,
+  } = useUIStore();
   const {
     projects,
     activeProjectId,
@@ -201,36 +153,39 @@ export const ProjectSidebar = () => {
   } | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const contextMenuRef = useRef<HTMLDivElement>(null);
-  const visibleProjects = useMemo(
-    () =>
-      [...projects]
-        .sort((a, b) => Number(Boolean(b.pinned)) - Number(Boolean(a.pinned)) || b.updatedAt - a.updatedAt),
-    [projects],
-  );
-  const conversationsByProject = useMemo(() => {
-    return conversations
-      .filter((conversation) => !conversation.archivedAt && conversation.projectId)
-      .reduce<Record<string, typeof conversations>>((groups, conversation) => {
-        const projectId = conversation.projectId as string;
-        groups[projectId] = groups[projectId] || [];
-        groups[projectId].push(conversation);
-        return groups;
-      }, {});
-  }, [conversations]);
-  const personalConversations = useMemo(
-    () => conversations.filter((conversation) => !conversation.archivedAt && !conversation.projectId),
-    [conversations],
-  );
+  const initializedProjectRef = useRef<string | null>(null);
   const contextProject = projects.find((project) => project.id === contextMenu?.projectId);
+  // 资产资料库是固定导航，不随上方生成/画板模块切换。
+
+  const openModule = (module: ModuleType, mode: WorkspaceMode = 'editor') => {
+    setWorkspaceMode(mode);
+    setActiveModule(module);
+  };
+
+  useEffect(() => {
+    if (!projects.length) {
+      const projectId = createProject('未命名项目');
+      initializedProjectRef.current = projectId;
+      useCanvasStore.getState().restoreSnapshot([], []);
+      return;
+    }
+
+    const activeProject = projects.find((project) => project.id === activeProjectId) || projects[0];
+    if (!activeProjectId) setActiveProject(activeProject.id);
+    if (initializedProjectRef.current === null) {
+      initializedProjectRef.current = activeProject.id;
+      useCanvasStore
+        .getState()
+        .restoreSnapshot(activeProject.canvas?.nodes || [], activeProject.canvas?.edges || []);
+    }
+  }, [activeProjectId, createProject, projects, setActiveProject]);
 
   useEffect(() => {
     if (!contextMenu) return;
     const close = (event: MouseEvent) => {
       if (!contextMenuRef.current?.contains(event.target as Node)) setContextMenu(null);
     };
-    const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') setContextMenu(null);
-    };
+    const closeOnEscape = (event: KeyboardEvent) => event.key === 'Escape' && setContextMenu(null);
     window.addEventListener('mousedown', close);
     window.addEventListener('keydown', closeOnEscape);
     return () => {
@@ -245,43 +200,6 @@ export const ProjectSidebar = () => {
     return () => window.clearTimeout(timer);
   }, [notice]);
 
-  const startProject = () => {
-    createProject();
-    setActiveConversation(null);
-    setActiveModule('new-chat');
-  };
-
-  const openConversation = (id: string) => {
-    const conversation = conversations.find((item) => item.id === id);
-    setActiveProject(conversation?.projectId || null);
-    setActiveConversation(id);
-    setActiveModule('new-chat');
-  };
-
-  const openProject = (id: string) => {
-    setActiveProject(id);
-    setActiveConversation(null);
-    setActiveModule('new-chat');
-  };
-
-  const startConversationInProject = (projectId: string) => {
-    setActiveProject(projectId);
-    const conversationId = createConversation({ projectId });
-    setActiveConversation(conversationId);
-    setActiveModule('new-chat');
-  };
-
-  const openProjectMenu = (
-    projectId: string,
-    x: number,
-    y: number,
-  ) => {
-    setContextMenu({
-      projectId,
-      x: Math.min(x, window.innerWidth - 220),
-      y: Math.min(y, window.innerHeight - 260),
-    });
-  };
 
   const runWorkspaceAction = async (
     path: '/api/workspace/reveal' | '/api/workspace/worktree',
@@ -309,151 +227,85 @@ export const ProjectSidebar = () => {
   return (
     <aside
       className={cn(
-        'flex h-full shrink-0 flex-col overflow-hidden border-r border-slate-200/80 bg-[#f6f7f7] text-slate-900 transition-all duration-200 dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-100',
-        projectSidebarOpen ? 'w-[300px]' : 'w-0 border-r-0'
+        'flex h-full w-14 shrink-0 flex-col overflow-hidden border-r border-black/[0.05] bg-card text-foreground dark:border-white/[0.06]',
       )}
     >
-      <div className="px-4 pb-3 pt-4">
-        <div className="mb-4 flex items-center gap-2">
-          <div className="grid h-7 w-7 place-items-center rounded-md bg-slate-950 text-[11px] font-bold text-white dark:bg-white dark:text-slate-950">
-            M
-          </div>
-          <div className="text-[17px] font-semibold tracking-normal">Mboard</div>
-        </div>
-
-        <div className="space-y-1">
-          {functionEntries.map((item) => (
-            <FunctionButton
-              key={item.label}
-              icon={item.icon}
-              label={item.label}
-              isActive={activeModule === item.module}
-              onClick={() => {
-                if (item.module === 'new-chat') {
-                  setActiveProject(null);
-                  setActiveConversation(null);
-                }
-                setActiveModule(item.module);
-              }}
-            />
-          ))}
-        </div>
+      <div className="flex h-[64px] shrink-0 items-center justify-center">
+        <Button type="button" variant="secondary" size="iconSm"
+          onClick={() => openModule('assets')}
+          aria-label="打开资产库"
+          title="Mboard"
+          className="relative h-9 w-9 shadow-sm"
+        >
+          <Command size={17} strokeWidth={2.3} />
+        </Button>
       </div>
 
-      <div className="min-h-0 flex-1 overflow-y-auto px-3 pb-4">
-        <div className="flex items-center justify-between px-1 pb-1 pt-5">
-          <button
-            onClick={() => {
-              setActiveProject(null);
-              setActiveModule('projects');
-            }}
+      <nav
+        aria-label="主要功能"
+        className="flex shrink-0 flex-col items-stretch gap-1 px-2 py-2"
+      >
+        {navigationGroups.map((group) => (
+          <div key={group.title} className="contents">
+            {group.items.map((item) => {
+              const Icon = item.icon;
+              const itemWorkspaceMode = item.workspaceMode || 'editor';
+              const active = workspaceMode === itemWorkspaceMode && activeModule === item.module;
+              return (
+              <Button type="button" variant="ghost"
+                key={item.module}
+                onClick={() => openModule(item.module, itemWorkspaceMode)}
+                aria-label={item.label}
+                title={item.label}
+                className={cn(
+                  'h-12 w-full flex-col gap-0.5 text-center text-xs',
+                  active
+                    ? 'bg-muted text-foreground shadow-sm'
+                    : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground',
+                )}
+              >
+                <Icon
+                  size={17}
+                  strokeWidth={active ? 2.2 : 1.8}
+                  className="shrink-0"
+                />
+                <span className="truncate leading-3">{item.label}</span>
+              </Button>
+              );
+            })}
+          </div>
+        ))}
+      </nav>
+
+      <div className="mt-auto flex shrink-0 flex-col items-stretch gap-1 px-2 py-2">
+        {[
+          {
+            label: theme === 'dark' ? '切换为明亮模式' : '切换为暗黑模式',
+            icon: theme === 'dark' ? Sun : Moon,
+            action: toggleTheme,
+          },
+          { label: '设置', icon: Settings, action: () => openModal('settings') },
+        ].map(({ label, icon: Icon, action }) => (
+          <Button type="button" variant="ghost"
+            key={label}
+            onClick={action}
+            aria-label={label}
+            title={label}
             className={cn(
-              'rounded-md px-2 py-1 text-[13px] font-semibold leading-none transition-colors',
-              activeModule === 'projects'
-                ? 'bg-slate-200/75 text-slate-800 dark:bg-zinc-800 dark:text-white'
-                : 'text-slate-400 hover:bg-slate-200/55 hover:text-slate-700 dark:hover:bg-zinc-800 dark:hover:text-zinc-200',
+              'h-10 w-full text-muted-foreground',
             )}
           >
-            项目
-          </button>
-          <button
-            onClick={startProject}
-            aria-label="新建项目"
-            title="新建项目"
-            className="grid h-6 w-6 place-items-center rounded-md text-slate-400 hover:bg-slate-200 hover:text-slate-800 dark:hover:bg-zinc-800 dark:hover:text-white"
-          >
-            <Plus size={14} />
-          </button>
-        </div>
-        <div className="space-y-0.5">
-          {visibleProjects.map((project) => {
-            const expanded = project.id === activeProjectId;
-            const projectConversations = conversationsByProject[project.id] || [];
-
-            return (
-              <Fragment key={project.id}>
-                <FolderRow
-                  id={project.id}
-                  label={project.name}
-                  expanded={expanded}
-                  onClick={() => openProject(project.id)}
-                  onCreateConversation={() => startConversationInProject(project.id)}
-                  onContextMenu={(event) => {
-                    event.preventDefault();
-                    event.stopPropagation();
-                    openProjectMenu(project.id, event.clientX, event.clientY);
-                  }}
-                  onOpenMenu={(event) => {
-                    const rect = event.currentTarget.getBoundingClientRect();
-                    openProjectMenu(project.id, rect.right + 6, rect.bottom);
-                  }}
-                />
-                {expanded && projectConversations.length > 0 && (
-                  <div className="mb-1 space-y-0.5">
-                    {projectConversations.map((conversation) => (
-                      <HistoryRow
-                        key={conversation.id}
-                        title={conversation.title}
-                        time={formatRelativeTime(conversation.updatedAt)}
-                        active={activeModule === 'new-chat' && activeConversationId === conversation.id}
-                        inset
-                        onClick={() => openConversation(conversation.id)}
-                      />
-                    ))}
-                  </div>
-                )}
-              </Fragment>
-            );
-          })}
-          {!visibleProjects.length && (
-            <button
-              onClick={startProject}
-              className="w-full rounded-lg px-3 py-3 text-left text-xs text-slate-400 hover:bg-slate-200/50 hover:text-slate-700 dark:hover:bg-zinc-800"
-            >
-              暂无项目，点击创建
-            </button>
-          )}
-        </div>
-
-        <SidebarSection title="对话" />
-        <div className="space-y-0.5">
-          {personalConversations
-            .map((conversation) => (
-            <HistoryRow
-              key={conversation.id}
-              title={conversation.title}
-              time={formatRelativeTime(conversation.updatedAt)}
-              active={activeModule === 'new-chat' && activeConversationId === conversation.id}
-              onClick={() => openConversation(conversation.id)}
-            />
-            ))}
-          {!personalConversations.length && (
-            <div className="px-3 py-3 text-xs text-slate-400">发送第一条消息后，对话会保存在这里。</div>
-          )}
-        </div>
-      </div>
-
-      <div className="border-t border-slate-200/80 p-3">
-        <button className="mb-1 flex h-10 w-full items-center gap-3 rounded-lg px-3 text-left text-[14px] font-medium text-slate-700 transition-colors hover:bg-slate-200/55 hover:text-slate-950 dark:text-zinc-300 dark:hover:bg-zinc-800 dark:hover:text-white">
-          <UserCircle size={19} strokeWidth={2} className="shrink-0" />
-          <span className="min-w-0 flex-1 truncate">个人账户</span>
-        </button>
-        <button
-          onClick={() => openModal('settings')}
-          className="flex h-10 w-full items-center gap-3 rounded-lg px-3 text-left text-[14px] font-medium text-slate-700 transition-colors hover:bg-slate-200/55 hover:text-slate-950 dark:text-zinc-300 dark:hover:bg-zinc-800 dark:hover:text-white"
-        >
-          <Settings size={19} strokeWidth={2} className="shrink-0" />
-          <span className="truncate">设置</span>
-        </button>
+            <Icon size={17} />
+          </Button>
+        ))}
       </div>
 
       {contextMenu && contextProject && (
-        <div
+        <Card
           ref={contextMenuRef}
           role="menu"
-          aria-label={`${contextProject.name} 项目操作`}
           style={{ left: contextMenu.x, top: contextMenu.y }}
-          className="fixed z-[100] w-52 rounded-lg border border-slate-200 bg-white p-1.5 shadow-xl dark:border-zinc-700 dark:bg-zinc-900"
+          padding="sm" className="fixed z-[100] w-52 p-1.5 shadow-lg"
         >
           {[
             {
@@ -465,9 +317,7 @@ export const ProjectSidebar = () => {
               label: '在 Finder 中显示',
               icon: FolderOpen,
               action: () =>
-                runWorkspaceAction('/api/workspace/reveal', {
-                  projectId: contextProject.id,
-                }),
+                runWorkspaceAction('/api/workspace/reveal', { projectId: contextProject.id }),
             },
             {
               label: '创建永久工作树',
@@ -486,49 +336,40 @@ export const ProjectSidebar = () => {
                 if (name?.trim()) renameProject(contextProject.id, name);
               },
             },
-            {
-              label: '归档对话',
-              icon: Archive,
-              action: () => archiveProjectConversations(contextProject.id),
-            },
           ].map(({ label, icon: Icon, action }) => (
-            <button
+            <Button type="button" variant="ghost" size="sm"
               key={label}
               role="menuitem"
               onClick={() => {
                 action();
                 setContextMenu(null);
               }}
-              className="flex h-9 w-full items-center gap-2.5 rounded-md px-2.5 text-left text-sm text-slate-700 hover:bg-slate-100 dark:text-zinc-200 dark:hover:bg-zinc-800"
+              className="h-9 w-full justify-start gap-2.5 px-2.5 text-left text-xs"
             >
-              <Icon size={16} className="text-slate-500 dark:text-zinc-400" />
+              <Icon size={15} className="text-muted-foreground" />
               {label}
-            </button>
+            </Button>
           ))}
-          <div className="my-1 border-t border-slate-100 dark:border-zinc-800" />
-          <button
+          <Separator className="my-1" />
+          <Button type="button" variant="ghost" size="sm"
             role="menuitem"
             onClick={() => {
-              if (window.confirm(`确定移除项目“${contextProject.name}”吗？相关对话也会被删除。`)) {
-                removeProjectConversations(contextProject.id);
+              if (window.confirm(`确定移除项目“${contextProject.name}”吗？`)) {
+                if (contextProject.id === activeProjectId) initializedProjectRef.current = null;
                 removeProject(contextProject.id);
-                if (contextProject.id === activeProjectId) {
-                  setActiveConversation(null);
-                  setActiveModule('new-chat');
-                }
               }
               setContextMenu(null);
             }}
-            className="flex h-9 w-full items-center gap-2.5 rounded-md px-2.5 text-left text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30"
+            className="h-9 w-full justify-start gap-2.5 px-2.5 text-left text-xs text-destructive hover:bg-destructive/10 hover:text-destructive"
           >
-            <Trash2 size={16} />
-            移除
-          </button>
-        </div>
+            <Trash2 size={15} />
+            移除项目
+          </Button>
+        </Card>
       )}
 
       {notice && (
-        <div className="fixed bottom-5 left-[316px] z-[110] max-w-sm rounded-lg bg-slate-950 px-3 py-2 text-sm text-white shadow-lg dark:bg-white dark:text-slate-950">
+        <div className="fixed bottom-8 left-[84px] z-[110] max-w-sm rounded-md border bg-popover px-3 py-2 text-xs text-popover-foreground shadow-lg">
           {notice}
         </div>
       )}

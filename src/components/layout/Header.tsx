@@ -1,44 +1,45 @@
 import { LayoutGrid, PanelLeft, Sun, Moon, Settings } from 'lucide-react';
 import { useUIStore } from '../../stores/useUIStore';
+import { Button, Separator } from '../ui';
 
 export const Header = () => {
   const { theme, toggleProjectSidebar, toggleTheme, openModal } = useUIStore();
 
   return (
-    <div className="h-9 bg-white dark:bg-zinc-900 flex items-center justify-between px-4 z-[60] relative transition-colors">
+    <div className="relative z-[60] flex h-9 items-center justify-between border-b border-border bg-background px-4">
       {/* Left: Logo & Sidebar Toggle */}
       <div className="flex items-center gap-3">
         <div className="flex items-center gap-2">
-          <div className="w-5 h-5 bg-indigo-600 rounded flex items-center justify-center text-white">
+          <div className="flex h-5 w-5 items-center justify-center rounded bg-[#c8ff00] text-black">
             <LayoutGrid size={12} />
           </div>
           <span className="font-bold text-sm text-slate-800 dark:text-white">Mboard</span>
         </div>
         
-        <div className="w-px h-3 bg-slate-200 dark:bg-white/10" />
+        <Separator orientation="vertical" className="h-3" />
         
-        <button 
+        <Button variant="ghost" size="iconSm"
           onClick={toggleProjectSidebar}
-          className="p-1 text-slate-500 dark:text-zinc-400 hover:text-slate-800 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-white/10 rounded transition-colors"
+          aria-label="切换项目侧栏" className="h-7 w-7"
         >
           <PanelLeft size={14} />
-        </button>
+        </Button>
       </div>
 
       {/* Right: Global Actions */}
       <div className="flex items-center gap-1">
-        <button 
+        <Button variant="ghost" size="iconSm"
           onClick={toggleTheme}
-          className="p-1 text-slate-500 dark:text-zinc-400 hover:text-slate-800 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-white/10 rounded transition-colors"
+          aria-label="切换主题" className="h-7 w-7"
         >
           {theme === 'dark' ? <Sun size={14} /> : <Moon size={14} />}
-        </button>
-        <button 
+        </Button>
+        <Button variant="ghost" size="iconSm"
           onClick={() => openModal('settings')}
-          className="p-1 text-slate-500 dark:text-zinc-400 hover:text-slate-800 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-white/10 rounded transition-colors"
+          aria-label="打开设置" className="h-7 w-7"
         >
           <Settings size={14} />
-        </button>
+        </Button>
       </div>
     </div>
   );

@@ -4,7 +4,7 @@ import { Clapperboard, Loader2, Plus, Sparkles, Wand2 } from 'lucide-react';
 import { BaseNode } from './BaseNode';
 import { StoryboardNodeData, StoryboardShot } from '../../types/node.types';
 import { useCanvasStore } from '../../stores/useCanvasStore';
-import { cn } from '../../lib/utils';
+import { Badge, Button, Card, Tabs, TabsList, TabsTrigger, Textarea } from '../ui';
 
 type StoryboardNode = Node<StoryboardNodeData>;
 
@@ -85,73 +85,56 @@ export const StoryboardNode = memo(({ id, data, selected }: NodeProps<Storyboard
     >
       <div className="p-4 space-y-3">
         <div className="flex items-center justify-between">
-          <div className="flex rounded-lg bg-slate-100 p-1 dark:bg-zinc-800">
-            {(['video', 'image'] as const).map((mode) => (
-              <button
-                key={mode}
-                onClick={() => updateNode(id, { mode })}
-                className={cn(
-                  'rounded-md px-3 py-1.5 text-xs font-semibold transition-colors',
-                  data.mode === mode
-                    ? 'bg-white text-green-700 shadow-sm dark:bg-zinc-700 dark:text-green-300'
-                    : 'text-slate-500 dark:text-zinc-400',
-                )}
-              >
-                {mode === 'video' ? '视频分镜' : '图片分镜'}
-              </button>
-            ))}
-          </div>
-          <span className="text-xs font-semibold text-slate-500 dark:text-zinc-400">
-            {readyCount}/{(data.shots || []).length || 0}
-          </span>
+          <Tabs value={data.mode || 'video'} onValueChange={(mode) => updateNode(id, { mode: mode as 'video' | 'image' })}><TabsList><TabsTrigger value="video" className="text-xs">视频分镜</TabsTrigger><TabsTrigger value="image" className="text-xs">图片分镜</TabsTrigger></TabsList></Tabs>
+          <Badge variant="secondary">{readyCount}/{(data.shots || []).length || 0}</Badge>
         </div>
 
-        <textarea
+        <Textarea
           value={data.script || ''}
           onChange={(event) => updateNode(id, { script: event.target.value })}
           placeholder="粘贴小说、广告脚本或剧情大纲，自动拆成镜头..."
-          className="nodrag h-24 w-full resize-none rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs leading-5 outline-none focus:border-green-400 dark:border-zinc-700 dark:bg-zinc-950"
+          className="nodrag h-24 text-xs leading-5"
         />
 
         <div className="grid grid-cols-2 gap-2">
-          <button
+          <Button variant="primary" size="sm"
             onClick={handleSplit}
             disabled={data.isGenerating}
-            className="nodrag flex items-center justify-center gap-2 rounded-lg bg-green-600 px-3 py-2 text-xs font-bold text-white hover:bg-green-700 disabled:opacity-60"
+            className="nodrag text-xs"
           >
             {data.isGenerating ? <Loader2 className="h-3 w-3 animate-spin" /> : <Wand2 className="h-3 w-3" />}
             拆分脚本
-          </button>
-          <button
+          </Button>
+          <Button variant="secondary" size="sm"
             onClick={handleCreateShotNodes}
             disabled={!data.shots?.length}
-            className="nodrag flex items-center justify-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-xs font-bold text-slate-700 hover:bg-slate-50 disabled:opacity-50 dark:border-zinc-700 dark:text-zinc-200 dark:hover:bg-white/10"
+            className="nodrag text-xs"
           >
             <Plus className="h-3 w-3" />
             生成镜头节点
-          </button>
+          </Button>
         </div>
 
         {data.shots?.length ? (
           <div className="max-h-72 space-y-2 overflow-y-auto pr-1 custom-scrollbar">
             {data.shots.map((shot) => (
-              <div key={shot.id} className="rounded-lg border border-slate-200 bg-slate-50 p-3 dark:border-zinc-800 dark:bg-zinc-950">
+              <Card key={shot.id} padding="sm">
                 <div className="mb-2 flex items-center justify-between">
-                  <span className="text-xs font-bold text-slate-700 dark:text-zinc-200">{shot.scene}</span>
-                  <span className="rounded-full bg-green-500/10 px-2 py-0.5 text-[10px] font-bold text-green-600 dark:text-green-400">
+                  <span className="text-xs font-bold">{shot.scene}</span>
+                  <Badge variant="secondary" className="text-xs">
                     {shot.status === 'queued' ? '已入队' : shot.status === 'done' ? '完成' : '就绪'}
-                  </span>
+                  </Badge>
                 </div>
-                <p className="line-clamp-2 text-[11px] leading-4 text-slate-500 dark:text-zinc-500">{shot.prompt}</p>
-                <div className="mt-2 flex items-center gap-2 text-[10px] text-slate-400">
+                <p className="line-clamp-2 text-xs leading-4 text-muted-foreground">{shot.prompt}</p>
+                <div className="mt-2 flex items-center gap-2 text-xs text-muted-foreground">
                   <Sparkles className="h-3 w-3" />
                   {shot.camera}{shot.duration ? ` · ${shot.duration}s` : ''}
                 </div>
-              </div>
+              </Card>
             ))}
           </div>
         ) : (
-          <div className="rounded-lg border border-dashed border-slate-300 py-6 text-center text-xs text-slate-400 dark:border-zinc-700">
+          <div className="rounded-md border border-dashed border-border py-6 text-center text-xs text-muted-foreground">
             等待拆分镜头
           </div>
         )}

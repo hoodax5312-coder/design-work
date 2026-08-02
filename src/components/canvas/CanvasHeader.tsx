@@ -1,6 +1,7 @@
 import { useRef } from 'react';
 import { ChevronDown, FolderInput, Save, Trash2, Undo, Redo } from 'lucide-react';
 import { useCanvasStore } from '../../stores/useCanvasStore';
+import { Button, Card, Separator } from '../ui';
 
 export const CanvasHeader = () => {
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -59,63 +60,60 @@ export const CanvasHeader = () => {
         }}
       />
        {/* Left: Toolbar */}
-      <div className="pointer-events-auto flex items-center gap-2 bg-[#edf1f5] dark:bg-zinc-800 p-1 rounded-xl shadow-sm border border-white/50 dark:border-white/10 backdrop-blur-sm transition-colors">
+      <Card padding="sm" className="pointer-events-auto flex items-center gap-2 p-1">
          {/* Project Name */}
-         <button className="flex items-center gap-2 px-3 py-1.5 bg-white dark:bg-zinc-900 rounded-lg hover:bg-white/80 dark:hover:bg-zinc-800 transition-colors text-slate-700 dark:text-zinc-200 shadow-sm border border-slate-100 dark:border-zinc-700">
+         <Button variant="ghost" size="sm">
             <span className="font-medium text-sm">未命名项目</span>
             <ChevronDown size={14} className="opacity-50" />
-         </button>
-      </div>
+         </Button>
+      </Card>
 
       {/* Right: Extra Actions */}
       <div className="pointer-events-auto flex items-center gap-2">
          {/* History */}
-         <div className="flex items-center gap-1 bg-white dark:bg-zinc-800 p-1 rounded-lg shadow-sm border border-slate-200 dark:border-zinc-700 transition-colors">
-            <button
+         <Card padding="sm" className="flex items-center gap-1 p-1">
+            <Button variant="ghost" size="iconSm"
               onClick={undo}
               disabled={!canUndo()}
-              className="p-1.5 text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-zinc-100 hover:bg-slate-50 dark:hover:bg-zinc-700 rounded-md transition-colors disabled:opacity-35 disabled:hover:bg-transparent"
               title="撤销"
             >
               <Undo size={16} />
-            </button>
-            <button
+            </Button>
+            <Separator orientation="vertical" className="h-4" />
+            <Button variant="ghost" size="iconSm"
               onClick={redo}
               disabled={!canRedo()}
-              className="p-1.5 text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-zinc-100 hover:bg-slate-50 dark:hover:bg-zinc-700 rounded-md transition-colors disabled:opacity-35 disabled:hover:bg-transparent"
               title="重做"
             >
               <Redo size={16} />
-            </button>
-         </div>
+            </Button>
+         </Card>
 
          {/* Actions */}
-         <div className="flex items-center gap-1 bg-white dark:bg-zinc-800 p-1 rounded-lg shadow-sm border border-slate-200 dark:border-zinc-700 transition-colors">
-            <button
+         <Card padding="sm" className="flex items-center gap-1 p-1">
+            <Button variant="ghost" size="sm"
               onClick={() => fileInputRef.current?.click()}
-              className="flex items-center gap-2 px-2 py-1.5 text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-zinc-100 hover:bg-slate-50 dark:hover:bg-zinc-700 rounded-md transition-colors"
             >
               <FolderInput size={16} />
               <span className="text-xs font-medium">导入</span>
-            </button>
-            <button
+            </Button>
+            <Button variant="ghost" size="sm"
               onClick={exportWorkflow}
-              className="flex items-center gap-2 px-2 py-1.5 text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-zinc-100 hover:bg-slate-50 dark:hover:bg-zinc-700 rounded-md transition-colors"
             >
               <Save size={16} />
               <span className="text-xs font-medium">存储</span>
-            </button>
-            <button
+            </Button>
+            <Button variant="ghost" size="sm"
               onClick={() => {
                 if (nodes.length === 0 && edges.length === 0) return;
                 if (window.confirm('确定清空当前画布吗？')) clearCanvas();
               }}
-              className="flex items-center gap-2 px-2 py-1.5 text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-zinc-100 hover:bg-slate-50 dark:hover:bg-zinc-700 rounded-md transition-colors"
+              className="text-destructive hover:bg-destructive/10 hover:text-destructive"
             >
               <Trash2 size={16} />
               <span className="text-xs font-medium">清空</span>
-            </button>
-         </div>
+            </Button>
+         </Card>
        </div>
     </div>
   );

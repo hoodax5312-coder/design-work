@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { type Node, type Edge, type Viewport, addEdge, applyNodeChanges, applyEdgeChanges, type Connection, type NodeChange, type EdgeChange } from '@xyflow/react';
+import { useProjectStore } from './useProjectStore';
 
 interface CanvasSnapshot {
   nodes: Node[];
@@ -163,6 +164,24 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
     redoStack: [],
     edges,
   })),
-  restoreSnapshot: (nodes, edges) => set({ nodes, edges }),
+  restoreSnapshot: (nodes, edges) => set({
+    nodes,
+    edges,
+    selectedNodes: [],
+    undoStack: [],
+    redoStack: [],
+  }),
   getSnapshot: () => ({ nodes: get().nodes, edges: get().edges }),
 }));
+
+let projectSaveTimer: number | undefined;
+useCanvasStore.subscribe((state, previousState) => {
+  if (state.nodes === previousState.nodes && state.edges === previousState.edges) return;
+  const projectId = useProjectStore.getState().activeProjectId;
+  if (!projectId) return;
+  window.clearTimeout(projectSaveTimer);
+  const canvas = { nodes: state.nodes, edges: state.edges };
+  projectSaveTimer = window.setTimeout(() => {
+    useProjectStore.getState().saveProjectCanvas(projectId, canvas);
+  }, 240);
+});

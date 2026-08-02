@@ -1,5 +1,6 @@
-import type { ChatMessage } from '../stores/useChatStore';
-import type { ProviderConfig } from '../stores/useProviderStore';
+import {
+  type ProviderConfig,
+} from '../stores/useProviderStore';
 
 const request = async <T>(path: string, body: unknown): Promise<T> => {
   const response = await fetch(path, {
@@ -20,7 +21,10 @@ const configPayload = (provider: ProviderConfig) => ({
   protocol: provider.protocol,
   baseUrl: provider.baseUrl,
   apiKey: provider.apiKey,
-  model: provider.model,
+  model: provider.model
+    || provider.configuredModels?.[0]?.id
+    || provider.models?.[0]
+    || '',
 });
 
 export const testProvider = (provider: ProviderConfig) =>
@@ -34,21 +38,6 @@ export const testProvider = (provider: ProviderConfig) =>
     config: configPayload(provider),
   });
 
-export const sendChat = (
-  provider: ProviderConfig,
-  messages: ChatMessage[],
-  systemPrompt?: string,
-) =>
-  request<{ content: string; usage?: unknown }>('/api/provider/chat', {
-    config: configPayload(provider),
-    messages: [
-      ...(systemPrompt ? [{ role: 'system', content: systemPrompt }] : []),
-      ...messages
-        .filter((message) => !message.error)
-        .map(({ role, content }) => ({ role, content })),
-    ],
-  });
-
 export const generateProviderImage = (
   provider: ProviderConfig,
   input: { prompt: string; size: string; quality: string },
@@ -56,4 +45,13 @@ export const generateProviderImage = (
   request<{ url: string; revisedPrompt?: string }>('/api/provider/image', {
     config: configPayload(provider),
     ...input,
+  });
+
+export const generateProviderText = (
+  provider: ProviderConfig,
+  prompt: string,
+) =>
+  request<{ content: string; usage?: unknown }>('/api/provider/chat', {
+    config: configPayload(provider),
+    messages: [{ role: 'user', content: prompt }],
   });
