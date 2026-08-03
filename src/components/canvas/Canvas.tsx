@@ -14,35 +14,29 @@ import '@xyflow/react/dist/style.css';
 import {
   Bot,
   ChevronDown,
-  Download,
   Hand,
   ImagePlus,
   LayoutGrid,
   ListFilter,
   Loader2,
+  Map,
   MessageSquareText,
   MousePointer2,
   PanelLeftClose,
   PanelLeftOpen,
-  PanelRightClose,
-  PanelRightOpen,
   Plus,
-  Redo2,
-  RotateCcw,
   Search,
   Send,
   Settings2,
-  Sparkles,
-  Trash2,
   Type,
   Upload,
   Video,
-  ZoomIn,
-  ZoomOut,
 } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { getConfiguredModels, getSelectedModel, modelSupportsCategory, useProviderStore } from '../../stores/useProviderStore';
 import { useCanvasStore } from '../../stores/useCanvasStore';
+import { useProjectStore } from '../../stores/useProjectStore';
+import { useUIStore } from '../../stores/useUIStore';
 import { ImageGenNode } from '../nodes/ImageGenNode';
 import { TextNode } from '../nodes/TextNode';
 import { VideoNode } from '../nodes/VideoNode';
@@ -50,10 +44,15 @@ import { Badge, Button, Card, Input, Select, Textarea } from '../ui';
 
 const nodeTypes = { text: TextNode, imageGen: ImageGenNode, video: VideoNode };
 type Tool = 'select' | 'pan';
+type ToolbarMenu = 'tool' | 'image' | 'video';
 type CanvasNodeType = 'text' | 'imageGen' | 'video';
+type ImageGenerationMode = 'text-to-image' | 'image-to-image';
+type VideoGenerationMode = 'text-to-video' | 'image-to-video';
 type AgentMode = 'auto' | 'ask';
 type ChatMessage = { id: string; role: 'user' | 'assistant'; content: string };
 type BoardSnapshot = { nodes: Node[]; edges: Edge[] };
+
+const PROJECT_EMOJIS = ['😀', '✨', '🌱', '🎨', '🚀', '🧩', '🌈', '🪄', '🐻', '🍀', '🌙', '🔥'];
 
 const createWelcomeMessage = (board: string): ChatMessage => ({
   id: `welcome-${board}`,
@@ -70,23 +69,30 @@ const NODE_META: Record<CanvasNodeType, { label: string; icon: React.ElementType
 const makeNode = (type: CanvasNodeType, position: { x: number; y: number }, data: Record<string, unknown> = {}): Node => {
   const id = crypto.randomUUID();
   if (type === 'text') return { id, type, position, data: { content: '', prompt: '', mode: 'edit', ...data } };
-  if (type === 'video') return { id, type, position, data: { prompt: '', model: '', aspectRatio: '16:9', resolution: '1080p', duration: 5, ...data } };
-  return { id, type, position, data: { prompt: '', model: '', style: '', resolution: '1k', aspectRatio: '1:1', isFocusMode: false, ...data } };
+  if (type === 'video') return { id, type, position, data: { prompt: '', model: '', generationMode: 'text-to-video', aspectRatio: '16:9', resolution: '1080p', duration: 5, ...data } };
+  return { id, type, position, data: { prompt: '', model: '', generationMode: 'text-to-image', style: '', resolution: '1k', aspectRatio: '1:1', isFocusMode: false, ...data } };
 };
 
 const CanvasInner = () => {
   const flowRef = useRef<ReactFlowInstance | null>(null);
-  const workflowInputRef = useRef<HTMLInputElement>(null);
   const mediaInputRef = useRef<HTMLInputElement>(null);
+  const toolbarRef = useRef<HTMLDivElement>(null);
   const [tool, setTool] = useState<Tool>('select');
+  const [imageGenerationMode, setImageGenerationMode] = useState<ImageGenerationMode>('text-to-image');
+  const [videoGenerationMode, setVideoGenerationMode] = useState<VideoGenerationMode>('text-to-video');
+  const [toolbarMenu, setToolbarMenu] = useState<ToolbarMenu | null>(null);
   const [showMinimap, setShowMinimap] = useState(false);
-  const [showExplorer, setShowExplorer] = useState(true);
-  const [showAgent, setShowAgent] = useState(true);
+  const [showExplorer, setShowExplorer] = useState(false);
+  const [projectEmojiOpen, setProjectEmojiOpen] = useState(false);
+  const [editingProjectName, setEditingProjectName] = useState(false);
+  const [projectNameDraft, setProjectNameDraft] = useState('');
+  const [showAgent, setShowAgent] = useState(false);
   const [agentSettingsOpen, setAgentSettingsOpen] = useState(false);
   const [componentQuery, setComponentQuery] = useState('');
   const [componentFilter, setComponentFilter] = useState<'all' | CanvasNodeType>('all');
   const [boards, setBoards] = useState(['画布 1', '画布 2']);
   const [activeBoard, setActiveBoard] = useState('画布 1');
+  const [boardNodeCounts, setBoardNodeCounts] = useState<Record<string, number>>({ '画布 1': 0, '画布 2': 0 });
   const activeBoardRef = useRef('画布 1');
   const [notice, setNotice] = useState<string | null>(null);
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
@@ -102,14 +108,15 @@ const CanvasInner = () => {
   const onEdgesChange = useCanvasStore((state) => state.onEdgesChange);
   const onConnect = useCanvasStore((state) => state.onConnect);
   const addNode = useCanvasStore((state) => state.addNode);
-  const clearCanvas = useCanvasStore((state) => state.clearCanvas);
   const undo = useCanvasStore((state) => state.undo);
   const redo = useCanvasStore((state) => state.redo);
-  const canUndo = useCanvasStore((state) => state.canUndo);
-  const canRedo = useCanvasStore((state) => state.canRedo);
-  const setNodes = useCanvasStore((state) => state.setNodes);
-  const setEdges = useCanvasStore((state) => state.setEdges);
   const restoreSnapshot = useCanvasStore((state) => state.restoreSnapshot);
+  const activeProject = useProjectStore((state) => state.projects.find((project) => project.id === state.activeProjectId));
+  const renameProject = useProjectStore((state) => state.renameProject);
+  const setProjectEmoji = useProjectStore((state) => state.setProjectEmoji);
+  const activeProjectName = activeProject?.name || '创作空间';
+  const activeProjectEmoji = activeProject?.emoji || '😀';
+  const theme = useUIStore((state) => state.theme);
   const boardSnapshotsRef = useRef<Record<string, BoardSnapshot>>({});
   const boardMessagesRef = useRef<Record<string, ChatMessage[]>>({});
   const boardsInitializedRef = useRef(false);
@@ -124,6 +131,21 @@ const CanvasInner = () => {
     ? `${fallbackProvider.id}::${getSelectedModel(fallbackProvider, 'language')}`
     : languageModels[0]?.value || '');
 
+  const beginProjectNameEdit = () => {
+    setProjectNameDraft(activeProjectName);
+    setEditingProjectName(true);
+  };
+
+  const commitProjectName = () => {
+    if (activeProject && projectNameDraft.trim()) renameProject(activeProject.id, projectNameDraft);
+    setEditingProjectName(false);
+  };
+
+  const selectProjectEmoji = (emoji: string) => {
+    if (activeProject) setProjectEmoji(activeProject.id, emoji);
+    setProjectEmojiOpen(false);
+  };
+
   useEffect(() => {
     if (boardsInitializedRef.current) return;
     boardSnapshotsRef.current = {
@@ -134,12 +156,14 @@ const CanvasInner = () => {
       '画布 1': messages,
       '画布 2': [createWelcomeMessage('画布 2')],
     };
+    setBoardNodeCounts({ '画布 1': nodes.length, '画布 2': 0 });
     boardsInitializedRef.current = true;
   }, [edges, messages, nodes]);
 
   useEffect(() => {
     if (!boardsInitializedRef.current) return;
     boardSnapshotsRef.current[activeBoardRef.current] = { nodes, edges };
+    setBoardNodeCounts((current) => ({ ...current, [activeBoardRef.current]: nodes.length }));
   }, [activeBoard, edges, nodes]);
 
   useEffect(() => {
@@ -152,6 +176,7 @@ const CanvasInner = () => {
     if (board === currentBoard) return;
     boardSnapshotsRef.current[currentBoard] = { nodes, edges };
     boardMessagesRef.current[currentBoard] = messages;
+    setBoardNodeCounts((current) => ({ ...current, [currentBoard]: nodes.length }));
     const nextSnapshot = boardSnapshotsRef.current[board] || { nodes: [], edges: [] };
     const nextMessages = boardMessagesRef.current[board] || [createWelcomeMessage(board)];
     activeBoardRef.current = board;
@@ -167,6 +192,7 @@ const CanvasInner = () => {
     const nextName = `画布 ${boards.length + 1}`;
     boardSnapshotsRef.current[nextName] = { nodes: [], edges: [] };
     boardMessagesRef.current[nextName] = [createWelcomeMessage(nextName)];
+    setBoardNodeCounts((current) => ({ ...current, [nextName]: 0 }));
     setBoards((current) => [...current, nextName]);
     switchBoard(nextName);
   }, [boards.length, switchBoard]);
@@ -198,28 +224,51 @@ const CanvasInner = () => {
     return () => window.removeEventListener('mousedown', close);
   }, []);
 
-  const exportWorkflow = () => {
-    const payload = { name: activeBoard, exportedAt: new Date().toISOString(), nodes, edges };
-    const anchor = document.createElement('a');
-    anchor.href = URL.createObjectURL(new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' }));
-    anchor.download = `mboard-${activeBoard}-${Date.now()}.json`;
-    anchor.click();
-    URL.revokeObjectURL(anchor.href);
-    setNotice('画布已导出');
-  };
+  useEffect(() => {
+    if (!toolbarMenu) return;
+    const closeOnOutsideClick = (event: MouseEvent) => {
+      if (!event.composedPath().includes(toolbarRef.current as EventTarget)) setToolbarMenu(null);
+    };
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setToolbarMenu(null);
+    };
+    window.addEventListener('mousedown', closeOnOutsideClick);
+    window.addEventListener('keydown', closeOnEscape);
+    return () => {
+      window.removeEventListener('mousedown', closeOnOutsideClick);
+      window.removeEventListener('keydown', closeOnEscape);
+    };
+  }, [toolbarMenu]);
 
-  const importWorkflow = async (file?: File) => {
-    if (!file) return;
-    try {
-      const payload = JSON.parse(await file.text()) as { nodes?: Node[]; edges?: Edge[] };
-      if (!Array.isArray(payload.nodes) || !Array.isArray(payload.edges)) throw new Error('invalid');
-      setNodes(payload.nodes);
-      setEdges(payload.edges);
-      setNotice('画布已导入');
-    } catch {
-      setNotice('导入失败，请选择 Mboard 画布 JSON');
-    }
-  };
+  useEffect(() => {
+    const switchToolWithShortcut = (event: KeyboardEvent) => {
+      const target = event.target as HTMLElement | null;
+      if (target?.matches('input, textarea, select, [contenteditable="true"]')) return;
+      if (event.key.toLowerCase() === 'v') setTool('select');
+      if (event.key.toLowerCase() === 'h') setTool('pan');
+    };
+    window.addEventListener('keydown', switchToolWithShortcut);
+    return () => window.removeEventListener('keydown', switchToolWithShortcut);
+  }, []);
+
+  useEffect(() => {
+    const handleHistoryShortcut = (event: KeyboardEvent) => {
+      if (!(event.ctrlKey || event.metaKey)) return;
+      const target = event.target as HTMLElement | null;
+      if (target?.matches('input, textarea, select, [contenteditable="true"]')) return;
+      const key = event.key.toLowerCase();
+      if (key === 'z') {
+        event.preventDefault();
+        if (event.shiftKey) redo();
+        else undo();
+      } else if (key === 'y' && event.ctrlKey) {
+        event.preventDefault();
+        redo();
+      }
+    };
+    window.addEventListener('keydown', handleHistoryShortcut);
+    return () => window.removeEventListener('keydown', handleHistoryShortcut);
+  }, [redo, undo]);
 
   const importMedia = (file?: File) => {
     if (!file) return;
@@ -248,7 +297,12 @@ const CanvasInner = () => {
     setAgentWorking(false);
   };
 
-  const minimapNodeColor = useMemo(() => (node: Node) => node.type === 'imageGen' ? '#c8ff00' : node.type === 'video' ? '#70a4ff' : '#a9b0a8', []);
+  const minimapNodeColor = useMemo(() => (node: Node) => {
+    if (theme === 'dark') {
+      return node.type === 'imageGen' ? 'rgba(245,245,245,0.34)' : node.type === 'video' ? 'rgba(245,245,245,0.26)' : 'rgba(245,245,245,0.2)';
+    }
+    return node.type === 'imageGen' ? 'rgba(17,23,19,0.3)' : node.type === 'video' ? 'rgba(17,23,19,0.23)' : 'rgba(17,23,19,0.17)';
+  }, [theme]);
   const visibleNodes = nodes.filter((node) => {
     const type = (node.type || 'text') as CanvasNodeType;
     const matchesType = componentFilter === 'all' || type === componentFilter;
@@ -260,10 +314,15 @@ const CanvasInner = () => {
   return (
     <main className="absolute inset-x-0 bottom-0 top-14 min-h-0 overflow-hidden bg-white text-foreground dark:bg-[#0b0b0b]">
       {showExplorer && (
-        <aside className="absolute bottom-0 left-3 top-3 z-40 flex w-[252px] flex-col rounded-t-xl bg-white/95 shadow-[0_8px_28px_rgba(15,15,15,0.08)] backdrop-blur-xl dark:bg-[#121212]/95 dark:shadow-[0_8px_28px_rgba(0,0,0,0.2)]">
-          <div className="flex h-14 shrink-0 items-center gap-2 px-3">
-            <span className="grid h-8 w-8 place-items-center rounded-lg bg-primary text-xs font-black text-primary-foreground">M</span>
-            <Button type="button" variant="ghost" size="sm" className="min-w-0 flex-1 justify-start px-2 text-xs"><span className="truncate">创作空间</span><ChevronDown size={13} className="ml-auto" /></Button>
+        <aside className="absolute bottom-3 left-3 top-3 z-40 flex w-[252px] flex-col rounded-xl bg-white/95 shadow-[0_8px_28px_rgba(15,15,15,0.08)] backdrop-blur-xl dark:bg-[#121212]/95 dark:shadow-[0_8px_28px_rgba(0,0,0,0.2)]">
+          <div className="flex h-14 shrink-0 items-center gap-1 px-3">
+            <div className="relative shrink-0">
+              <Button type="button" variant="ghost" size="iconSm" onClick={() => setProjectEmojiOpen((open) => !open)} aria-label="选择项目表情" title="选择项目表情" className="h-8 w-8 rounded-lg bg-muted text-base">{activeProjectEmoji}</Button>
+              {projectEmojiOpen && <Card padding="none" className="absolute left-0 top-10 z-50 grid w-[176px] grid-cols-6 gap-1 p-2 shadow-xl">{PROJECT_EMOJIS.map((emoji) => <Button key={emoji} type="button" variant="ghost" size="iconSm" onClick={() => selectProjectEmoji(emoji)} aria-label={`使用${emoji}表情`} className="h-7 w-7 text-base">{emoji}</Button>)}</Card>}
+            </div>
+            <div className="min-w-0 flex-1 text-xs font-semibold">
+              {editingProjectName ? <Input autoFocus value={projectNameDraft} onChange={(event) => setProjectNameDraft(event.target.value)} onBlur={commitProjectName} onKeyDown={(event) => { if (event.key === 'Enter') commitProjectName(); if (event.key === 'Escape') setEditingProjectName(false); }} aria-label="编辑项目名称" inputSize="sm" className="h-8 px-2 text-xs" /> : <button type="button" onDoubleClick={beginProjectNameEdit} className="block w-full truncate text-left" title="双击编辑项目名称">{activeProjectName}</button>}
+            </div>
             <Button type="button" variant="ghost" size="iconSm" onClick={() => setShowExplorer(false)} aria-label="收起画布侧栏"><PanelLeftClose size={15} /></Button>
           </div>
 
@@ -272,7 +331,7 @@ const CanvasInner = () => {
             <div className="space-y-1">
               {boards.map((board) => (
                 <Button key={board} type="button" variant="ghost" size="sm" onClick={() => switchBoard(board)} aria-pressed={activeBoard === board} className={cn('h-9 w-full justify-start gap-2 px-2 text-xs', activeBoard === board && 'bg-muted text-foreground hover:bg-muted')}>
-                  <LayoutGrid size={14} /><span className="flex-1 truncate text-left">{board}</span><span className="font-mono text-xs opacity-60">{board === activeBoard ? nodes.length : boardSnapshotsRef.current[board]?.nodes.length || 0}</span>
+                  <LayoutGrid size={14} /><span className="flex-1 truncate text-left">{board}</span><span className="font-mono text-xs opacity-60">{boardNodeCounts[board] || 0}</span>
                 </Button>
               ))}
             </div>
@@ -296,14 +355,16 @@ const CanvasInner = () => {
       )}
 
       <section className="absolute inset-0 z-0 overflow-hidden">
-        <div className={cn('absolute top-3 z-30 flex items-center gap-2', showExplorer ? 'left-[276px]' : 'left-3')}>
-          {!showExplorer && <Button type="button" variant="secondary" size="iconSm" onClick={() => setShowExplorer(true)} aria-label="展开画布侧栏" className="shadow-sm"><PanelLeftOpen size={15} /></Button>}
-          <div className="flex h-8 items-center gap-2 rounded-lg bg-white/90 px-2.5 text-xs font-semibold shadow-sm backdrop-blur-md dark:bg-[#171717]/90"><span className="h-1.5 w-1.5 rounded-full bg-primary" /><span>{activeBoard}</span><span className="font-mono text-muted-foreground">{nodes.length}</span></div>
-        </div>
-        <div className={cn('absolute top-3 z-30 flex items-center gap-2', showAgent ? 'right-[376px]' : 'right-3')}>
-          <Button type="button" variant="secondary" size="sm" onClick={exportWorkflow} className="h-8 bg-white/90 text-xs shadow-sm dark:bg-[#171717]/90"><Download size={13} />导出</Button>
-          {!showAgent && <Button type="button" variant="secondary" size="iconSm" onClick={() => setShowAgent(true)} aria-label="展开 Agent" className="shadow-sm"><PanelRightOpen size={15} /></Button>}
-        </div>
+        {!showExplorer && (
+          <div className="absolute left-3 top-3 z-30 flex h-10 max-w-[240px] items-center gap-1 rounded-lg border border-black/[0.05] bg-white/90 py-1 pl-3 pr-1 shadow-sm backdrop-blur-xl dark:border-white/[0.07] dark:bg-[#171717]/90">
+            <div className="relative shrink-0">
+              <Button type="button" variant="ghost" size="iconSm" onClick={() => setProjectEmojiOpen((open) => !open)} aria-label="选择项目表情" title="选择项目表情" className="h-8 w-8 rounded-md text-base">{activeProjectEmoji}</Button>
+              {projectEmojiOpen && <Card padding="none" className="absolute left-0 top-10 z-50 grid w-[176px] grid-cols-6 gap-1 p-2 shadow-xl">{PROJECT_EMOJIS.map((emoji) => <Button key={emoji} type="button" variant="ghost" size="iconSm" onClick={() => selectProjectEmoji(emoji)} aria-label={`使用${emoji}表情`} className="h-7 w-7 text-base">{emoji}</Button>)}</Card>}
+            </div>
+            <div className="min-w-0 flex-1 truncate text-xs font-semibold">{editingProjectName ? <Input autoFocus value={projectNameDraft} onChange={(event) => setProjectNameDraft(event.target.value)} onBlur={commitProjectName} onKeyDown={(event) => { if (event.key === 'Enter') commitProjectName(); if (event.key === 'Escape') setEditingProjectName(false); }} aria-label="编辑项目名称" inputSize="sm" className="h-8 px-2 text-xs" /> : <button type="button" onDoubleClick={beginProjectNameEdit} className="block w-full truncate text-left" title="双击编辑项目名称">{activeProjectName}</button>}</div>
+            <Button type="button" variant="ghost" size="iconSm" onClick={() => setShowExplorer(true)} aria-label="展开画布侧栏" title="展开项目面板" className="h-8 w-8 shrink-0"><PanelLeftOpen size={15} /></Button>
+          </div>
+        )}
 
         <ReactFlow
           nodes={nodes}
@@ -315,6 +376,7 @@ const CanvasInner = () => {
           onInit={(instance) => { flowRef.current = instance; }}
           onPaneContextMenu={(event) => { event.preventDefault(); setContextMenu({ x: event.clientX, y: event.clientY }); }}
           onPaneClick={() => setContextMenu(null)}
+          deleteKeyCode={['Backspace', 'Delete']}
           fitView
           fitViewOptions={{ padding: 0.28, maxZoom: 0.95 }}
           panOnDrag={tool === 'pan'}
@@ -324,32 +386,172 @@ const CanvasInner = () => {
           zoomOnPinch
           minZoom={0.15}
           maxZoom={2.5}
-          defaultEdgeOptions={{ type: 'smoothstep', animated: true, style: { stroke: '#9caf42', strokeWidth: 1.4 } }}
+          defaultEdgeOptions={{ type: 'smoothstep', animated: true, style: { stroke: '#8a948d', strokeWidth: 1.4 } }}
           proOptions={{ hideAttribution: true }}
           className="mboard-flow h-full w-full bg-white dark:bg-[#0b0b0b]"
         >
           <Background gap={18} size={0.8} color="rgba(116,124,114,0.13)" />
-          {showMinimap && <MiniMap pannable zoomable nodeColor={minimapNodeColor} className={cn('!bottom-16 !m-0 !rounded-lg !border-black/10 !bg-white/90 dark:!border-white/10 dark:!bg-[#181818]/95', showExplorer ? '!left-[276px]' : '!left-3')} />}
+          {showMinimap && (
+            <MiniMap
+              pannable
+              zoomable
+              nodeColor={minimapNodeColor}
+              nodeStrokeColor={theme === 'dark' ? 'rgba(255,255,255,0.1)' : 'rgba(17,23,19,0.08)'}
+              nodeStrokeWidth={1}
+              bgColor={theme === 'dark' ? 'rgba(18,18,18,0.58)' : 'rgba(255,255,255,0.58)'}
+              maskColor={theme === 'dark' ? 'rgba(5,5,5,0.3)' : 'rgba(255,255,255,0.3)'}
+              maskStrokeColor={theme === 'dark' ? 'rgba(255,255,255,0.12)' : 'rgba(17,23,19,0.1)'}
+              maskStrokeWidth={1}
+              style={{ width: 192, height: 108, backdropFilter: 'blur(18px) saturate(120%)' }}
+              className={cn(
+                '!bottom-3 !left-auto !m-0 !overflow-hidden !rounded-lg !border-black/[0.06] !shadow-[0_8px_24px_rgba(0,0,0,0.08)] dark:!border-white/[0.08] dark:!shadow-[0_8px_24px_rgba(0,0,0,0.18)]',
+                showAgent ? '!right-[376px]' : '!right-3',
+              )}
+            />
+          )}
         </ReactFlow>
 
-        <input ref={workflowInputRef} type="file" accept="application/json,.json" className="sr-only" onChange={(event) => { void importWorkflow(event.target.files?.[0]); event.target.value = ''; }} />
         <input ref={mediaInputRef} type="file" accept="image/*,video/*,.txt,.md" className="sr-only" onChange={(event) => { importMedia(event.target.files?.[0]); event.target.value = ''; }} />
 
-        <Card padding="sm" className="absolute bottom-3 left-1/2 z-30 flex max-w-[calc(100%-24px)] -translate-x-1/2 items-center gap-0.5 overflow-x-auto border-black/[0.06] bg-white/94 p-1 shadow-[0_8px_28px_rgba(0,0,0,0.12)] backdrop-blur-xl dark:border-white/10 dark:bg-[#171717]/94">
-          <CanvasToolButton icon={MousePointer2} label="选择" active={tool === 'select'} onClick={() => setTool('select')} />
-          <CanvasToolButton icon={Hand} label="移动画布" active={tool === 'pan'} onClick={() => setTool('pan')} />
+        <Card ref={toolbarRef} padding="sm" className="absolute bottom-3 left-1/2 z-30 flex max-w-[calc(100%-24px)] -translate-x-1/2 items-center gap-2 overflow-visible border-black/[0.06] bg-white/94 p-1 shadow-[0_8px_28px_rgba(0,0,0,0.12)] backdrop-blur-xl dark:border-white/10 dark:bg-[#171717]/94">
+          <div className="relative">
+            <div role="group" aria-label="画布操作工具" className="flex h-8 overflow-hidden rounded-md bg-muted">
+              <Button
+                type="button"
+                variant="ghost"
+                size="iconSm"
+                onClick={() => setToolbarMenu(null)}
+                aria-label={tool === 'select' ? '当前工具：选择与移动' : '当前工具：拖动画布'}
+                title={tool === 'select' ? '选择与移动（V）' : '拖动画布（H）'}
+                className="h-8 w-8 rounded-r-none bg-foreground p-0 text-background hover:bg-foreground/90 hover:text-background"
+              >
+                {tool === 'select' ? <MousePointer2 size={14} /> : <Hand size={14} />}
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                size="iconSm"
+                onClick={() => setToolbarMenu((menu) => menu === 'tool' ? null : 'tool')}
+                aria-label="展开画布操作工具"
+                aria-haspopup="menu"
+                aria-expanded={toolbarMenu === 'tool'}
+                title="选择画布操作工具"
+                className="h-8 w-5 rounded-l-none p-0 text-muted-foreground"
+              >
+                <ChevronDown size={10} />
+              </Button>
+            </div>
+            {toolbarMenu === 'tool' && (
+              <Card role="menu" padding="none" className="absolute bottom-10 left-0 w-40 p-1.5 shadow-xl">
+                {([
+                  ['select', MousePointer2, '选择与移动', 'V'],
+                  ['pan', Hand, '拖动画布', 'H'],
+                ] as const).map(([value, Icon, label, shortcut]) => (
+                  <Button
+                    key={value}
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    role="menuitemradio"
+                    aria-checked={tool === value}
+                    onClick={() => { setTool(value); setToolbarMenu(null); }}
+                    className={cn('h-9 w-full justify-start gap-2 px-2 text-xs', tool === value && 'bg-muted text-foreground')}
+                  >
+                    <Icon size={14} />
+                    <span className="flex-1 text-left">{label}</span>
+                    <kbd className="text-[10px] text-muted-foreground">{shortcut}</kbd>
+                  </Button>
+                ))}
+              </Card>
+            )}
+          </div>
           <CanvasToolButton icon={Upload} label="上传素材" onClick={() => mediaInputRef.current?.click()} />
-          <CanvasToolButton icon={Type} label="添加文本" onClick={() => addAtCenter('text')} />
-          <CanvasToolButton icon={ImagePlus} label="添加图片" onClick={() => addAtCenter('imageGen')} />
-          <CanvasToolButton icon={Video} label="添加视频" onClick={() => addAtCenter('video')} />
-          <CanvasToolButton icon={ZoomOut} label="缩小" onClick={() => { void flowRef.current?.zoomOut({ duration: 160 }); }} />
-          <Button type="button" variant="ghost" size="sm" onClick={() => { void flowRef.current?.fitView({ duration: 180, padding: 0.28 }); }} className="h-8 min-w-12 px-2 font-mono text-xs" title="适应画布">适应</Button>
-          <CanvasToolButton icon={ZoomIn} label="放大" onClick={() => { void flowRef.current?.zoomIn({ duration: 160 }); }} />
-          <CanvasToolButton icon={RotateCcw} label="撤销" disabled={!canUndo()} onClick={undo} />
-          <CanvasToolButton icon={Redo2} label="重做" disabled={!canRedo()} onClick={redo} />
-          <CanvasToolButton icon={Sparkles} label="小地图" active={showMinimap} onClick={() => setShowMinimap((visible) => !visible)} />
-          <CanvasToolButton icon={Upload} label="导入画布" onClick={() => workflowInputRef.current?.click()} />
-          <CanvasToolButton icon={Trash2} label="清空画布" onClick={() => { if (nodes.length && window.confirm('确定清空当前画布吗？')) clearCanvas(); }} />
+          <CanvasToolButton icon={Type} label="添加文字" onClick={() => addAtCenter('text')} />
+          <div className="relative">
+            <div role="group" aria-label="生成图片" className="flex h-8 overflow-hidden rounded-md">
+              <Button
+                type="button"
+                variant="ghost"
+                size="iconSm"
+                onClick={() => addAtCenter('imageGen', { generationMode: imageGenerationMode })}
+                aria-label="生成图片"
+                title={`生成图片（${imageGenerationMode === 'text-to-image' ? '文生图' : '图生图'}）`}
+                className="h-8 w-8 rounded-r-none p-0"
+              >
+                <ImagePlus size={14} />
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                size="iconSm"
+                onClick={() => setToolbarMenu((menu) => menu === 'image' ? null : 'image')}
+                aria-label="展开图片生成方式"
+                aria-haspopup="menu"
+                aria-expanded={toolbarMenu === 'image'}
+                title="选择图片生成方式"
+                className="h-8 w-5 rounded-l-none p-0 text-muted-foreground"
+              >
+                <ChevronDown size={10} />
+              </Button>
+            </div>
+            {toolbarMenu === 'image' && (
+              <Card role="menu" padding="none" className="absolute bottom-10 left-0 w-36 p-1.5 shadow-xl">
+                {([
+                  ['text-to-image', Type, '文生图'],
+                  ['image-to-image', ImagePlus, '图生图'],
+                ] as const).map(([mode, Icon, label]) => (
+                  <Button key={mode} type="button" variant="ghost" size="sm" role="menuitemradio" aria-checked={imageGenerationMode === mode} onClick={() => { setImageGenerationMode(mode); addAtCenter('imageGen', { generationMode: mode }); setToolbarMenu(null); }} className={cn('h-9 w-full justify-start gap-2 px-2 text-xs', imageGenerationMode === mode && 'bg-muted text-foreground')}>
+                    <Icon size={14} />{label}
+                  </Button>
+                ))}
+              </Card>
+            )}
+          </div>
+          <div className="relative">
+            <div role="group" aria-label="生成视频" className="flex h-8 overflow-hidden rounded-md">
+              <Button
+                type="button"
+                variant="ghost"
+                size="iconSm"
+                onClick={() => addAtCenter('video', { generationMode: videoGenerationMode })}
+                aria-label="生成视频"
+                title={`生成视频（${videoGenerationMode === 'text-to-video' ? '文生视频' : '图生视频'}）`}
+                className="h-8 w-8 rounded-r-none p-0"
+              >
+                <Video size={14} />
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                size="iconSm"
+                onClick={() => setToolbarMenu((menu) => menu === 'video' ? null : 'video')}
+                aria-label="展开视频生成方式"
+                aria-haspopup="menu"
+                aria-expanded={toolbarMenu === 'video'}
+                title="选择视频生成方式"
+                className="h-8 w-5 rounded-l-none p-0 text-muted-foreground"
+              >
+                <ChevronDown size={10} />
+              </Button>
+            </div>
+            {toolbarMenu === 'video' && (
+              <Card role="menu" padding="none" className="absolute bottom-10 left-0 w-40 p-1.5 shadow-xl">
+                {([
+                  ['text-to-video', Type, '文生视频'],
+                  ['image-to-video', ImagePlus, '图生视频'],
+                ] as const).map(([mode, Icon, label]) => (
+                  <Button key={mode} type="button" variant="ghost" size="sm" role="menuitemradio" aria-checked={videoGenerationMode === mode} onClick={() => { setVideoGenerationMode(mode); addAtCenter('video', { generationMode: mode }); setToolbarMenu(null); }} className={cn('h-9 w-full justify-start gap-2 px-2 text-xs', videoGenerationMode === mode && 'bg-muted text-foreground')}>
+                    <Icon size={14} />{label}
+                  </Button>
+                ))}
+              </Card>
+            )}
+          </div>
+          <span aria-hidden="true" className="h-6 w-px shrink-0 bg-black/[0.08] dark:bg-white/[0.1]" />
+          <div className="flex h-8 items-center gap-1 rounded-lg bg-black/[0.05] p-0.5 dark:bg-white/[0.07]">
+            <CanvasToolButton icon={Map} label="小地图" active={showMinimap} onClick={() => setShowMinimap((visible) => !visible)} className="h-7 w-7" />
+            <CanvasToolButton icon={Bot} label={showAgent ? '收起 Agent' : '展开 Agent'} active={showAgent} onClick={() => setShowAgent((visible) => !visible)} className="h-7 w-7" />
+          </div>
         </Card>
 
         {contextMenu && (
@@ -362,8 +564,8 @@ const CanvasInner = () => {
       </section>
 
       {showAgent && (
-        <aside className="absolute bottom-0 right-3 top-3 z-40 flex w-[352px] flex-col rounded-t-xl bg-white/[0.96] shadow-[0_8px_28px_rgba(15,15,15,0.08)] backdrop-blur-xl dark:bg-[#121212]/[0.96] dark:shadow-[0_8px_28px_rgba(0,0,0,0.22)]">
-          <header className="flex h-14 shrink-0 items-center gap-2 px-3"><span className="grid h-8 w-8 place-items-center rounded-lg bg-muted text-foreground"><Bot size={16} /></span><div className="min-w-0 flex-1"><div className="text-xs font-semibold">Canvas Agent</div><div className="truncate text-xs text-muted-foreground">{agentWorking ? `正在操作 ${activeBoard}` : `当前画布：${activeBoard}`}</div></div><Button type="button" variant="ghost" size="iconSm" onClick={() => setAgentSettingsOpen((open) => !open)} aria-label="Agent 设置"><Settings2 size={15} /></Button><Button type="button" variant="ghost" size="iconSm" onClick={() => setShowAgent(false)} aria-label="收起 Agent"><PanelRightClose size={15} /></Button></header>
+        <aside className="absolute bottom-3 right-3 top-3 z-40 flex w-[352px] flex-col rounded-xl bg-white/[0.96] shadow-[0_8px_28px_rgba(15,15,15,0.08)] backdrop-blur-xl dark:bg-[#121212]/[0.96] dark:shadow-[0_8px_28px_rgba(0,0,0,0.22)]">
+          <header className="flex h-14 shrink-0 items-center gap-2 px-3"><span className="grid h-8 w-8 place-items-center rounded-lg bg-muted text-foreground"><Bot size={16} /></span><div className="min-w-0 flex-1"><div className="text-xs font-semibold">Canvas Agent</div><div className="truncate text-xs text-muted-foreground">{agentWorking ? `正在操作 ${activeBoard}` : `当前画布：${activeBoard}`}</div></div><Button type="button" variant="ghost" size="iconSm" onClick={() => setAgentSettingsOpen((open) => !open)} aria-label="Agent 设置"><Settings2 size={15} /></Button></header>
 
           {agentSettingsOpen && <Card padding="sm" className="absolute right-3 top-12 z-40 w-[310px] p-3 shadow-xl"><div className="mb-2 text-xs font-semibold">Agent 模型</div><Select aria-label="Agent 模型" value={resolvedAgentModel} onChange={(event) => setAgentModel(event.target.value)} selectSize="sm" options={languageModels.length ? languageModels.map(({ value, label }) => ({ value, label })) : [{ value: '', label: '暂无语言模型' }]} disabled={!languageModels.length} /><div className="mb-2 mt-4 text-xs font-semibold">执行模式</div><div className="grid grid-cols-2 gap-1 rounded-lg bg-muted p-1"><Button type="button" variant={agentMode === 'auto' ? 'primary' : 'ghost'} size="sm" onClick={() => setAgentMode('auto')} className="text-xs">自动执行</Button><Button type="button" variant={agentMode === 'ask' ? 'primary' : 'ghost'} size="sm" onClick={() => setAgentMode('ask')} className="text-xs">询问执行</Button></div><p className="mt-2 text-xs leading-4 text-muted-foreground">自动执行会直接创建画布节点；询问执行会先确认任务。</p></Card>}
 
@@ -384,8 +586,8 @@ const CanvasInner = () => {
   );
 };
 
-const CanvasToolButton = ({ icon: Icon, label, active, disabled, onClick }: { icon: React.ElementType; label: string; active?: boolean; disabled?: boolean; onClick: () => void }) => (
-  <Button type="button" variant={active ? 'secondary' : 'ghost'} size="iconSm" aria-label={label} title={label} aria-pressed={active} disabled={disabled} onClick={onClick} className="h-8 w-8 shrink-0"><Icon size={14} strokeWidth={active ? 2.2 : 1.8} /></Button>
+const CanvasToolButton = ({ icon: Icon, label, active, disabled, onClick, className }: { icon: React.ElementType; label: string; active?: boolean; disabled?: boolean; onClick: () => void; className?: string }) => (
+  <Button type="button" variant={active ? 'secondary' : 'ghost'} size="iconSm" aria-label={label} title={label} aria-pressed={active} disabled={disabled} onClick={onClick} className={cn('h-8 w-8 shrink-0', className)}><Icon size={14} strokeWidth={active ? 2.2 : 1.8} /></Button>
 );
 
 export const Canvas = () => <ReactFlowProvider><CanvasInner /></ReactFlowProvider>;

@@ -80,11 +80,12 @@ const DOCUMENTS: SpaceEntry[] = [
 const itemIcon = (kind: SpaceKind, open = false) =>
   kind === 'document' ? FileText : open ? FolderOpen : Folder;
 
-export const PersonalSpace = () => {
+export const PersonalSpace = ({ embedded = false, query: externalQuery }: { embedded?: boolean; query?: string }) => {
   const { projects, activeProjectId, setActiveProject } = useProjectStore();
   const [selectedId, setSelectedId] = useState('home');
   const [expanded, setExpanded] = useState<Set<string>>(() => new Set(['creative', 'video']));
-  const [query, setQuery] = useState('');
+  const [localQuery, setLocalQuery] = useState('');
+  const query = externalQuery ?? localQuery;
 
   const projectEntries = useMemo<SpaceEntry[]>(() => projects.map((project) => ({
     id: project.id,
@@ -152,9 +153,9 @@ export const PersonalSpace = () => {
   const selectedProject = selected?.kind === 'project' ? selected : undefined;
 
   return (
-    <main className="module-workspace flex h-full min-h-0 flex-col bg-background text-foreground">
-      <header className="mx-16 flex h-14 shrink-0 items-center justify-between gap-4 border-0 px-0">
-        <h1 className="text-base font-semibold tracking-[-0.02em]">空间</h1>
+    <main className={cn('flex h-full min-h-0 flex-col text-foreground', embedded ? 'bg-transparent' : 'module-workspace bg-background')}>
+      {!embedded && <header className="mx-16 flex h-14 shrink-0 items-center justify-between gap-4 border-0 px-0">
+        <h1 className="text-base font-semibold tracking-[-0.02em]">文档</h1>
         <label className="flex h-8 w-[240px] max-w-[48vw] items-center gap-2 rounded-md bg-muted px-2.5">
           <Search aria-hidden="true" size={15} className="shrink-0 text-muted-foreground" />
           <Input
@@ -162,14 +163,14 @@ export const PersonalSpace = () => {
             inputSize="sm"
             aria-label="搜索空间文件"
             value={query}
-            onChange={(event) => setQuery(event.target.value)}
-            placeholder="搜索空间文件"
+            onChange={(event) => setLocalQuery(event.target.value)}
+            placeholder="搜索文档"
             className="h-8 min-w-0 flex-1 text-xs"
           />
         </label>
-      </header>
+      </header>}
 
-      <div className="mx-16 mb-0 flex min-h-0 flex-1 flex-col gap-3 overflow-hidden rounded-xl bg-[#f8f8f6] p-2 dark:bg-white/[0.035] md:flex-row">
+      <div className={cn('mb-0 flex min-h-0 flex-1 flex-col gap-3 overflow-hidden rounded-xl bg-[#f8f8f6] p-2 dark:bg-white/[0.035] md:flex-row', !embedded && 'mx-16')}>
       <aside className="flex max-h-[38vh] w-full shrink-0 flex-col bg-transparent p-4 shadow-none md:max-h-none md:w-[270px]">
         <h2 className="px-2 text-sm font-semibold">标题筛选</h2>
         <div className="mt-4 min-h-0 flex-1 overflow-y-auto">

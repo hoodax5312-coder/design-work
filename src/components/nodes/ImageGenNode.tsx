@@ -28,6 +28,7 @@ export const ImageGenNode = memo(({ id, data, selected }: NodeProps<ImageNode>) 
   const model = data.model || getSelectedModel(selectedProvider, 'image') || providerOptions[0]?.model || '';
   const activeOption = providerOptions.find((option) => option.provider.id === selectedProvider?.id && option.model === model);
   const providerName = activeOption?.provider.name || selectedProvider?.name || '未配置 Provider';
+  const generationMode = data.generationMode || 'text-to-image';
   const ratio = data.aspectRatio || '1:1';
   const quality = data.quality || 'standard';
 
@@ -53,19 +54,19 @@ export const ImageGenNode = memo(({ id, data, selected }: NodeProps<ImageNode>) 
   };
 
   return (
-    <BaseNode selected={selected} icon={ImageIcon} title="图片" width={420} showTargetHandle showSourceHandle onDelete={() => deleteNode(id)}>
+    <BaseNode selected={selected} icon={ImageIcon} title={generationMode === 'image-to-image' ? '图生图' : '文生图'} width={420} showTargetHandle showSourceHandle onDelete={() => deleteNode(id)}>
       <div className="px-3 pb-3">
         <div className={cn('relative flex min-h-[220px] w-full items-center justify-center overflow-hidden rounded-md bg-muted/55', data.imageUrl ? '' : 'border border-dashed border-border')}>
           {data.imageUrl ? <img src={data.imageUrl} alt={data.prompt || '生成图片'} className="h-full min-h-[220px] w-full object-cover" /> : (
             <div className="max-w-[240px] text-center text-muted-foreground">
               {data.isGenerating ? <Loader2 size={25} className="mx-auto animate-spin" /> : <Sparkles size={24} className="mx-auto" />}
-              <p className="mt-3 text-xs font-medium">{data.isGenerating ? '正在生成画面…' : '在节点下方输入 Prompt 生成图片'}</p>
+              <p className="mt-3 text-xs font-medium">{data.isGenerating ? '正在生成画面…' : generationMode === 'image-to-image' ? '连接参考图片并输入 Prompt 生成图片' : '在节点下方输入 Prompt 生成图片'}</p>
             </div>
           )}
         </div>
 
         <div className="mt-3 flex w-full items-center gap-2 rounded-md border border-border bg-background p-2">
-          <Textarea aria-label="图像生成提示词" value={data.prompt || ''} onChange={(event) => updateNode(id, { prompt: event.target.value })} onKeyDown={(event) => { if ((event.metaKey || event.ctrlKey) && event.key === 'Enter') { event.preventDefault(); void generate(); } }} placeholder="描述想生成的画面，@ 引用画布素材…" variant="ghost" className="nodrag nowheel h-14 min-h-0 flex-1 text-xs leading-5" />
+          <Textarea aria-label="图像生成提示词" value={data.prompt || ''} onChange={(event) => updateNode(id, { prompt: event.target.value })} onKeyDown={(event) => { if ((event.metaKey || event.ctrlKey) && event.key === 'Enter') { event.preventDefault(); void generate(); } }} placeholder={generationMode === 'image-to-image' ? '描述如何基于参考图生成新画面…' : '描述想生成的画面，@ 引用画布素材…'} variant="ghost" className="nodrag nowheel h-14 min-h-0 flex-1 text-xs leading-5" />
           <Button type="button" variant="primary" size="iconSm" onClick={() => void generate()} disabled={data.isGenerating || !data.prompt?.trim()} aria-label="开始生成图片">{data.isGenerating ? <Loader2 size={15} className="animate-spin" /> : <Send size={14} />}</Button>
         </div>
 

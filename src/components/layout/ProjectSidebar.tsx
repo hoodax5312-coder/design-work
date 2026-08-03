@@ -33,8 +33,7 @@ const navigationGroups: Array<{ title: string; items: Array<{ module: ModuleType
       { module: 'image-gen', label: '创作', icon: LayoutDashboard, workspaceMode: 'manager' },
       { module: 'assets', label: '图片', icon: ImageIcon },
       { module: 'video-gen', label: '视频', icon: Clapperboard },
-      { module: 'sources', label: '知识', icon: Database },
-      { module: 'projects', label: '空间', icon: FolderKanban },
+      { module: 'sources', label: '文档', icon: FileText },
       { module: 'tools', label: '工具', icon: Command },
     ],
   },
@@ -227,7 +226,7 @@ export const ProjectSidebar = () => {
   return (
     <aside
       className={cn(
-        'flex h-full w-14 shrink-0 flex-col overflow-hidden border-r border-black/[0.05] bg-card text-foreground dark:border-white/[0.06]',
+        'flex h-full w-16 shrink-0 flex-col overflow-hidden border-r border-black/[0.05] bg-card text-foreground dark:border-white/[0.06]',
       )}
     >
       <div className="flex h-[64px] shrink-0 items-center justify-center">
@@ -258,7 +257,7 @@ export const ProjectSidebar = () => {
                 aria-label={item.label}
                 title={item.label}
                 className={cn(
-                  'h-12 w-full flex-col gap-0.5 text-center text-xs',
+                  'h-12 w-full flex-col gap-1 text-center text-[10px]',
                   active
                     ? 'bg-muted text-foreground shadow-sm'
                     : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground',
@@ -292,10 +291,10 @@ export const ProjectSidebar = () => {
             aria-label={label}
             title={label}
             className={cn(
-              'h-10 w-full text-muted-foreground',
+              'h-10 w-full p-0 text-muted-foreground',
             )}
           >
-            <Icon size={17} />
+            <Icon size={18} className="shrink-0" />
           </Button>
         ))}
       </div>

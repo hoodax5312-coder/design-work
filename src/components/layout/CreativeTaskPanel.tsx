@@ -25,7 +25,7 @@ const moduleNames = {
   projects: '个人空间',
   tools: 'AI 应用',
   ecommerce: '电商设计',
-  sources: '知识',
+  sources: '文档',
   exports: '导出中心',
 } as const;
 

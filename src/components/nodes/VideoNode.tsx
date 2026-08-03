@@ -20,6 +20,7 @@ export const VideoNode = memo(({ id, data, selected }: NodeProps<CanvasVideoNode
   const provider = providers.find((item) => item.id === data.providerId) || providers.find((item) => item.id === activeProviderId) || options[0]?.provider;
   const model = data.model || getSelectedModel(provider, 'video') || options[0]?.model || '';
   const active = options.find((option) => option.provider.id === provider?.id && option.model === model);
+  const generationMode = data.generationMode || 'text-to-video';
 
   const createTask = () => {
     if (!active && (!provider || !model)) {
@@ -31,13 +32,13 @@ export const VideoNode = memo(({ id, data, selected }: NodeProps<CanvasVideoNode
   };
 
   return (
-    <BaseNode selected={selected} icon={Video} title="视频" width={420} showSourceHandle showTargetHandle onDelete={() => deleteNode(id)}>
+    <BaseNode selected={selected} icon={Video} title={generationMode === 'image-to-video' ? '图生视频' : '文生视频'} width={420} showSourceHandle showTargetHandle onDelete={() => deleteNode(id)}>
       <div className="px-3 pb-3">
         <div className="flex min-h-[220px] w-full items-center justify-center overflow-hidden rounded-md border border-dashed border-border bg-muted/55">
-          {data.previewUrl ? <video src={data.previewUrl} controls className="h-full min-h-[220px] w-full object-cover" /> : <div className="max-w-[240px] text-center text-muted-foreground"><Film size={25} className="mx-auto" /><p className="mt-3 text-xs font-medium">在节点下方描述动作与镜头</p></div>}
+          {data.previewUrl ? <video src={data.previewUrl} controls className="h-full min-h-[220px] w-full object-cover" /> : <div className="max-w-[240px] text-center text-muted-foreground"><Film size={25} className="mx-auto" /><p className="mt-3 text-xs font-medium">{generationMode === 'image-to-video' ? '连接参考图片并描述动作与镜头' : '在节点下方描述动作与镜头'}</p></div>}
         </div>
         <div className="mt-3 flex w-full items-center gap-2 rounded-md border border-border bg-background p-2">
-          <Textarea aria-label="视频生成提示词" value={data.prompt || ''} onChange={(event) => updateNode(id, { prompt: event.target.value })} placeholder="描述视频主题、动作与镜头节奏…" variant="ghost" className="nodrag nowheel h-14 min-h-0 flex-1 text-xs leading-5" />
+          <Textarea aria-label="视频生成提示词" value={data.prompt || ''} onChange={(event) => updateNode(id, { prompt: event.target.value })} placeholder={generationMode === 'image-to-video' ? '描述如何让参考图片动起来…' : '描述视频主题、动作与镜头节奏…'} variant="ghost" className="nodrag nowheel h-14 min-h-0 flex-1 text-xs leading-5" />
           <Button type="button" variant="primary" size="iconSm" onClick={createTask} disabled={!data.prompt?.trim()} aria-label="创建视频任务"><Send size={14} /></Button>
         </div>
         <Select aria-label="选择视频模型" value={active ? active.provider.id + '::' + active.model : ''} onChange={(event) => { const [providerId, ...parts] = event.target.value.split('::'); updateNode(id, { providerId, model: parts.join('::') }); }} disabled={!options.length} selectSize="sm" className="nodrag mt-2 text-xs" options={options.length ? options.map((option) => ({ value: option.provider.id + '::' + option.model, label: option.model })) : [{ value: '', label: '暂无视频模型' }]} />

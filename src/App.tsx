@@ -14,7 +14,6 @@ import { ImageGeneration } from './components/image-gen/ImageGeneration';
 import { VideoGeneration } from './components/video-gen/VideoGeneration';
 import { PptGeneration } from './components/ppt-gen/PptGeneration';
 import { AssetLibraryPage } from './components/assets/AssetLibraryPage';
-import { PersonalSpace } from './components/spaces/PersonalSpace';
 import { Ecommerce } from './components/ecommerce/Ecommerce';
 import { ExportCenter, SourceCenter } from './components/delivery/DeliveryCenter';
 import { WorkflowModal } from './components/modals/WorkflowModal';
@@ -155,7 +154,7 @@ function App() {
         {activeModule === 'image-gen' && <ImageGeneration />}
         {activeModule === 'ppt-gen' && <PptGeneration />}
         {activeModule === 'video-gen' && <VideoGeneration />}
-        {activeModule === 'projects' && <PersonalSpace />}
+        {activeModule === 'projects' && <SourceCenter initialSection="documents" />}
         {activeModule === 'ecommerce' && <Ecommerce />}
         {activeModule === 'assets' && <AssetLibraryPage />}
         {activeModule === 'tools' && <ToolsHub />}

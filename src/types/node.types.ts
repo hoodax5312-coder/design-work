@@ -12,6 +12,7 @@ export interface TextNodeData extends Record<string, unknown> {
 export interface VideoNodeData extends Record<string, unknown> {
   prompt: string;
   model: string;
+  generationMode?: 'text-to-video' | 'image-to-video';
   providerId?: string;
   aspectRatio: '16:9' | '21:9' | '9:16' | '1:1';
   resolution: '1080p' | '4k';
@@ -34,6 +35,7 @@ export interface AudioNodeData extends Record<string, unknown> {
 export interface ImageGenNodeData extends Record<string, unknown> {
   prompt: string;
   model: string;
+  generationMode?: 'text-to-image' | 'image-to-image';
   providerId?: string;
   style: string;
   cameraControl: {

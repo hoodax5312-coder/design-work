@@ -10,6 +10,7 @@ export interface ProjectCanvasSnapshot {
 export interface Project {
   id: string;
   name: string;
+  emoji?: string;
   createdAt: number;
   updatedAt: number;
   pinned?: boolean;
@@ -22,6 +23,7 @@ interface ProjectState {
   createProject: (name?: string) => string;
   setActiveProject: (id: string | null) => void;
   renameProject: (id: string, name: string) => void;
+  setProjectEmoji: (id: string, emoji: string) => void;
   toggleProjectPinned: (id: string) => void;
   saveProjectCanvas: (id: string, canvas: ProjectCanvasSnapshot) => void;
   removeProject: (id: string) => void;
@@ -39,6 +41,7 @@ export const useProjectStore = create<ProjectState>()(
         const project: Project = {
           id,
           name: name?.trim() || (projectNumber === 1 ? '未命名项目' : `未命名项目 ${projectNumber}`),
+          emoji: '😀',
           createdAt: now,
           updatedAt: now,
           canvas: { nodes: [], edges: [] },
@@ -55,6 +58,14 @@ export const useProjectStore = create<ProjectState>()(
           projects: state.projects.map((project) =>
             project.id === id
               ? { ...project, name: name.trim() || project.name, updatedAt: Date.now() }
+              : project,
+          ),
+        })),
+      setProjectEmoji: (id, emoji) =>
+        set((state) => ({
+          projects: state.projects.map((project) =>
+            project.id === id
+              ? { ...project, emoji, updatedAt: Date.now() }
               : project,
           ),
         })),
