@@ -10,19 +10,19 @@
     --card-foreground: 84 15% 9%;
     --popover: 0 0% 100%;
     --popover-foreground: 84 15% 9%;
-    --primary: 75 100% 50%;
-    --primary-foreground: 84 15% 8%;
+    --primary: 0 0% 7%;
+    --primary-foreground: 0 0% 100%;
     --secondary: 80 9% 92%;
     --secondary-foreground: 84 15% 15%;
     --muted: 80 8% 93%;
     --muted-foreground: 84 7% 42%;
-    --accent: 75 100% 50%;
+    --accent: 80 8% 93%;
     --accent-foreground: 84 15% 8%;
     --destructive: 0 72% 51%;
     --destructive-foreground: 0 0% 100%;
     --border: 84 10% 86%;
     --input: 84 10% 82%;
-    --ring: 75 100% 38%;
+    --ring: 0 0% 7%;
     --radius: 0.625rem;
     --workspace-bg: #ffffff;
     --surface-bg: #ffffff;
@@ -32,8 +32,8 @@
     --text-primary: #111713;
     --text-secondary: #59635c;
     --text-muted: #8a948d;
-    --brand-accent: #c8ff00;
-    --accent-readable: #587100;
+    --brand-accent: #111111;
+    --accent-readable: #59635c;
     --ui-page-gutter: 64px;
     --ui-surface-inset: 8px;
     --ui-control-gap: 12px;
@@ -50,19 +50,19 @@
     --card-foreground: 0 0% 96%;
     --popover: 0 0% 10%;
     --popover-foreground: 0 0% 96%;
-    --primary: 75 100% 50%;
+    --primary: 0 0% 96%;
     --primary-foreground: 0 0% 7%;
     --secondary: 0 0% 15%;
     --secondary-foreground: 0 0% 96%;
     --muted: 0 0% 15%;
     --muted-foreground: 0 0% 64%;
-    --accent: 75 100% 50%;
-    --accent-foreground: 0 0% 7%;
+    --accent: 0 0% 15%;
+    --accent-foreground: 0 0% 96%;
     --destructive: 0 63% 43%;
     --destructive-foreground: 0 0% 96%;
     --border: 0 0% 21%;
     --input: 0 0% 25%;
-    --ring: 75 100% 50%;
+    --ring: 0 0% 96%;
     --workspace-bg: #0b0b0b;
     --surface-bg: #151515;
     --surface-subtle: #111111;
@@ -71,7 +71,8 @@
     --text-primary: #f5f5f5;
     --text-secondary: #a3a3a3;
     --text-muted: #6f6f6f;
-    --accent-readable: #c8ff00;
+    --brand-accent: #f5f5f5;
+    --accent-readable: #a3a3a3;
     --ui-page-gutter: 64px;
     --ui-surface-inset: 8px;
     --ui-control-gap: 12px;
@@ -87,7 +88,7 @@
   }
 
   *:focus-visible {
-    outline: 2px solid #c8ff00;
+    outline: 2px solid hsl(var(--ring));
     outline-offset: 2px;
   }
 
@@ -221,7 +222,7 @@
 
   .creation-record-prompt:hover {
     background: var(--surface-hover);
-    border-color: rgba(200, 255, 0, 0.38);
+    border-color: hsl(var(--ring) / 0.28);
   }
 
   .asset-filter-panel {
@@ -318,7 +319,7 @@
 
   .dark .module-card:hover {
     background: var(--surface-hover);
-    border-color: rgba(200, 255, 0, 0.22);
+    border-color: hsl(var(--ring) / 0.16);
   }
 
   .prompt-library-card:hover {
@@ -388,7 +389,7 @@
   @media (hover: hover) and (pointer: fine) {
     .video-asset-card:hover {
       transform: translateY(-3px);
-      border-color: rgba(200, 255, 0, 0.5);
+      border-color: hsl(var(--ring) / 0.25);
       box-shadow: 0 16px 36px rgba(0, 0, 0, 0.26);
     }
   }

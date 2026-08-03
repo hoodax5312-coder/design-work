@@ -502,7 +502,7 @@ const VideoAssetLibrary = ({ onCreate }: { onCreate: () => void }) => {
           onAssets={() => setActiveTab('assets')}
           onProjects={() => setActiveTab('projects')}
         />
-        <div className="relative ml-auto w-[min(28vw,360px)] min-w-[160px]">
+        <div className="relative ml-auto w-[240px] shrink-0">
           <Search size={16} className="pointer-events-none absolute left-3 top-1/2 z-10 -translate-y-1/2 text-muted-foreground" />
           <Input
             value={query}
@@ -550,53 +550,24 @@ const VideoProjectLibrary = ({ onCreate, query }: { onCreate: () => void; query:
   return (
     <main className="grid h-full min-w-0 grid-cols-1 gap-3 overflow-hidden text-foreground md:grid-cols-[260px_minmax(0,1fr)]">
       <aside aria-label="视频工程列表" className="flex min-h-0 flex-col overflow-hidden rounded-lg bg-transparent p-3">
-        <header className="shrink-0 px-1 pb-3">
-          <h1 className="text-sm font-semibold tracking-[-0.01em]">视频工程</h1>
-          <p className="mt-1 text-xs leading-5 text-muted-foreground">选择工程查看成片、素材和剧本。</p>
-        </header>
         <div className="min-h-0 flex-1 space-y-2 overflow-y-auto pr-1">
           {visibleProjects.map((project) => {
-              const isSelected = selectedProjectId === project.id;
-              return (
-                <Button
-                  key={project.id}
-                  type="button"
-                  variant="ghost"
-                  onClick={() => {
-                    setSelectedProjectId(project.id);
-                    setIsPlaying(false);
-                  }}
-                  className={cn(
-                    'group flex h-auto w-full items-center gap-3 overflow-hidden rounded-lg border-0 bg-background/80 p-2 text-left shadow-none transition-colors hover:bg-background',
-                    isSelected && 'bg-foreground text-background hover:bg-foreground/90 hover:text-background',
-                  )}
-                >
-                  <div className="relative aspect-video w-[88px] shrink-0 overflow-hidden rounded-md bg-[#121212]">
-                    {project.thumbnail ? <img src={project.thumbnail} alt="" className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105" /> : <Film aria-hidden="true" className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 text-zinc-700" size={28} />}
-                    <span className="absolute bottom-1 left-1 rounded bg-black/70 px-1.5 py-0.5 text-xs text-white/85">{project.code}</span>
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <h2 className="truncate text-sm font-semibold">{project.title}</h2>
-                    <p className={cn('mt-1 truncate text-xs text-muted-foreground', isSelected && 'text-background/60')}>{project.author}</p>
-                    <p className={cn('mt-1 text-xs text-muted-foreground', isSelected && 'text-background/60')}>分镜 {4 + (Number(project.id.slice(-1)) % 4)} · 素材 {8 + Number(project.id.slice(-1))}
-                    </p>
-                  </div>
-                </Button>
-              );
-            })}
+            const isSelected = selectedProjectId === project.id;
+            return (
+              <Button key={project.id} type="button" variant="ghost" onClick={() => { setSelectedProjectId(project.id); setIsPlaying(false); }} className={cn('group relative block h-auto w-full overflow-hidden rounded-lg border-0 bg-background/80 p-0 text-left shadow-none transition-[transform,box-shadow] hover:-translate-y-0.5 hover:bg-background hover:shadow-md focus-visible:ring-2 focus-visible:ring-foreground/30', isSelected && 'ring-2 ring-foreground/80 ring-offset-2 ring-offset-background')}>
+                <div className="relative aspect-video w-full overflow-hidden rounded-lg bg-[#121212]">
+                  {project.thumbnail ? <img src={project.thumbnail} alt="视频封面" className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105" /> : <Film aria-hidden="true" className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 text-zinc-700" size={28} />}
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/10 to-transparent opacity-0 transition-opacity duration-200 group-hover:opacity-100 group-focus-visible:opacity-100" />
+                  <h2 className="absolute inset-x-3 bottom-3 translate-y-1 truncate text-sm font-semibold text-white opacity-0 transition-[opacity,transform] duration-200 group-hover:translate-y-0 group-hover:opacity-100 group-focus-visible:translate-y-0 group-focus-visible:opacity-100">{project.title}</h2>
+                </div>
+              </Button>
+            );
+          })}
           {!visibleProjects.length && <div className="px-2 py-8 text-center text-xs text-muted-foreground">没有匹配的视频工程</div>}
         </div>
-        <Button type="button" variant="secondary" onClick={onCreate} className="mt-3 h-8 w-full shrink-0 justify-center border-0 bg-background hover:bg-background/80">
-          <FolderPlus aria-hidden="true" size={15} /> 创建工程
-        </Button>
+        <Button type="button" variant="secondary" onClick={onCreate} className="mt-3 h-8 w-full shrink-0 justify-center border-0 bg-background hover:bg-background/80"><FolderPlus aria-hidden="true" size={15} /> 创建工程</Button>
       </aside>
-
-      <ProjectMaterials
-        project={selectedProject}
-        assets={assets}
-        isPlaying={isPlaying}
-        onTogglePlayback={() => setIsPlaying((playing) => !playing)}
-      />
+      {!visibleProjects.length ? <div className="flex items-center justify-center text-xs text-muted-foreground">没有匹配的视频工程</div> : <ProjectMaterials project={selectedProject} assets={assets} isPlaying={isPlaying} onTogglePlayback={() => setIsPlaying((playing) => !playing)} />}
     </main>
   );
 };
@@ -613,6 +584,22 @@ const ProjectMaterials = ({
   onTogglePlayback: () => void;
 }) => {
   const projectNumber = Number(project.id.replace('project-', '')) || 1;
+  const sourceAsset = assets[projectNumber - 1] || assets[0];
+  const metadata = sourceAsset?.normalizedMetadata || {};
+  const fileSizeValue = metadata.fileSize ?? metadata.size ?? metadata.bytes;
+  const fileSize = typeof fileSizeValue === 'number' && fileSizeValue > 0
+    ? fileSizeValue >= 1024 ** 3
+      ? String((fileSizeValue / 1024 ** 3).toFixed(1)) + ' GB'
+      : fileSizeValue >= 1024 ** 2
+        ? String((fileSizeValue / 1024 ** 2).toFixed(1)) + ' MB'
+        : String(Math.round(fileSizeValue / 1024)) + ' KB'
+    : '—';
+  const updatedAt = sourceAsset?.updatedAt || sourceAsset?.createdAt;
+  const updatedDate = updatedAt
+    ? new Intl.DateTimeFormat('zh-CN', { year: 'numeric', month: '2-digit', day: '2-digit' }).format(updatedAt)
+    : '—';
+  const duration = String(26 + projectNumber * 3) + 's';
+  const [activeDetailTab, setActiveDetailTab] = useState('character');
   const detailGroups = [
     { id: 'character', label: '角色', icon: UserRound, assets: assets.slice(0, 3) },
     { id: 'scene', label: '场景', icon: MapPin, assets: assets.slice(3, 6) },
@@ -622,15 +609,14 @@ const ProjectMaterials = ({
 
   return (
     <section aria-label={`${project.title} 工程详情`} className="min-h-0 min-w-0 overflow-y-auto rounded-lg bg-background">
-      <div className="mx-auto max-w-6xl p-4 lg:p-5">
-        <header className="mb-4 flex flex-wrap items-start justify-between gap-3">
-          <div>
-            <p className="text-xs font-medium text-muted-foreground">{project.code} · 更新于今天</p>
-            <h2 className="mt-1 text-lg font-semibold tracking-[-0.025em]">{project.title}</h2>
-            <p className="mt-1 text-xs text-muted-foreground">成片、角色、场景、分镜与剧本会保存在同一工程。</p>
-          </div>
-          <div className="flex items-center gap-2 text-xs text-muted-foreground">
-            <span>16:9</span><span aria-hidden="true">·</span><span>1080P</span><span aria-hidden="true">·</span><span>{26 + projectNumber * 3}s</span>
+      <div className="mx-auto max-w-6xl px-6 pb-5 pt-4">
+        <header className="mb-4 px-1">
+          <h2 className="text-lg font-semibold tracking-[-0.025em]">{project.title}</h2>
+          <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
+            <span>时间 {updatedDate}</span>
+            <span>时长 {duration}</span>
+            <span>分辨率 1920 × 1080</span>
+            <span>文件大小 {fileSize}</span>
           </div>
         </header>
 
@@ -656,15 +642,17 @@ const ProjectMaterials = ({
           </div>
         </div>
 
-        <div className="mt-6 space-y-6">
-          {detailGroups.map((group, groupIndex) => {
+        <div className="mt-4 space-y-4">
+          <Tabs value={activeDetailTab} onValueChange={setActiveDetailTab}>
+            <TabsList aria-label="工程内容分类" className="h-9 w-full justify-start gap-1 overflow-x-auto rounded-lg bg-muted p-1">
+              {detailGroups.map((group) => <TabsTrigger key={group.id} value={group.id} className="h-7 flex-1 px-3 text-xs">{group.label}</TabsTrigger>)}
+              <TabsTrigger value="script" className="h-7 flex-1 px-3 text-xs">剧本</TabsTrigger>
+            </TabsList>
+          </Tabs>
+          {activeDetailTab !== 'script' && detailGroups.filter((group) => group.id === activeDetailTab).map((group, groupIndex) => {
             const Icon = group.icon;
             return (
               <section key={group.id}>
-                <div className="mb-3 flex items-center justify-between">
-                  <h3 className="flex items-center gap-2 text-sm font-semibold"><Icon aria-hidden="true" size={15} className="text-muted-foreground" />{group.label}</h3>
-                  <span className="text-xs tabular-nums text-muted-foreground">{group.assets.length || (groupIndex + 2)} 项</span>
-                </div>
                 <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
                   {(group.assets.length ? group.assets : Array.from({ length: groupIndex + 2 }, (_, index) => ({ id: `${group.id}-${index}`, title: `${group.label} ${index + 1}`, previewUrl: undefined }))).map((asset) => (
                     <article key={`${group.id}-${asset.id}`} className="overflow-hidden rounded-lg bg-muted/70">
@@ -681,7 +669,7 @@ const ProjectMaterials = ({
             );
           })}
 
-          <section className="grid gap-3 lg:grid-cols-2">
+          {activeDetailTab === 'script' && <section className="grid gap-3 lg:grid-cols-2">
             <Card padding="md" className="border-0 bg-muted/65 shadow-none">
               <p className="text-xs font-semibold text-muted-foreground">剧本概要</p>
               <h3 className="mt-2 text-sm font-semibold">第一幕：角色进入世界</h3>
@@ -694,7 +682,7 @@ const ProjectMaterials = ({
               </div>
               <p className="mt-2 text-xs leading-6 text-foreground/80">Cinematic short film, {project.title}, expressive character performance, layered environment, deliberate camera movement, restrained color palette, 16:9, high detail.</p>
             </Card>
-          </section>
+          </section>}
         </div>
       </div>
     </section>
