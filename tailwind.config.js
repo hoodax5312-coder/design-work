@@ -3,7 +3,7 @@ export default {
   darkMode: 'class',
   content: [
     "./index.html",
-    "./src/**/*.{js,ts,jsx,tsx}",
+    "./03-程序区/前端代码/**/*.{js,ts,jsx,tsx}",
   ],
   theme: {
     fontFamily: {

@@ -11,7 +11,7 @@ export default [
   },
   js.configs.recommended,
   {
-    files: ['scripts/**/*.mjs'],
+    files: ['03-程序区/启动构建/**/*.mjs'],
     languageOptions: {
       ecmaVersion: 2022,
       sourceType: 'module',
