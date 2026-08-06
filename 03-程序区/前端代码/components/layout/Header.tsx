@@ -13,7 +13,7 @@ export const Header = () => {
           <div className="flex h-5 w-5 items-center justify-center rounded bg-[#c8ff00] text-black">
             <LayoutGrid size={12} />
           </div>
-          <span className="font-bold text-sm text-slate-800 dark:text-white">Mboard</span>
+          <span className="font-bold text-sm text-slate-800 dark:text-white">Design Work</span>
         </div>
         
         <Separator orientation="vertical" className="h-3" />

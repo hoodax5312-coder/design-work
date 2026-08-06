@@ -13,7 +13,7 @@ const supported = comparison >= 0;
 
 if (!supported) {
   console.error([
-    `Mboard 需要 Node.js >= ${minimum.join('.')}，当前版本为 ${reportedVersion}。`,
+    `Design Work 需要 Node.js >= ${minimum.join('.')}，当前版本为 ${reportedVersion}。`,
     '请升级 Node.js 后重新运行该命令。',
   ].join('\n'));
   process.exit(1);

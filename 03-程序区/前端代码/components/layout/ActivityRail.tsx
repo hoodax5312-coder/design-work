@@ -34,7 +34,7 @@ export const ActivityRail = () => {
     <nav className="flex h-full w-16 shrink-0 flex-col items-center border-r border-black/[0.08] bg-[#f8f8f7] py-2 dark:border-white/10 dark:bg-[#0d0d0d]">
       <Button type="button" variant="primary" size="iconSm"
         onClick={() => openEditor('assets')}
-        aria-label="Mboard 资产库"
+        aria-label="Design Work 资产库"
         className="relative mb-4 h-8 w-8 shadow-sm"
       >
         <Command size={16} strokeWidth={2.3} />

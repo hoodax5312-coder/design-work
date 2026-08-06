@@ -634,7 +634,7 @@ export const AssetLibraryPage = () => {
                 <FolderPlus size={14} aria-hidden="true" /> 选择文件夹
               </Button>
             </div>
-            <p className="mt-4 text-xs text-muted-foreground">图片会保存到 Mboard 本地管理目录，不会上传到第三方服务</p>
+            <p className="mt-4 text-xs text-muted-foreground">图片会保存到 Design Work 本地管理目录，不会上传到第三方服务</p>
           </section>
         )}
         {selectedCount > 0 && (

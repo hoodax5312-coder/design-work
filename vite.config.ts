@@ -9,7 +9,7 @@ export default defineConfig({
   plugins: [
     react(),
     {
-      name: 'mboard-provider-api',
+      name: 'design-work-provider-api',
       configureServer(server) {
         server.middlewares.use(createApiApp(__dirname))
       },

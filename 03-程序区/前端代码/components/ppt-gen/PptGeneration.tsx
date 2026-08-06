@@ -165,7 +165,7 @@ export const PptGeneration = () => {
                     )}>{selectedSlide.title}</h2>
                     <p className="mt-4 max-w-[56%] whitespace-pre-line text-[clamp(12px,1vw,14px)] leading-relaxed opacity-65">{selectedSlide.body}</p>
                   </div>
-                  <div className="absolute bottom-[8%] left-[7%] right-[7%] flex items-center justify-between border-t pt-3 text-xs uppercase tracking-[0.18em] opacity-40" style={{ borderColor: `${selectedTheme.swatches[1]}30` }}><span>Mboard studio</span><span>{String(selectedSlide.id).padStart(2, '0')} / {String(slides.length).padStart(2, '0')}</span></div>
+                  <div className="absolute bottom-[8%] left-[7%] right-[7%] flex items-center justify-between border-t pt-3 text-xs uppercase tracking-[0.18em] opacity-40" style={{ borderColor: `${selectedTheme.swatches[1]}30` }}><span>Design Work studio</span><span>{String(selectedSlide.id).padStart(2, '0')} / {String(slides.length).padStart(2, '0')}</span></div>
                 </div>
 
                 <div className="mt-5 grid grid-cols-[1fr_1.4fr] gap-3">

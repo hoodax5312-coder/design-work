@@ -62,7 +62,7 @@ export const AssetImportDialog = ({
           <div>
             <SheetTitle id="asset-import-title" className="text-xl tracking-tight">导入图片素材</SheetTitle>
             <SheetDescription id="asset-import-description" className="mt-1.5 text-xs leading-5">
-              拖入图片即可自动存入 Mboard 管理目录，并完成去重与预览准备。
+              拖入图片即可自动存入 Design Work 管理目录，并完成去重与预览准备。
             </SheetDescription>
           </div>
           <Button type="button" variant="ghost" size="iconSm" onClick={onClose} disabled={busy} aria-label="关闭导入素材面板">
@@ -126,7 +126,7 @@ export const AssetImportDialog = ({
           <div className="mt-3 flex items-center justify-between gap-4 rounded-lg border border-border bg-card px-4 py-3">
             <div className="flex min-w-0 items-center gap-2.5 text-xs leading-4 text-muted-foreground">
               <ShieldCheck size={15} className="shrink-0 text-foreground" aria-hidden="true" />
-              拖入图片会保存到 Mboard 本地管理目录；不会上传到第三方服务。
+              拖入图片会保存到 Design Work 本地管理目录；不会上传到第三方服务。
             </div>
             <Button
               type="button"
