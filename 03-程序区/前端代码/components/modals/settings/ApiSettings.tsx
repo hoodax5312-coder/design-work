@@ -233,7 +233,7 @@ export function ApiSettings() {
                 </div>
 
                 <section className="border-t border-black/[0.045] dark:border-white/[0.06]" aria-label={provider.name + ' 模型信息'}>
-                  <Button type="button" variant="ghost" onClick={() => toggleProviderModels(provider.id)} aria-expanded={modelsExpanded} className="mx-4 h-12 w-[calc(100%-2rem)] justify-between rounded-md px-0 text-left sm:mx-5 sm:w-[calc(100%-2.5rem)]">
+                  <Button type="button" variant="ghost" onClick={() => toggleProviderModels(provider.id)} aria-expanded={modelsExpanded} className="mx-4 my-2 h-8 w-[calc(100%-2rem)] justify-between rounded-md px-2 text-left sm:mx-5 sm:w-[calc(100%-2.5rem)]">
                     <span className="flex min-w-0 items-center gap-2">
                       <Cpu aria-hidden="true" size={15} className="shrink-0 text-muted-foreground" />
                       <span className="text-xs font-semibold">模型信息</span>
@@ -244,7 +244,7 @@ export function ApiSettings() {
                   </Button>
 
                   {modelsExpanded && (models.length ? (
-                    <ul className="grid w-full gap-2 px-4 pb-4 md:grid-cols-2 sm:px-5">
+                    <ul className="grid w-full gap-2 px-4 pb-4 pt-1 md:grid-cols-2 sm:px-5">
                       {models.map((model) => {
                         const categories = getModelCategories(model);
                         const defaultFor = modelCapabilities.filter(
@@ -289,7 +289,6 @@ export function ApiSettings() {
 function ProviderEditor({ draft, setDraft, testing, message, onTest, onSave, onCancel }: { draft: ProviderConfig; setDraft: (provider: ProviderConfig) => void; testing: boolean; message: { type: 'success' | 'error'; text: string } | null; onTest: () => void; onSave: () => void; onCancel: () => void }) {
   const [showKey, setShowKey] = useState(false);
   const [pendingModelId, setPendingModelId] = useState('');
-  const [pendingCategories, setPendingCategories] = useState<ModelCategory[]>(['language']);
   const [editingModelId, setEditingModelId] = useState<string | null>(null);
   const [editingModelValue, setEditingModelValue] = useState('');
   const configuredModels = getConfiguredModels(draft);
@@ -306,7 +305,7 @@ function ProviderEditor({ draft, setDraft, testing, message, onTest, onSave, onC
   const addModel = () => {
     const id = pendingModelId.trim();
     if (!id || configuredModels.some((model) => model.id === id)) return;
-    const categories = [...new Set(pendingCategories)];
+    const categories: ModelCategory[] = ['language'];
     const next: ConfiguredModel[] = [
       ...configuredModels,
       { id, category: categories[0], categories },
@@ -322,13 +321,6 @@ function ProviderEditor({ draft, setDraft, testing, message, onTest, onSave, onC
       modelSelections,
     });
     setPendingModelId('');
-  };
-  const togglePendingCategory = (category: ModelCategory) => {
-    setPendingCategories((current) => (
-      current.includes(category)
-        ? current.filter((item) => item !== category)
-        : [...current, category]
-    ));
   };
   const updateModelCategories = (model: ConfiguredModel, category: ModelCategory) => {
     const currentCategories = getModelCategories(model);
@@ -415,25 +407,13 @@ function ProviderEditor({ draft, setDraft, testing, message, onTest, onSave, onC
             <Button type="button" variant="ghost" size="iconSm" onClick={() => setShowKey((visible) => !visible)} aria-label={showKey ? '隐藏 API 密钥' : '显示 API 密钥'} className="absolute right-1 top-1/2 -translate-y-1/2">{showKey ? <EyeOff aria-hidden="true" size={16} /> : <Eye aria-hidden="true" size={16} />}</Button>
           </span>
         </label>
-        <section aria-labelledby="provider-model-ids" className="space-y-3">
-          <div>
-            <h6 id="provider-model-ids" className="text-xs font-medium text-slate-600 dark:text-slate-300">模型与能力</h6>
-            <p className="mt-1 text-xs text-slate-400">添加模型 ID，并直接选择它支持文本、生图或视频；一个模型可以同时支持多种能力。</p>
-          </div>
-          <form className="rounded-md bg-card p-3" onSubmit={(event) => { event.preventDefault(); addModel(); }}>
-            <div className="flex gap-2">
+        <section aria-labelledby="provider-model-ids" className="space-y-2">
+          <h6 id="provider-model-ids" className="text-xs font-medium text-slate-600 dark:text-slate-300">模型</h6>
+          <form onSubmit={(event) => { event.preventDefault(); addModel(); }}>
+            <div className="flex items-center gap-2">
               <label className="sr-only" htmlFor="provider-model-id">新增模型 ID</label>
-              <Input id="provider-model-id" inputSize="sm" value={pendingModelId} onChange={(event) => setPendingModelId(event.target.value)} placeholder="例如：gpt-4o-mini" className="text-xs" />
-              <Button type="submit" variant="primary" size="sm" disabled={!pendingModelId.trim() || !pendingCategories.length} className="h-8 bg-foreground text-background hover:bg-foreground/85"><Plus aria-hidden="true" size={15} /> 添加</Button>
-            </div>
-            <div className="mt-2 flex flex-wrap items-center gap-1.5" aria-label="新增模型能力">
-              <Cpu aria-hidden="true" size={13} className="mr-1 text-slate-400" />
-              {modelCapabilities.map((capability) => {
-                const active = pendingCategories.includes(capability.id);
-                return (
-                  <Button key={capability.id} type="button" variant={active ? 'secondary' : 'ghost'} size="sm" aria-pressed={active} onClick={() => togglePendingCategory(capability.id)} className={cn('h-7 px-2 text-xs', active && capability.activeClass)}>{capability.label}</Button>
-                );
-              })}
+              <Input id="provider-model-id" inputSize="sm" value={pendingModelId} onChange={(event) => setPendingModelId(event.target.value)} placeholder="model-id" className="min-w-0 flex-1 text-xs" />
+              <Button type="submit" variant="primary" size="sm" disabled={!pendingModelId.trim()} className="h-8 shrink-0 bg-foreground text-background hover:bg-foreground/85"><Plus aria-hidden="true" size={14} /> 添加</Button>
             </div>
           </form>
           {configuredModels.length ? (

@@ -277,7 +277,7 @@ export const PersonalSpace = ({ embedded = false, query: externalQuery }: { embe
   return (
     <main className={cn('flex h-full min-h-0 flex-col text-foreground', embedded ? 'bg-transparent' : 'module-workspace bg-background')}>
       {!embedded && <header className="mx-16 flex h-14 shrink-0 items-center justify-between gap-4 border-0 px-0">
-        <h1 className="text-base font-semibold tracking-[-0.02em]">文档</h1>
+        <h1 className="text-base font-semibold tracking-[-0.02em]">知识</h1>
         <label className="flex h-8 w-[240px] max-w-[48vw] items-center gap-2 rounded-md bg-muted px-2.5">
           <Search aria-hidden="true" size={15} className="shrink-0 text-muted-foreground" />
           <Input
@@ -286,14 +286,14 @@ export const PersonalSpace = ({ embedded = false, query: externalQuery }: { embe
             aria-label="搜索空间文件"
             value={query}
             onChange={(event) => setLocalQuery(event.target.value)}
-            placeholder="搜索文档"
+            placeholder="搜索知识"
             className="h-8 min-w-0 flex-1 text-xs"
           />
         </label>
       </header>}
 
       <div className={cn('mb-0 flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl bg-[#f8f8f6] dark:bg-white/[0.035] md:flex-row', !embedded && 'mx-16 p-2')}>
-      <aside aria-label="文档文件树" className="flex max-h-[38vh] w-full shrink-0 flex-col overflow-hidden bg-transparent py-2 pr-2 shadow-none md:max-h-none md:w-[240px]">
+      <aside aria-label="知识文件树" className="flex max-h-[38vh] w-full shrink-0 flex-col overflow-hidden bg-transparent py-2 pr-2 shadow-none md:max-h-none md:w-[240px]">
         <div className="mb-2 flex h-8 shrink-0 items-center justify-between px-1">
           <button type="button" onClick={() => setActiveFolderId(undefined)} className="min-w-0 flex-1 truncate px-2 text-left text-xs font-semibold text-muted-foreground" title="在根目录新建">文件</button>
           <div className="flex shrink-0 gap-1">
@@ -311,7 +311,7 @@ export const PersonalSpace = ({ embedded = false, query: externalQuery }: { embe
       </aside>
 
       <section className="flex min-w-0 flex-1 flex-col overflow-hidden rounded-lg bg-background shadow-sm">
-        <div role="tablist" aria-label="已打开的文档" className="flex h-10 shrink-0 items-end overflow-x-auto border-b border-black/[0.05] bg-background px-1 pt-1 dark:border-white/[0.06]">
+        <div role="tablist" aria-label="已打开的知识" className="flex h-10 shrink-0 items-end overflow-x-auto border-b border-black/[0.05] bg-background px-1 pt-1 dark:border-white/[0.06]">
           {openEntries.map((entry) => {
             const isActive = activeEntryId === entry.id;
             return <div key={entry.id} className={cn('group flex h-9 min-w-[132px] max-w-[220px] items-center rounded-t-md border border-b-0 border-transparent', isActive && 'border-black/[0.05] bg-background dark:border-white/[0.06]')}>

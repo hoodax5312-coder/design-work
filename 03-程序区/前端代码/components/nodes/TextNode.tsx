@@ -38,16 +38,15 @@ export const TextNode = memo(({ id, data, selected }: NodeProps<CanvasTextNode>)
   return (
     <BaseNode selected={selected} icon={Type} title="文本" width={420} showSourceHandle showTargetHandle onDelete={() => deleteNode(id)}>
       <div className="px-3 pb-3">
-        <div className="min-h-[150px] w-full rounded-md bg-muted/55 p-4 text-xs leading-6">
-          {data.isGenerating ? <div className="flex h-28 items-center justify-center gap-2 text-muted-foreground"><Loader2 size={16} className="animate-spin" /> 正在生成文本…</div> : <Textarea aria-label="编辑文本内容" value={data.content || ''} onChange={(event) => updateNode(id, { content: event.target.value })} placeholder="双击编辑文本，或在下方输入 Prompt 生成" variant="ghost" className="nodrag nowheel h-32 leading-6" />}
+        <div className="w-full rounded-lg border border-border bg-background p-2 shadow-sm">
+          {data.isGenerating ? <div className="flex h-28 items-center justify-center gap-2 text-muted-foreground"><Loader2 size={16} className="animate-spin" /> 正在生成文本…</div> : <Textarea aria-label="文本输入" value={data.prompt || data.content || ''} onChange={(event) => updateNode(id, { prompt: event.target.value, content: event.target.value })} onKeyDown={(event) => { if ((event.metaKey || event.ctrlKey) && event.key === 'Enter') { event.preventDefault(); void generate(); } }} placeholder="输入文本，@ 引用画布素材…" variant="ghost" className="nodrag nowheel h-28 min-h-0 w-full resize-none px-1 text-xs leading-6" />}
+          <div className="mt-2 flex items-center gap-2 border-t border-border/70 pt-2">
+            <Select aria-label="选择文本模型" value={active ? active.provider.id + '::' + active.model : ''} onChange={(event) => { const [providerId, ...parts] = event.target.value.split('::'); updateNode(id, { providerId, model: parts.join('::') }); }} disabled={!options.length} selectSize="sm" className="min-w-0 flex-1 text-xs" options={options.length ? options.map((option) => ({ value: option.provider.id + '::' + option.model, label: option.model })) : [{ value: '', label: '暂无文本模型' }]} />
+            <Button type="button" variant="primary" size="iconSm" onClick={() => void generate()} disabled={data.isGenerating || !(data.prompt || data.content)?.trim()} aria-label="生成文本">{data.isGenerating ? <Loader2 size={15} className="animate-spin" /> : <Send size={14} />}</Button>
+          </div>
+          <div className="mt-2 flex items-center justify-between px-1 text-[11px] font-medium text-muted-foreground"><span className="truncate">{active?.provider.name || provider?.name || '未配置 Provider'}</span><span className="truncate font-mono">{model || '未选择模型'}</span></div>
+          {data.error && <p role="alert" className="mt-2 px-1 text-xs leading-4 text-red-600 dark:text-red-300">{data.error}</p>}
         </div>
-        <div className="mt-3 flex w-full items-center gap-2 rounded-md border border-border bg-background p-2">
-          <Textarea aria-label="文本生成提示词" value={data.prompt || ''} onChange={(event) => updateNode(id, { prompt: event.target.value })} onKeyDown={(event) => { if ((event.metaKey || event.ctrlKey) && event.key === 'Enter') { event.preventDefault(); void generate(); } }} placeholder="描述你想生成的文本，@ 引用画布素材…" variant="ghost" className="nodrag nowheel h-14 min-h-0 flex-1 text-xs leading-5" />
-          <Button type="button" variant="primary" size="iconSm" onClick={() => void generate()} disabled={data.isGenerating || !data.prompt?.trim()} aria-label="开始生成文本">{data.isGenerating ? <Loader2 size={15} className="animate-spin" /> : <Send size={14} />}</Button>
-        </div>
-        <Select aria-label="选择文本模型" value={active ? active.provider.id + '::' + active.model : ''} onChange={(event) => { const [providerId, ...parts] = event.target.value.split('::'); updateNode(id, { providerId, model: parts.join('::') }); }} disabled={!options.length} selectSize="sm" className="nodrag mt-2 text-xs" options={options.length ? options.map((option) => ({ value: option.provider.id + '::' + option.model, label: option.model })) : [{ value: '', label: '暂无文本模型' }]} />
-        <div className="mt-2 flex w-full items-center justify-between text-xs font-medium text-muted-foreground"><span>Provider · {active?.provider.name || provider?.name || '未配置'}</span><span className="font-mono">Model · {model || '未选择'}</span></div>
-        {data.error && <p role="alert" className="mt-2 text-xs leading-4 text-red-600 dark:text-red-300">{data.error}</p>}
       </div>
     </BaseNode>
   );
