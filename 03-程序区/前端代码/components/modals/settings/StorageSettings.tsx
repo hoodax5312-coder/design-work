@@ -121,7 +121,7 @@ export function StorageSettings() {
               onChange={(event) =>
                 setSettings((current) => ({ ...current, dataDirectory: event.target.value }))
               }
-              placeholder="/Users/you/Documents/Mboard"
+              placeholder="/Users/you/Documents/Design Work"
               className="min-w-0 flex-1 text-xs"
             />
             <Button
@@ -159,7 +159,7 @@ export function StorageSettings() {
                 onChange={(event) =>
                   setSettings((current) => ({ ...current, cacheDirectory: event.target.value }))
                 }
-                placeholder="/Users/you/Library/Caches/Mboard"
+                placeholder="/Users/you/Library/Caches/Design Work"
                 aria-label="缓存目录"
                 className="min-w-0 flex-1 text-xs"
               />

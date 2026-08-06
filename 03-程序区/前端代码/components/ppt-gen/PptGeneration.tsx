@@ -74,7 +74,7 @@ export const PptGeneration = () => {
     const url = URL.createObjectURL(new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' }));
     const anchor = document.createElement('a');
     anchor.href = url;
-    anchor.download = `mboard-presentation-${Date.now()}.json`;
+    anchor.download = `design-work-presentation-${Date.now()}.json`;
     anchor.click();
     URL.revokeObjectURL(url);
   };

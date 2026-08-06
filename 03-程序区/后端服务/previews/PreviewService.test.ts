@@ -17,7 +17,7 @@ const withLibrary = async (
     service: PreviewService;
   }) => Promise<void>,
 ) => {
-  const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'mboard-preview-'));
+  const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'design-work-preview-'));
   const paths = createLibraryPaths(path.join(directory, 'library'));
   await ensureLibraryDirectories(paths);
   const database = openLibraryDatabase(paths.database);

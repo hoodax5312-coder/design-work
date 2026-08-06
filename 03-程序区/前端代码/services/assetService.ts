@@ -117,7 +117,7 @@ export const assetService = {
       method: 'POST',
       headers: {
         'Content-Type': file.type || 'application/octet-stream',
-        'X-Mboard-File-Name': encodeURIComponent(file.name),
+        'X-Design-Work-File-Name': encodeURIComponent(file.name),
       },
       body: file,
     });

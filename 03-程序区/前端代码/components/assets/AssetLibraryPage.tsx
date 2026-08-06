@@ -86,8 +86,8 @@ export const AssetLibraryPage = () => {
   useEffect(() => {
     const sync = () => setGeneratedItems(contentFeed.list());
     sync();
-    window.addEventListener('mboard:content-feed-updated', sync);
-    return () => window.removeEventListener('mboard:content-feed-updated', sync);
+    window.addEventListener('design-work:content-feed-updated', sync);
+    return () => window.removeEventListener('design-work:content-feed-updated', sync);
   }, []);
 
   useEffect(() => {
@@ -188,8 +188,8 @@ export const AssetLibraryPage = () => {
           ?.focus();
       }
     };
-    window.addEventListener('mboard:asset-navigation', navigate);
-    return () => window.removeEventListener('mboard:asset-navigation', navigate);
+    window.addEventListener('design-work:asset-navigation', navigate);
+    return () => window.removeEventListener('design-work:asset-navigation', navigate);
   }, []);
 
   const refresh = useCallback(() => {

@@ -14,7 +14,7 @@ export const createApiApp = (projectRoot: string) => {
 
   app.use(express.json({ limit: '20mb' }));
   app.get('/api/health', (_request, response) => {
-    response.json({ ok: true, service: 'mboard-local' });
+    response.json({ ok: true, service: 'design-work-local' });
   });
   app.use('/api/provider', createProviderRouter());
   app.use('/api/storage', createStorageRouter(projectRoot));

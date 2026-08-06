@@ -10,7 +10,7 @@ Design Work 是一个本地优先的 AI 创作工作台，包含真实模型对�
 - 按“项目 → 情节 → 片段 → 生成候选”浏览工程
 - 查看 Prompt、模型、Seed、分辨率、时长和风格参数
 - 将候选片段加入底部镜头组合轨道
-- 将项目目录和生成元数据同步到 `.mboard/higgsfield/`
+- 将项目目录和生成元数据同步到 `.design-work/higgsfield/`
 - 扫描全部公开项目的文件数和容量，生成归档清单
 
 容量盘点使用 HTTP `HEAD` 或 `bytes=0-0` Range 请求获取文件大小。HLS 视频会解析最高码率播放清单并累加分片大小。扫描过程不会下载或写入原始图片和视频。
@@ -18,7 +18,7 @@ Design Work 是一个本地优先的 AI 创作工作台，包含真实模型对�
 盘点结果保存在：
 
 ```text
-.mboard/higgsfield-audit/
+.design-work/higgsfield-audit/
 ├── status.json
 ├── manifest.json
 └── projects/
@@ -52,7 +52,7 @@ npm start
 
 ### 关于单文件 HTML
 
-`npm run build:html` 生成的 `output/Mboard-standalone.html` 仅用于界面预览。浏览器直接打开单文件时没有 Node.js、SQLite、文件扫描或媒体处理能力；完整的本地资产管理功能必须通过 `npm run dev` 或 `npm start` 运行本地服务。
+`npm run build:html` 生成的 `output/Design Work-standalone.html` 仅用于界面预览。浏览器直接打开单文件时没有 Node.js、SQLite、文件扫描或媒体处理能力；完整的本地资产管理功能必须通过 `npm run dev` 或 `npm start` 运行本地服务。
 
 ## 配置模型
 

@@ -15,5 +15,5 @@ app.use((_request, response) => {
 });
 
 app.listen(port, () => {
-  console.log(`Mboard is running at http://localhost:${port}`);
+  console.log(`Design Work is running at http://localhost:${port}`);
 });

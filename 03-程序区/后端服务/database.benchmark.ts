@@ -8,7 +8,7 @@ import { AssetRepository } from './repositories/AssetRepository';
 const assetCount = 100_000;
 const sampleCount = 30;
 const maximumP95Milliseconds = 300;
-const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'mboard-benchmark-'));
+const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'design-work-benchmark-'));
 const databasePath = path.join(directory, 'library.sqlite');
 const database = openLibraryDatabase(databasePath);
 

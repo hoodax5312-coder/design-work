@@ -21,7 +21,7 @@ import { TaskRunner } from './tasks/TaskRunner';
 
 const createRuntime = (): LibraryRuntime => {
   const database = openLibraryDatabase(':memory:');
-  const paths = createLibraryPaths('/tmp/mboard-asset-api-test');
+  const paths = createLibraryPaths('/tmp/design-work-asset-api-test');
   return {
     database,
     paths,
@@ -37,7 +37,7 @@ const createRuntime = (): LibraryRuntime => {
 
 test('asset API supports combined filters, durable updates, bulk operations, delete and restore', async () => {
   const runtime = createRuntime();
-  const filesDirectory = await fs.mkdtemp(path.join(os.tmpdir(), 'mboard-relocate-'));
+  const filesDirectory = await fs.mkdtemp(path.join(os.tmpdir(), 'design-work-relocate-'));
   const originalPath = path.join(filesDirectory, 'original.png');
   const relocatedPath = path.join(filesDirectory, 'relocated.png');
   await fs.writeFile(originalPath, 'same-file-content');

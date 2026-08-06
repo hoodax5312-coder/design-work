@@ -199,7 +199,7 @@ const VideoStudio = ({ onOpenLibrary }: { onOpenLibrary: () => void }) => {
       shots,
       savedAt: new Date().toISOString(),
     };
-    localStorage.setItem('mboard:video-template', JSON.stringify(template));
+    localStorage.setItem('design-work:video-template', JSON.stringify(template));
   };
 
   const updateShot = (id: number, patch: Partial<StoryboardShot>) => {
@@ -716,8 +716,8 @@ const VideoAssetCatalog = ({ query }: { query: string }) => {
 
   useEffect(() => {
     const sync = () => setItems(contentFeed.list().filter((item) => item.type === 'video'));
-    window.addEventListener('mboard:content-feed-updated', sync);
-    return () => window.removeEventListener('mboard:content-feed-updated', sync);
+    window.addEventListener('design-work:content-feed-updated', sync);
+    return () => window.removeEventListener('design-work:content-feed-updated', sync);
   }, []);
 
   useEffect(() => {

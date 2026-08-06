@@ -24,13 +24,13 @@ const [script, style] = await Promise.all([
 
 // The standalone file uses a classic inline script so it can be opened from file://.
 // Fail the build if Vite ever emits module-only syntax or the bundle is malformed.
-new Script(script, { filename: 'mboard-standalone.js' });
+new Script(script, { filename: 'design-work-standalone.js' });
 
 const standalone = html
   .replace(styleMatch[0], () => `<style>\n${style.replaceAll('</style', '<\\/style')}\n</style>`)
   .replace(scriptMatch[0], '')
   .replace('</body>', () => `<script>\n${script.replaceAll('</script', '<\\/script')}\n</script>\n</body>`)
-  .replace('</head>', '  <meta name="mboard-build" content="standalone" />\n  </head>');
+  .replace('</head>', '  <meta name="design-work-build" content="standalone" />\n  </head>');
 
 const rootPosition = standalone.indexOf('id="root"');
 const runtimePosition = standalone.lastIndexOf('<script>');
@@ -42,7 +42,7 @@ if (/<script[^>]+src=|<link[^>]+href=/.test(standalone)) {
 }
 
 await mkdir(outputDir, { recursive: true });
-const outputPath = path.join(outputDir, 'Mboard-standalone.html');
+const outputPath = path.join(outputDir, 'Design Work-standalone.html');
 await writeFile(outputPath, standalone, 'utf8');
 
 console.log(`单文件 HTML 已生成：${outputPath}`);

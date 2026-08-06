@@ -370,7 +370,7 @@ const CanvasInner = () => {
           maxZoom={2.5}
           defaultEdgeOptions={{ type: 'smoothstep', animated: true, style: { stroke: '#8a948d', strokeWidth: 1.4 } }}
           proOptions={{ hideAttribution: true }}
-          className="mboard-flow h-full w-full bg-white dark:bg-[#0b0b0b]"
+          className="design-work-flow h-full w-full bg-white dark:bg-[#0b0b0b]"
         >
           <Background gap={18} size={0.8} color="rgba(116,124,114,0.13)" />
           {showMinimap && (

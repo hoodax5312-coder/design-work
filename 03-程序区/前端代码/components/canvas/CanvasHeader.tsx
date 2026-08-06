@@ -24,12 +24,12 @@ export const CanvasHeader = () => {
       nodes,
       edges,
     };
-    localStorage.setItem('mboard:last-workflow', JSON.stringify(payload));
+    localStorage.setItem('design-work:last-workflow', JSON.stringify(payload));
     const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const anchor = document.createElement('a');
     anchor.href = url;
-    anchor.download = `mboard-workflow-${Date.now()}.json`;
+    anchor.download = `design-work-workflow-${Date.now()}.json`;
     anchor.click();
     URL.revokeObjectURL(url);
   };
