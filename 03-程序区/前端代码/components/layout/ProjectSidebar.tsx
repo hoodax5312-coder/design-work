@@ -233,7 +233,7 @@ export const ProjectSidebar = () => {
         <Button type="button" variant="secondary" size="iconSm"
           onClick={() => openModule('assets')}
           aria-label="打开资产库"
-          title="Mboard"
+          title="Design Work"
           className="relative h-9 w-9 shadow-sm"
         >
           <Command size={17} strokeWidth={2.3} />

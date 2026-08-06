@@ -54,7 +54,7 @@ export const CanvasHeader = () => {
         className="hidden"
         onChange={(event) => {
           importWorkflow(event.target.files?.[0]).catch(() => {
-            window.alert('导入失败，请选择有效的 Mboard 工作流 JSON 文件。');
+            window.alert('导入失败，请选择有效的 Design Work 工作流 JSON 文件。');
           });
           event.target.value = '';
         }}
