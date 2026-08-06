@@ -8,10 +8,6 @@ import {
   User, 
   LayoutGrid, 
   MessageSquare,
-  Upload,
-  Wand2,
-  Film,
-  PlaySquare,
   Scissors,
   Clapperboard,
   Network,
@@ -99,21 +95,21 @@ export const CanvasToolbar = () => {
     });
   };
 
-  const handleAddImageNode = (type: string) => {
+  const handleAddImageNode = () => {
     addNode({
       id: nanoid(),
       type: 'imageGen', // Using imageGen type as placeholder
       position: { x: 200 + Math.random() * 100, y: 200 + Math.random() * 100 },
-      data: { prompt: type === 'upload' ? '上传图片' : '输入提示词生成图片...', model: 'default' },
+      data: { prompt: '', model: 'default' },
     });
   };
 
-  const handleAddVideoNode = (type: string) => {
+  const handleAddVideoNode = () => {
     addNode({
       id: nanoid(),
       type: 'video',
       position: { x: 300 + Math.random() * 100, y: 300 + Math.random() * 100 },
-      data: { prompt: type === 'text-to-video' ? '文生视频' : '图生视频', model: '' },
+      data: { prompt: '', model: '' },
     });
   };
 
@@ -158,18 +154,9 @@ export const CanvasToolbar = () => {
           onClick={handleAddText} 
         />
         
-        <ToolbarItem icon={ImageIcon}>
-          <SubMenuItem icon={Upload} label="上传图片" onClick={() => handleAddImageNode('upload')} />
-          <SubMenuItem icon={Wand2} label="文生图" onClick={() => handleAddImageNode('text-to-image')} />
-          <SubMenuItem icon={ImageIcon} label="图生图" onClick={() => handleAddImageNode('image-to-image')} />
-          <SubMenuItem icon={LayoutGrid} label="风格转换" onClick={() => handleAddImageNode('style-transfer')} />
-        </ToolbarItem>
+        <ToolbarItem icon={ImageIcon} label="添加图片节点" onClick={handleAddImageNode} />
 
-        <ToolbarItem icon={Video}>
-          <SubMenuItem icon={Film} label="文生视频" onClick={() => handleAddVideoNode('text-to-video')} />
-          <SubMenuItem icon={PlaySquare} label="图生视频" onClick={() => handleAddVideoNode('image-to-video')} />
-          <SubMenuItem icon={Scissors} label="首尾帧视频" onClick={() => handleAddVideoNode('frame-video')} />
-        </ToolbarItem>
+        <ToolbarItem icon={Video} label="添加视频节点" onClick={handleAddVideoNode} />
 
         <ToolbarItem icon={Boxes}>
           <SubMenuItem icon={Clapperboard} label="智能分镜" onClick={handleAddStoryboardNode} />

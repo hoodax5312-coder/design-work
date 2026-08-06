@@ -17,7 +17,6 @@ import {
   Hand,
   ImagePlus,
   LayoutGrid,
-  ListFilter,
   Loader2,
   Map,
   MessageSquareText,
@@ -25,7 +24,6 @@ import {
   PanelLeftClose,
   PanelLeftOpen,
   Plus,
-  Search,
   Send,
   Settings2,
   Type,
@@ -46,8 +44,6 @@ const nodeTypes = { text: TextNode, imageGen: ImageGenNode, video: VideoNode };
 type Tool = 'select' | 'pan';
 type ToolbarMenu = 'tool' | 'image' | 'video';
 type CanvasNodeType = 'text' | 'imageGen' | 'video';
-type ImageGenerationMode = 'text-to-image' | 'image-to-image';
-type VideoGenerationMode = 'text-to-video' | 'image-to-video';
 type AgentMode = 'auto' | 'ask';
 type ChatMessage = { id: string; role: 'user' | 'assistant'; content: string };
 type BoardSnapshot = { nodes: Node[]; edges: Edge[] };
@@ -69,8 +65,8 @@ const NODE_META: Record<CanvasNodeType, { label: string; icon: React.ElementType
 const makeNode = (type: CanvasNodeType, position: { x: number; y: number }, data: Record<string, unknown> = {}): Node => {
   const id = crypto.randomUUID();
   if (type === 'text') return { id, type, position, data: { content: '', prompt: '', mode: 'edit', ...data } };
-  if (type === 'video') return { id, type, position, data: { prompt: '', model: '', generationMode: 'text-to-video', aspectRatio: '16:9', resolution: '1080p', duration: 5, ...data } };
-  return { id, type, position, data: { prompt: '', model: '', generationMode: 'text-to-image', style: '', resolution: '1k', aspectRatio: '1:1', isFocusMode: false, ...data } };
+  if (type === 'video') return { id, type, position, data: { prompt: '', model: '', aspectRatio: '16:9', resolution: '1080p', duration: 5, ...data } };
+  return { id, type, position, data: { prompt: '', model: '', style: '', resolution: '1k', aspectRatio: '1:1', isFocusMode: false, ...data } };
 };
 
 const CanvasInner = () => {
@@ -78,8 +74,6 @@ const CanvasInner = () => {
   const mediaInputRef = useRef<HTMLInputElement>(null);
   const toolbarRef = useRef<HTMLDivElement>(null);
   const [tool, setTool] = useState<Tool>('select');
-  const [imageGenerationMode, setImageGenerationMode] = useState<ImageGenerationMode>('text-to-image');
-  const [videoGenerationMode, setVideoGenerationMode] = useState<VideoGenerationMode>('text-to-video');
   const [toolbarMenu, setToolbarMenu] = useState<ToolbarMenu | null>(null);
   const [showMinimap, setShowMinimap] = useState(false);
   const [showExplorer, setShowExplorer] = useState(false);
@@ -88,8 +82,6 @@ const CanvasInner = () => {
   const [projectNameDraft, setProjectNameDraft] = useState('');
   const [showAgent, setShowAgent] = useState(false);
   const [agentSettingsOpen, setAgentSettingsOpen] = useState(false);
-  const [componentQuery, setComponentQuery] = useState('');
-  const [componentFilter, setComponentFilter] = useState<'all' | CanvasNodeType>('all');
   const [boards, setBoards] = useState(['画布 1', '画布 2']);
   const [activeBoard, setActiveBoard] = useState('画布 1');
   const [boardNodeCounts, setBoardNodeCounts] = useState<Record<string, number>>({ '画布 1': 0, '画布 2': 0 });
@@ -182,8 +174,6 @@ const CanvasInner = () => {
     activeBoardRef.current = board;
     setActiveBoard(board);
     setMessages(nextMessages);
-    setComponentQuery('');
-    setComponentFilter('all');
     restoreSnapshot(nextSnapshot.nodes, nextSnapshot.edges);
     window.setTimeout(() => void flowRef.current?.fitView({ duration: 220, padding: 0.28 }), 20);
   }, [edges, messages, nodes, restoreSnapshot]);
@@ -303,13 +293,7 @@ const CanvasInner = () => {
     }
     return node.type === 'imageGen' ? 'rgba(17,23,19,0.3)' : node.type === 'video' ? 'rgba(17,23,19,0.23)' : 'rgba(17,23,19,0.17)';
   }, [theme]);
-  const visibleNodes = nodes.filter((node) => {
-    const type = (node.type || 'text') as CanvasNodeType;
-    const matchesType = componentFilter === 'all' || type === componentFilter;
-    const query = componentQuery.trim().toLowerCase();
-    const content = `${NODE_META[type]?.label || '节点'} ${String(node.data?.prompt || '')} ${String(node.data?.content || '')}`.toLowerCase();
-    return matchesType && (!query || content.includes(query));
-  });
+  const visibleNodes = nodes;
 
   return (
     <main className="absolute inset-x-0 bottom-0 top-14 min-h-0 overflow-hidden bg-white text-foreground dark:bg-[#0b0b0b]">
@@ -338,9 +322,7 @@ const CanvasInner = () => {
           </div>
 
           <div className="flex min-h-0 flex-1 flex-col px-3 pb-3 pt-2">
-            <div className="mb-2 flex h-8 items-center justify-between px-2"><span className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">组件 <span className="ml-1 font-mono">{visibleNodes.length}</span></span><ListFilter size={13} className="text-muted-foreground" /></div>
-            <label className="mb-2 flex h-9 items-center gap-2 rounded-lg bg-muted/70 px-2.5"><Search size={13} className="text-muted-foreground" /><Input inputSize="sm" aria-label="搜索画布组件" value={componentQuery} onChange={(event) => setComponentQuery(event.target.value)} placeholder="搜索画布内容" variant="ghost" className="h-8 flex-1 px-0 text-xs" /></label>
-            <div className="mb-2 flex gap-1">{([['all', '全部'], ['text', '文本'], ['imageGen', '图片'], ['video', '视频']] as const).map(([value, label]) => <Button key={value} type="button" variant={componentFilter === value ? 'secondary' : 'ghost'} size="sm" onClick={() => setComponentFilter(value)} className="h-7 flex-1 px-1 text-xs">{label}</Button>)}</div>
+            <div className="mb-2 flex h-8 items-center px-2"><span className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">组件 <span className="ml-1 font-mono">{visibleNodes.length}</span></span></div>
             <div className="min-h-0 flex-1 space-y-1 overflow-y-auto">
               {visibleNodes.length ? visibleNodes.map((node) => {
                 const type = (node.type || 'text') as CanvasNodeType;
@@ -473,79 +455,29 @@ const CanvasInner = () => {
                 type="button"
                 variant="ghost"
                 size="iconSm"
-                onClick={() => addAtCenter('imageGen', { generationMode: imageGenerationMode })}
+                onClick={() => addAtCenter('imageGen')}
                 aria-label="生成图片"
-                title={`生成图片（${imageGenerationMode === 'text-to-image' ? '文生图' : '图生图'}）`}
+                title="添加图片节点"
                 className="h-8 w-8 rounded-r-none p-0"
               >
                 <ImagePlus size={14} />
               </Button>
-              <Button
-                type="button"
-                variant="ghost"
-                size="iconSm"
-                onClick={() => setToolbarMenu((menu) => menu === 'image' ? null : 'image')}
-                aria-label="展开图片生成方式"
-                aria-haspopup="menu"
-                aria-expanded={toolbarMenu === 'image'}
-                title="选择图片生成方式"
-                className="h-8 w-5 rounded-l-none p-0 text-muted-foreground"
-              >
-                <ChevronDown size={10} />
-              </Button>
             </div>
-            {toolbarMenu === 'image' && (
-              <Card role="menu" padding="none" className="absolute bottom-10 left-0 w-36 p-1.5 shadow-xl">
-                {([
-                  ['text-to-image', Type, '文生图'],
-                  ['image-to-image', ImagePlus, '图生图'],
-                ] as const).map(([mode, Icon, label]) => (
-                  <Button key={mode} type="button" variant="ghost" size="sm" role="menuitemradio" aria-checked={imageGenerationMode === mode} onClick={() => { setImageGenerationMode(mode); addAtCenter('imageGen', { generationMode: mode }); setToolbarMenu(null); }} className={cn('h-9 w-full justify-start gap-2 px-2 text-xs', imageGenerationMode === mode && 'bg-muted text-foreground')}>
-                    <Icon size={14} />{label}
-                  </Button>
-                ))}
-              </Card>
-            )}
           </div>
-          <div className="relative">
+          <div>
             <div role="group" aria-label="生成视频" className="flex h-8 overflow-hidden rounded-md">
               <Button
                 type="button"
                 variant="ghost"
                 size="iconSm"
-                onClick={() => addAtCenter('video', { generationMode: videoGenerationMode })}
+                onClick={() => addAtCenter('video')}
                 aria-label="生成视频"
-                title={`生成视频（${videoGenerationMode === 'text-to-video' ? '文生视频' : '图生视频'}）`}
+                title="添加视频节点"
                 className="h-8 w-8 rounded-r-none p-0"
               >
                 <Video size={14} />
               </Button>
-              <Button
-                type="button"
-                variant="ghost"
-                size="iconSm"
-                onClick={() => setToolbarMenu((menu) => menu === 'video' ? null : 'video')}
-                aria-label="展开视频生成方式"
-                aria-haspopup="menu"
-                aria-expanded={toolbarMenu === 'video'}
-                title="选择视频生成方式"
-                className="h-8 w-5 rounded-l-none p-0 text-muted-foreground"
-              >
-                <ChevronDown size={10} />
-              </Button>
             </div>
-            {toolbarMenu === 'video' && (
-              <Card role="menu" padding="none" className="absolute bottom-10 left-0 w-40 p-1.5 shadow-xl">
-                {([
-                  ['text-to-video', Type, '文生视频'],
-                  ['image-to-video', ImagePlus, '图生视频'],
-                ] as const).map(([mode, Icon, label]) => (
-                  <Button key={mode} type="button" variant="ghost" size="sm" role="menuitemradio" aria-checked={videoGenerationMode === mode} onClick={() => { setVideoGenerationMode(mode); addAtCenter('video', { generationMode: mode }); setToolbarMenu(null); }} className={cn('h-9 w-full justify-start gap-2 px-2 text-xs', videoGenerationMode === mode && 'bg-muted text-foreground')}>
-                    <Icon size={14} />{label}
-                  </Button>
-                ))}
-              </Card>
-            )}
           </div>
           <span aria-hidden="true" className="h-6 w-px shrink-0 bg-black/[0.08] dark:bg-white/[0.1]" />
           <div className="flex h-8 items-center gap-1 rounded-lg bg-black/[0.05] p-0.5 dark:bg-white/[0.07]">

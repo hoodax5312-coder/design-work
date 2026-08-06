@@ -268,15 +268,25 @@ export const QuickNotes = () => {
 
       <section aria-label="小记列表" className="min-h-0 flex-1 overflow-y-auto rounded-lg bg-white p-3 dark:bg-[#121212] sm:p-4">
         <div className="mx-auto max-w-4xl">
-          <div aria-label="按标签筛选小记" className="sticky top-0 z-20 mb-4 flex flex-wrap items-center gap-2 border-b border-black/[0.05] bg-white dark:border-white/[0.06] dark:bg-[#121212]">
-            <Button type="button" variant="ghost" size="iconSm" onClick={() => setComposerOpen((open) => !open)} aria-label={composerOpen ? '收起笔记输入区' : '展开笔记输入区'} title={composerOpen ? '收起笔记输入区' : '展开笔记输入区'} aria-expanded={composerOpen} className="h-8 w-8 shrink-0 text-muted-foreground hover:bg-black/[0.05] dark:hover:bg-white/[0.08]">
+          <div aria-label="按标签筛选小记" className="sticky top-0 z-20 mb-4 flex min-w-0 flex-nowrap items-center gap-2 overflow-hidden border-b border-black/[0.05] bg-white dark:border-white/[0.06] dark:bg-[#121212]">
+            <div className="flex shrink-0 items-center gap-2">
+              <Button type="button" variant="ghost" size="iconSm" onClick={() => setComposerOpen((open) => !open)} aria-label={composerOpen ? '收起笔记输入区' : '展开笔记输入区'} title={composerOpen ? '收起笔记输入区' : '展开笔记输入区'} aria-expanded={composerOpen} className="h-8 w-8 shrink-0 text-muted-foreground hover:bg-black/[0.05] dark:hover:bg-white/[0.08]">
               {composerOpen ? <PanelLeftClose size={15} /> : <PanelLeftOpen size={15} />}
-            </Button>
-            <span aria-hidden="true" className="h-4 w-px shrink-0 bg-black/[0.06] dark:bg-white/[0.07]" />
-            {usedTags.length > 0 && <Button type="button" variant="ghost" size="sm" onClick={() => setActiveTagFilter(ALL_NOTES_FILTER)} aria-pressed={activeTagFilter === ALL_NOTES_FILTER} className={activeTagFilter === ALL_NOTES_FILTER ? 'h-8 bg-foreground px-3 text-xs text-background hover:bg-foreground/90 hover:text-background' : 'h-8 bg-muted px-3 text-xs font-normal text-muted-foreground'}>全部（{notes.length}）</Button>}
-            {usedTags.map((tag) => <Button key={tag} type="button" variant="ghost" size="sm" onClick={() => setActiveTagFilter(tag)} aria-pressed={activeTagFilter === tag} className={activeTagFilter === tag ? 'h-8 bg-foreground px-3 text-xs text-background hover:bg-foreground/90 hover:text-background' : 'h-8 bg-muted px-3 text-xs font-normal text-muted-foreground'}>{tag}（{tagCounts.get(tag)}）</Button>)}
-            {untaggedNotesCount > 0 && <Button type="button" variant="ghost" size="sm" onClick={() => setActiveTagFilter(UNTAGGED_NOTES_FILTER)} aria-pressed={activeTagFilter === UNTAGGED_NOTES_FILTER} className={activeTagFilter === UNTAGGED_NOTES_FILTER ? 'h-8 bg-foreground px-3 text-xs text-background hover:bg-foreground/90 hover:text-background' : 'h-8 bg-muted px-3 text-xs font-normal text-muted-foreground'}>无标签（{untaggedNotesCount}）</Button>}
-            <Button type="button" variant="ghost" size="sm" onClick={() => setTagManagerOpen(true)} className="ml-auto h-8 shrink-0 gap-1.5 px-2 text-xs font-normal text-muted-foreground"><TagsIcon size={14} /> 标签管理</Button>
+              </Button>
+              <span aria-hidden="true" className="h-4 w-px shrink-0 bg-black/[0.06] dark:bg-white/[0.07]" />
+            </div>
+            <div className="min-w-0 flex-1 overflow-x-auto overscroll-x-contain [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+              <div className="flex w-max min-w-full flex-nowrap items-center gap-2 py-0.5 pr-1">
+                {usedTags.length > 0 && <Button type="button" variant="ghost" size="sm" onClick={() => setActiveTagFilter(ALL_NOTES_FILTER)} aria-pressed={activeTagFilter === ALL_NOTES_FILTER} className={activeTagFilter === ALL_NOTES_FILTER ? 'h-8 shrink-0 whitespace-nowrap bg-foreground px-3 text-xs text-background hover:bg-foreground/90 hover:text-background' : 'h-8 shrink-0 whitespace-nowrap bg-muted px-3 text-xs font-normal text-muted-foreground'}>全部（{notes.length}）</Button>}
+                {usedTags.map((tag) => <Button key={tag} type="button" variant="ghost" size="sm" onClick={() => setActiveTagFilter(tag)} aria-pressed={activeTagFilter === tag} className={activeTagFilter === tag ? 'h-8 shrink-0 whitespace-nowrap bg-foreground px-3 text-xs text-background hover:bg-foreground/90 hover:text-background' : 'h-8 shrink-0 whitespace-nowrap bg-muted px-3 text-xs font-normal text-muted-foreground'}>{tag}（{tagCounts.get(tag)}）</Button>)}
+                {untaggedNotesCount > 0 ? (
+                  <Button type="button" variant="ghost" size="sm" onClick={() => setActiveTagFilter(UNTAGGED_NOTES_FILTER)} aria-pressed={activeTagFilter === UNTAGGED_NOTES_FILTER} className={activeTagFilter === UNTAGGED_NOTES_FILTER ? 'h-8 shrink-0 whitespace-nowrap bg-foreground px-3 text-xs text-background hover:bg-foreground/90 hover:text-background' : 'h-8 shrink-0 whitespace-nowrap bg-muted px-3 text-xs font-normal text-muted-foreground'}>
+                    无标签（{untaggedNotesCount}）
+                  </Button>
+                ) : null}
+              </div>
+            </div>
+            <Button type="button" variant="ghost" size="sm" onClick={() => setTagManagerOpen(true)} className="shrink-0 gap-1.5 bg-white px-2 text-xs font-normal text-muted-foreground dark:bg-[#121212]"><TagsIcon size={14} /> 标签管理</Button>
           </div>
           <div className="space-y-4 pb-2">
           {filteredNotes.map((note) => (
