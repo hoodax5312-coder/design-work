@@ -64,3 +64,4 @@ vendor/infinite-canvas/data/shared_folders.json
 vendor/infinite-canvas/data/storage_settings.json
 vendor/infinite-canvas/global_config.json
 vendor/infinite-canvas/history.json
+.env*
