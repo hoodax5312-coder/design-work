@@ -51,7 +51,7 @@ export const createImportRouter = (
   });
 
   router.post('/drop-file', async (request, response, next) => {
-    const encodedFileName = request.header('x-mboard-file-name');
+    const encodedFileName = request.header('x-design-work-file-name');
     const decodedFileName = encodedFileName ? decodeURIComponent(encodedFileName) : '';
     const fileName = path.basename(decodedFileName);
     const extension = path.extname(fileName).toLowerCase();

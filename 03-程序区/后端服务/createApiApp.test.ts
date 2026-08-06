@@ -16,7 +16,7 @@ test('shared API app exposes the local service health endpoint', async () => {
     const response = await fetch(`http://127.0.0.1:${address.port}/api/health`);
 
     assert.equal(response.status, 200);
-    assert.deepEqual(await response.json(), { ok: true, service: 'mboard-local' });
+    assert.deepEqual(await response.json(), { ok: true, service: 'design-work-local' });
   } finally {
     await new Promise<void>((resolve, reject) => {
       server.close((error) => error ? reject(error) : resolve());

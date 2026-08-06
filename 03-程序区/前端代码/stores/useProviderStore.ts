@@ -166,7 +166,7 @@ export const useProviderStore = create<ProviderState>()(
         }),
     }),
     {
-      name: 'mboard-providers',
+      name: 'design-work-providers',
       version: 4,
       migrate: (persistedState) => {
         const state = persistedState as Partial<ProviderState>;

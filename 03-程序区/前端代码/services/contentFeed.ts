@@ -9,7 +9,7 @@ export interface GeneratedContentItem {
   metadata: Record<string, unknown>;
 }
 
-const KEY = 'mboard-content-feed';
+const KEY = 'design-work-content-feed';
 
 export const contentFeed = {
   list(): GeneratedContentItem[] {
@@ -27,12 +27,12 @@ export const contentFeed = {
       savedToAssets: false,
     };
     localStorage.setItem(KEY, JSON.stringify([next, ...contentFeed.list()].slice(0, 100)));
-    window.dispatchEvent(new Event('mboard:content-feed-updated'));
+    window.dispatchEvent(new Event('design-work:content-feed-updated'));
     return next;
   },
   markSaved(id: string) {
     const next = contentFeed.list().map((item) => item.id === id ? { ...item, savedToAssets: true } : item);
     localStorage.setItem(KEY, JSON.stringify(next));
-    window.dispatchEvent(new Event('mboard:content-feed-updated'));
+    window.dispatchEvent(new Event('design-work:content-feed-updated'));
   },
 };

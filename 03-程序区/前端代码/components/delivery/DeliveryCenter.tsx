@@ -332,7 +332,7 @@ export const ExportCenter = () => {
                   label="输出规格"
                   value={kind === 'pptx' ? '16:9 · 可编辑' : '1080p · 高质量'}
                 />
-                <Setting label="文件位置" value="~/Mboard/Exports" />
+                <Setting label="文件位置" value="~/Design Work/Exports" />
                 <Setting
                   label="资源策略"
                   value={kind === 'pptx' ? '嵌入图片与字体替代' : '复制所有依赖文件'}

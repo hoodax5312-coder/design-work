@@ -39,7 +39,7 @@ export const createStorageRouter = (projectRoot: string) => {
 
   router.post('/choose-directory', async (_request, response, next) => {
     try {
-      const dataDirectory = await chooseDirectory('选择 Mboard 数据保存文件夹');
+      const dataDirectory = await chooseDirectory('选择 Design Work 数据保存文件夹');
       const current = await readStorageSettings(projectRoot);
       const settings = await writeStorageSettings(projectRoot, { ...current, dataDirectory });
       response.json(settings);
@@ -54,7 +54,7 @@ export const createStorageRouter = (projectRoot: string) => {
 
   router.post('/choose-cache-directory', async (_request, response, next) => {
     try {
-      const cacheDirectory = await chooseDirectory('选择 Mboard 缓存文件夹');
+      const cacheDirectory = await chooseDirectory('选择 Design Work 缓存文件夹');
       const current = await readStorageSettings(projectRoot);
       const settings = await writeStorageSettings(projectRoot, { ...current, cacheDirectory });
       response.json(settings);

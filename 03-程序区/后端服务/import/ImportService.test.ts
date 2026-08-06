@@ -9,7 +9,7 @@ import { TaskRunner } from '../tasks/TaskRunner';
 import { ImportService } from './ImportService';
 
 const withTemporaryDirectory = async (run: (directory: string) => Promise<void>) => {
-  const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'mboard-import-service-'));
+  const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'design-work-import-service-'));
   try {
     await run(directory);
   } finally {

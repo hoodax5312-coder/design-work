@@ -8,7 +8,7 @@
 
 ## 目标
 
-将项目对外展示名称从 Mboard 改为 Design Work。
+将项目对外展示名称从 Design Work 改为 Design Work。
 
 ## 范围
 
@@ -17,7 +17,7 @@
 
 ## 不在范围内
 
-- mboard localStorage key、事件名、CSS class、下载文件前缀及本地目录名等兼容性技术标识。
+- design-work localStorage key、事件名、CSS class、下载文件前缀及本地目录名等兼容性技术标识。
 
 ## 验收标准
 
@@ -29,7 +29,7 @@
 
 ## 记录
 
-- 保留 mboard 技术 key，避免升级后丢失已有本地数据和事件监听。
+- 保留 design-work 技术 key，避免升级后丢失已有本地数据和事件监听。
 - GitHub 提交：1884905 rename product to Design Work。
 - Vercel 新构建产物已生成，但项目保护状态为 BLOCKED，正式生产别名暂未切换。
 

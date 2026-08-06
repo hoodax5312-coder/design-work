@@ -91,6 +91,6 @@ export const useProjectStore = create<ProjectState>()(
           activeProjectId: state.activeProjectId === id ? null : state.activeProjectId,
         })),
     }),
-    { name: 'mboard-projects' },
+    { name: 'design-work-projects' },
   ),
 );

@@ -28,8 +28,8 @@ export const createWorkspaceRouter = (projectRoot: string) => {
     try {
       const projectName = String(request.body?.projectName || 'project');
       const projectId = String(request.body?.projectId || Date.now());
-      const branch = `mboard/${slugify(projectName)}-${projectId.slice(0, 8)}`;
-      const worktreeRoot = path.join(path.dirname(projectRoot), '.mboard-worktrees');
+      const branch = `design-work/${slugify(projectName)}-${projectId.slice(0, 8)}`;
+      const worktreeRoot = path.join(path.dirname(projectRoot), '.design-work-worktrees');
       const worktreePath = path.join(worktreeRoot, slugify(projectName));
 
       await execFileAsync('mkdir', ['-p', worktreeRoot]);

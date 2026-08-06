@@ -13,7 +13,7 @@ import {
 import { readStorageSettings, writeStorageSettings } from './storageSettings';
 
 const withTemporaryDirectory = async (run: (directory: string) => Promise<void>) => {
-  const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'mboard-library-'));
+  const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'design-work-library-'));
   try {
     await run(directory);
   } finally {

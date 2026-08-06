@@ -46,7 +46,7 @@ output/
 .cache
 
 # Local app settings
-.mboard/
+.design-work/
 .gstack/
 
 # Embedded Infinite Canvas local runtime

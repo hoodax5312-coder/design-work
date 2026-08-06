@@ -20,7 +20,7 @@ import { PreviewService } from './previews/PreviewService';
 import { TaskRunner } from './tasks/TaskRunner';
 
 test('import API exposes picker, scan review and confirmed import flow', async () => {
-  const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'mboard-import-api-'));
+  const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'design-work-import-api-'));
   const file = path.join(directory, 'reference.png');
   await fs.writeFile(file, 'image-data');
   const database = openLibraryDatabase(':memory:');
@@ -61,7 +61,7 @@ test('import API exposes picker, scan review and confirmed import flow', async (
       method: 'POST',
       headers: {
         'Content-Type': 'image/png',
-        'X-Mboard-File-Name': encodeURIComponent('dropped-image.png'),
+        'X-Design-Work-File-Name': encodeURIComponent('dropped-image.png'),
       },
       body: new Uint8Array([137, 80, 78, 71]),
     });

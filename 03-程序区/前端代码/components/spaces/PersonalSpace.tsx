@@ -79,8 +79,8 @@ const DOCUMENTS: SpaceEntry[] = [
 ];
 
 const DEFAULT_DOCUMENT_ID = DOCUMENTS.find((entry) => entry.kind === 'document')?.id || '';
-const DOCUMENT_TREE_STORAGE_KEY = 'mboard-document-tree';
-const PROJECT_PARENT_STORAGE_KEY = 'mboard-project-document-parents';
+const DOCUMENT_TREE_STORAGE_KEY = 'design-work-document-tree';
+const PROJECT_PARENT_STORAGE_KEY = 'design-work-project-document-parents';
 
 const readDocumentTree = (): SpaceEntry[] => {
   try {

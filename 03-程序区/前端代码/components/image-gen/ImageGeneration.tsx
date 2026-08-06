@@ -205,7 +205,7 @@ export const ImageGeneration = () => {
     if (!url) return;
     const anchor = document.createElement('a');
     anchor.href = url;
-    anchor.download = `mboard-image-${Date.now()}.jpg`;
+    anchor.download = `design-work-image-${Date.now()}.jpg`;
     anchor.target = '_blank';
     anchor.rel = 'noreferrer';
     anchor.click();

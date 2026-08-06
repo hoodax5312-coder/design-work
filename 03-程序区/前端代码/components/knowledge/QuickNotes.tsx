@@ -9,8 +9,8 @@ type QuickNote = {
   updatedAt: number;
 };
 
-const STORAGE_KEY = 'mboard-quick-notes';
-const TAGS_STORAGE_KEY = 'mboard-quick-note-tags';
+const STORAGE_KEY = 'design-work-quick-notes';
+const TAGS_STORAGE_KEY = 'design-work-quick-note-tags';
 const ALL_NOTES_FILTER = '__all_notes__';
 const UNTAGGED_NOTES_FILTER = '__untagged_notes__';
 

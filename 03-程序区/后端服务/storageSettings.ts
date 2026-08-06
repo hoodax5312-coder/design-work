@@ -17,7 +17,7 @@ export const expandHome = (value: string) => {
 };
 
 export const defaultStorageSettings = (): StorageSettings => {
-  const dataDirectory = path.join(os.homedir(), 'Documents', 'Mboard');
+  const dataDirectory = path.join(os.homedir(), 'Documents', 'Design Work');
   return {
     dataDirectory,
     cacheDirectory: path.join(dataDirectory, '.cache'),
@@ -44,7 +44,7 @@ export const normalizeStorageSettings = (
 };
 
 export const storageSettingsPath = (projectRoot: string) =>
-  path.join(projectRoot, '.mboard', 'settings.json');
+  path.join(projectRoot, '.design-work', 'settings.json');
 
 export const readStorageSettings = async (projectRoot: string): Promise<StorageSettings> => {
   try {

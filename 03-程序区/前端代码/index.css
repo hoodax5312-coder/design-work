@@ -154,19 +154,19 @@
     background-size: 64px 64px;
   }
 
-  .mboard-flow .react-flow__pane {
+  .design-work-flow .react-flow__pane {
     cursor: default;
   }
 
-  .mboard-flow .react-flow__node {
+  .design-work-flow .react-flow__node {
     font-family: inherit;
   }
 
-  .mboard-flow .react-flow__attribution {
+  .design-work-flow .react-flow__attribution {
     display: none;
   }
 
-  .mboard-flow .react-flow__controls {
+  .design-work-flow .react-flow__controls {
     display: none;
   }
 

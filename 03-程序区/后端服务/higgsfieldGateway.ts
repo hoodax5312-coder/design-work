@@ -15,7 +15,7 @@ const fetchJson = async <T>(pathname: string): Promise<T> => {
           Accept: 'application/json',
           Origin: 'https://higgsfield.ai',
           Referer: 'https://higgsfield.ai/',
-          'User-Agent': 'Mboard-Local-Project-Workbench/0.1',
+          'User-Agent': 'Design Work-Local-Project-Workbench/0.1',
         },
         signal: controller.signal,
       });
@@ -157,14 +157,14 @@ const measureHttpObject = async (url: string): Promise<AuditFile> => {
     const head = await fetch(url, {
       method: 'HEAD',
       redirect: 'follow',
-      headers: { 'User-Agent': 'Mboard-Capacity-Audit/0.1' },
+      headers: { 'User-Agent': 'Design Work-Capacity-Audit/0.1' },
       signal: controller.signal,
     });
     const length = Number(head.headers.get('content-length') || 0);
     if (head.ok && length > 0) return { url, type, bytes: length, reachable: true, status: head.status };
 
     const range = await fetch(url, {
-      headers: { Range: 'bytes=0-0', 'User-Agent': 'Mboard-Capacity-Audit/0.1' },
+      headers: { Range: 'bytes=0-0', 'User-Agent': 'Design Work-Capacity-Audit/0.1' },
       redirect: 'follow',
       signal: controller.signal,
     });
@@ -192,7 +192,7 @@ const measureHls = async (url: string, depth = 0): Promise<AuditFile> => {
   try {
     const response = await fetch(url, {
       redirect: 'follow',
-      headers: { 'User-Agent': 'Mboard-Capacity-Audit/0.1' },
+      headers: { 'User-Agent': 'Design Work-Capacity-Audit/0.1' },
       signal: controller.signal,
     });
     if (!response.ok) return { url, type: 'video', bytes: null, reachable: false, status: response.status };
@@ -274,7 +274,7 @@ const persistAuditState = async (auditRoot: string) => {
 };
 
 const runCapacityAudit = async (projectRoot: string) => {
-  const auditRoot = path.join(projectRoot, '.mboard', 'higgsfield-audit');
+  const auditRoot = path.join(projectRoot, '.design-work', 'higgsfield-audit');
   const projectReportsDir = path.join(auditRoot, 'projects');
   await fs.mkdir(projectReportsDir, { recursive: true });
   const measuredFiles = new Map<string, AuditFile>();
@@ -446,7 +446,7 @@ export const createHiggsfieldRouter = (projectRoot: string) => {
   router.post('/sync/:folderId', async (request, response, next) => {
     try {
       const rootFolderId = safeSegment(request.params.folderId);
-      const syncRoot = path.join(projectRoot, '.mboard', 'higgsfield', rootFolderId);
+      const syncRoot = path.join(projectRoot, '.design-work', 'higgsfield', rootFolderId);
       const foldersDir = path.join(syncRoot, 'folders');
       const itemsDir = path.join(syncRoot, 'items');
       await fs.mkdir(foldersDir, { recursive: true });
@@ -510,7 +510,7 @@ export const createHiggsfieldRouter = (projectRoot: string) => {
   router.get('/audit', async (_request, response, next) => {
     try {
       if (auditState.status === 'idle') {
-        const statusPath = path.join(projectRoot, '.mboard', 'higgsfield-audit', 'status.json');
+        const statusPath = path.join(projectRoot, '.design-work', 'higgsfield-audit', 'status.json');
         try {
           const saved = JSON.parse(await fs.readFile(statusPath, 'utf8')) as AuditState;
           if (saved.status !== 'running') auditState = saved;

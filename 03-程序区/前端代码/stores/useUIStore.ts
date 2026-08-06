@@ -96,7 +96,7 @@ export const useUIStore = create<UIState>()(persist((set) => ({
     return { theme: newTheme };
   }),
 }), {
-  name: 'mboard-ui',
+  name: 'design-work-ui',
   version: 4,
   migrate: (persistedState) => {
     const previous = persistedState as Partial<UIState> | undefined;

@@ -9,7 +9,7 @@ import { FingerprintService } from './FingerprintService';
 import { MacOsFilePickerProvider } from './MacOsFilePickerProvider';
 
 const withTemporaryDirectory = async (run: (directory: string) => Promise<void>) => {
-  const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'mboard-import-'));
+  const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'design-work-import-'));
   try {
     await run(directory);
   } finally {

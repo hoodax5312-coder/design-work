@@ -20,7 +20,7 @@ const withDatabase = (run: (database: DatabaseSync) => void) => {
 };
 
 test('applies migrations once and safely reopens an existing library database', () => {
-  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'mboard-database-'));
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'design-work-database-'));
   const databasePath = path.join(directory, 'library.sqlite');
   try {
     const first = openLibraryDatabase(databasePath);
