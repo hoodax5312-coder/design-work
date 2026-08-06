@@ -23,6 +23,13 @@ const json = (body: unknown): RequestInit => ({
   body: JSON.stringify(body),
 });
 
+const normalizeAssetPage = (page: Partial<AssetPage> | null | undefined): AssetPage => ({
+  items: Array.isArray(page?.items) ? page.items : [],
+  total: Number.isFinite(page?.total) ? Number(page?.total) : 0,
+  limit: Number.isFinite(page?.limit) ? Number(page?.limit) : 0,
+  offset: Number.isFinite(page?.offset) ? Number(page?.offset) : 0,
+});
+
 const normalizeTag = (tag: Record<string, unknown>): AssetTag => ({
   id: String(tag.id),
   name: String(tag.name),
@@ -54,12 +61,12 @@ export const assetService = {
     primaryFolderId?: string | null;
     userMetadata?: Record<string, unknown>;
   }) => request<AssetSummary>('/api/assets', json(input)),
-  list: (query: AssetQuery = {}) => {
+  list: async (query: AssetQuery = {}) => {
     const parameters = new URLSearchParams();
     Object.entries(query).forEach(([key, value]) => {
       if (value !== undefined && value !== '') parameters.set(key, String(value));
     });
-    return request<AssetPage>(`/api/assets?${parameters}`);
+    return normalizeAssetPage(await request<Partial<AssetPage>>(`/api/assets?${parameters}`));
   },
   detail: async (id: string) => {
     const detail = await request<AssetDetail & { tags: Array<Record<string, unknown>> }>(
@@ -78,11 +85,14 @@ export const assetService = {
     if (!response.ok) throw new Error('删除资产失败');
   },
   restore: (id: string) => request<AssetDetail>(`/api/assets/${id}/restore`, { method: 'POST' }),
-  folders: async () => (await request<{ items: AssetFolder[] }>('/api/assets/folders')).items,
+  folders: async () => {
+    const result = await request<{ items?: AssetFolder[] }>('/api/assets/folders');
+    return Array.isArray(result.items) ? result.items : [];
+  },
   createFolder: (name: string) => request<AssetFolder>('/api/assets/folders', json({ name })),
   tags: async () => {
-    const result = await request<{ items: Array<Record<string, unknown>> }>('/api/assets/tags');
-    return result.items.map(normalizeTag);
+    const result = await request<{ items?: Array<Record<string, unknown>> }>('/api/assets/tags');
+    return (Array.isArray(result.items) ? result.items : []).map(normalizeTag);
   },
   createTag: async (name: string) =>
     normalizeTag(await request<Record<string, unknown>>('/api/assets/tags', json({ name }))),
