@@ -1,6 +1,9 @@
 import { execFile } from 'node:child_process';
+import fs from 'node:fs/promises';
+import path from 'node:path';
 import { promisify } from 'node:util';
 import { Router } from 'express';
+import { atomicWriteFile } from './atomicFile';
 import {
   readStorageSettings,
   writeStorageSettings,
@@ -8,6 +11,13 @@ import {
 } from './storageSettings';
 
 const execFileAsync = promisify(execFile);
+const WORKSPACE_CACHE_KEYS = new Set(['generation-history', 'canvas-workspace']);
+
+const workspaceCachePath = async (projectRoot: string, key: string) => {
+  if (!WORKSPACE_CACHE_KEYS.has(key)) throw new Error('不支持的创作缓存类型');
+  const settings = await readStorageSettings(projectRoot);
+  return path.join(settings.cacheDirectory, 'workspace', `${key}.json`);
+};
 
 const chooseDirectory = async (prompt: string) => {
   const { stdout } = await execFileAsync('osascript', [
@@ -63,6 +73,31 @@ export const createStorageRouter = (projectRoot: string) => {
         response.status(400).json({ error: '已取消选择文件夹' });
         return;
       }
+      next(error);
+    }
+  });
+
+  router.get('/workspace/:key', async (request, response, next) => {
+    try {
+      const filePath = await workspaceCachePath(projectRoot, request.params.key);
+      try {
+        response.json(JSON.parse(await fs.readFile(filePath, 'utf8')));
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
+        response.json(null);
+      }
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  router.put('/workspace/:key', async (request, response, next) => {
+    try {
+      const filePath = await workspaceCachePath(projectRoot, request.params.key);
+      await fs.mkdir(path.dirname(filePath), { recursive: true });
+      await atomicWriteFile(filePath, JSON.stringify(request.body ?? null));
+      response.json({ ok: true });
+    } catch (error) {
       next(error);
     }
   });

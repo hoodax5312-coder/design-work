@@ -9,7 +9,7 @@ import {
   Sparkles,
   X,
 } from 'lucide-react';
-import { generateProviderImage } from '../../services/providerService';
+import { generateProviderImage, generateProviderVideo } from '../../services/providerService';
 import {
   getActiveProvider,
   getConfiguredModels,
@@ -20,6 +20,7 @@ import {
 import { useUIStore } from '../../stores/useUIStore';
 import { assetService } from '../../services/assetService';
 import { contentFeed } from '../../services/contentFeed';
+import { workspaceCacheService } from '../../services/workspaceCacheService';
 import { cn } from '../../lib/utils';
 import { Badge, Button, Card, Select, Textarea } from '../ui';
 
@@ -42,7 +43,33 @@ interface GenerationRecord {
   resolution: string;
   quality: string;
   outputs: string[];
+  mode?: 'image' | 'video';
 }
+
+interface GenerationHistoryCache {
+  image: GenerationRecord[];
+  video: GenerationRecord[];
+}
+
+const feedHistory = (): GenerationHistoryCache => {
+  const cache: GenerationHistoryCache = { image: [], video: [] };
+  contentFeed.list().forEach((item) => {
+    if (item.type !== 'image' && item.type !== 'video') return;
+    const metadata = item.metadata || {};
+    cache[item.type].push({
+      id: item.id,
+      prompt: String(metadata.prompt || item.description || ''),
+      createdAt: new Date(item.createdAt).toISOString(),
+      model: String(metadata.model || ''),
+      ratio: String(metadata.ratio || '16:9'),
+      resolution: String(metadata.resolution || (item.type === 'video' ? '480p' : '2k')),
+      quality: String(metadata.quality || '中'),
+      outputs: item.previewUrl ? [item.previewUrl] : [],
+      mode: item.type,
+    });
+  });
+  return cache;
+};
 
 const isImage = (file: File) => file.type.startsWith('image/');
 
@@ -51,6 +78,14 @@ const imageSizeForRatio = (ratio: string, model: string) => {
   if (ratio === '9:16' || ratio === '3:4') return isDallE3 ? '1024x1792' : '1024x1536';
   if (ratio === '16:9') return isDallE3 ? '1792x1024' : '1536x1024';
   return '1024x1024';
+};
+
+const videoResolutionForRatio = (ratio: string) => {
+  if (ratio === '9:16') return '320x480';
+  if (ratio === '3:4') return '360x480';
+  if (ratio === '4:3') return '480x360';
+  if (ratio === '1:1') return '480x480';
+  return '480x320';
 };
 
 const formatGenerationTime = (value: string) => new Intl.DateTimeFormat('zh-CN', {
@@ -69,6 +104,8 @@ export const ImageGeneration = () => {
   const [referenceImages, setReferenceImages] = useState<ReferenceImage[]>([]);
   const [previewUrl, setPreviewUrl] = useState('');
   const [history, setHistory] = useState<GenerationRecord[]>([]);
+  const historyCacheRef = useRef<GenerationHistoryCache>({ image: [], video: [] });
+  const historyLoadedRef = useRef(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [error, setError] = useState('');
@@ -97,6 +134,36 @@ export const ImageGeneration = () => {
     window.addEventListener('keydown', closeSettings);
     return () => window.removeEventListener('keydown', closeSettings);
   }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    historyLoadedRef.current = false;
+    void workspaceCacheService.read<GenerationHistoryCache>('generation-history')
+      .then((cached) => {
+        if (cancelled) return;
+        const migrated = feedHistory();
+        const normalized: GenerationHistoryCache = {
+          image: Array.isArray(cached?.image) && cached.image.length ? cached.image : migrated.image,
+          video: Array.isArray(cached?.video) && cached.video.length ? cached.video : migrated.video,
+        };
+        historyCacheRef.current = normalized;
+        setHistory(normalized[generationMode]);
+        historyLoadedRef.current = true;
+      })
+      .catch(() => {
+        if (!cancelled) historyLoadedRef.current = true;
+      });
+    return () => { cancelled = true; };
+  }, [generationMode]);
+
+  useEffect(() => {
+    if (!historyLoadedRef.current) return;
+    historyCacheRef.current[generationMode] = history;
+    const timer = window.setTimeout(() => {
+      void workspaceCacheService.write('generation-history', historyCacheRef.current).catch(() => undefined);
+    }, 180);
+    return () => window.clearTimeout(timer);
+  }, [generationMode, history]);
 
   const addReferences = (files: FileList | File[]) => {
     const accepted = [...files].filter(isImage).slice(0, 3 - referenceImages.length);
@@ -138,12 +205,12 @@ export const ImageGeneration = () => {
     setIsGenerating(true);
     try {
       if (generationMode === 'video') {
-        await new Promise((resolve) => window.setTimeout(resolve, 650));
+        const result = await generateProviderVideo({ ...provider, model: videoModel }, { prompt: generationPrompt, resolution: videoResolutionForRatio(ratio) });
         contentFeed.add({
           type: 'video',
           title: `视频生成任务 · ${new Date().toLocaleDateString('zh-CN')}`,
           description: generationPrompt,
-          previewUrl: '',
+          previewUrl: result.url,
           metadata: {
             prompt: generationPrompt,
             model: videoModel,
@@ -151,10 +218,22 @@ export const ImageGeneration = () => {
             resolution,
             quality,
             referenceImageNames: referenceImages.map((item) => item.file.name),
-            status: 'queued',
+            status: 'completed',
+            taskId: result.id,
           },
         });
-        setAssetNotice('视频任务已创建，可在「视频 > 素材」查看');
+        setHistory((current) => [{
+          id: `${Date.now()}-${result.url}`,
+          prompt: generationPrompt,
+          createdAt: new Date().toISOString(),
+          model: videoModel,
+          ratio,
+          resolution,
+          quality,
+          outputs: [result.url],
+          mode: 'video' as const,
+        }, ...current].slice(0, 12));
+        setAssetNotice('视频生成完成，已加入视频素材');
         window.setTimeout(() => setAssetNotice(''), 3000);
         return;
       }
@@ -179,6 +258,7 @@ export const ImageGeneration = () => {
         resolution,
         quality,
         outputs: [result.url],
+        mode: 'image' as const,
       }, ...current.filter((item) => !item.outputs.includes(result.url))].slice(0, 12));
       contentFeed.add({
         type: 'image',
@@ -282,8 +362,8 @@ export const ImageGeneration = () => {
                     </Button>
                     <div className="flex min-w-0 gap-3 overflow-x-auto pb-1">
                       {record.outputs.map((output, outputIndex) => (
-                        <div key={output} className="group relative aspect-[4/5] min-h-[190px] min-w-[150px] flex-1 overflow-hidden rounded-lg border border-border bg-card sm:min-w-[210px]">
-                          <Button type="button" variant="ghost" onClick={() => setPreviewUrl(output)} className="block h-full w-full rounded-none p-0" aria-label={`查看第 ${outputIndex + 1} 张生成图片`}><img src={output} alt={`生成结果 ${outputIndex + 1}：${record.prompt}`} className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.025]" /></Button>
+                        <div key={output} className="group relative aspect-[4/5] max-h-[360px] min-h-[190px] min-w-[150px] flex-1 overflow-hidden rounded-lg border border-border bg-card sm:min-w-[210px]">
+                          <Button type="button" variant="ghost" onClick={() => setPreviewUrl(output)} className="block h-full w-full rounded-none p-0" aria-label={`查看第 ${outputIndex + 1} 个生成${record.mode === 'video' ? '视频' : '图片'}`}>{record.mode === 'video' ? <video src={output} controls preload="metadata" className="h-full w-full object-cover" /> : <img src={output} alt={`生成结果 ${outputIndex + 1}：${record.prompt}`} className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.025]" />}</Button>
                           {previewUrl === output && <Badge className="absolute left-2 top-2 text-xs">当前</Badge>}
                         </div>
                       ))}
@@ -342,7 +422,7 @@ export const ImageGeneration = () => {
                 value={selectedModel}
                 onChange={(event) => selectModel(event.target.value)}
                 disabled={!modelOptions.length}
-                selectSize="sm" className="h-8 w-auto max-w-[220px] truncate border-0 bg-transparent text-xs font-semibold shadow-none hover:bg-black/[0.05] focus-visible:ring-1 focus-visible:ring-black/10 dark:bg-transparent dark:hover:bg-white/[0.08] dark:focus-visible:ring-white/15"
+                selectSize="sm" className="h-8 w-auto max-w-[220px] truncate border-0 bg-transparent pl-3 pr-9 text-xs font-semibold shadow-none hover:bg-black/[0.05] focus-visible:ring-1 focus-visible:ring-black/10 dark:bg-transparent dark:hover:bg-white/[0.08] dark:focus-visible:ring-white/15"
                 options={modelOptions.length ? [
                   ...(!selectedModel ? [{ value: '', label: `选择${generationMode === 'image' ? '图像' : '视频'}模型` }] : []),
                   ...modelOptions.map((model) => ({ value: model, label: model })),

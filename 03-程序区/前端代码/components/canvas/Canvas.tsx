@@ -35,6 +35,7 @@ import { getConfiguredModels, getSelectedModel, modelSupportsCategory, useProvid
 import { useCanvasStore } from '../../stores/useCanvasStore';
 import { useProjectStore } from '../../stores/useProjectStore';
 import { useUIStore } from '../../stores/useUIStore';
+import { workspaceCacheService } from '../../services/workspaceCacheService';
 import { ImageGenNode } from '../nodes/ImageGenNode';
 import { TextNode } from '../nodes/TextNode';
 import { VideoNode } from '../nodes/VideoNode';
@@ -47,6 +48,12 @@ type CanvasNodeType = 'text' | 'imageGen' | 'video';
 type AgentMode = 'auto' | 'ask';
 type ChatMessage = { id: string; role: 'user' | 'assistant'; content: string };
 type BoardSnapshot = { nodes: Node[]; edges: Edge[] };
+type CanvasWorkspaceCache = {
+  boards: string[];
+  activeBoard: string;
+  snapshots: Record<string, BoardSnapshot>;
+  messages: Record<string, ChatMessage[]>;
+};
 
 const PROJECT_EMOJIS = ['😀', '✨', '🌱', '🎨', '🚀', '🧩', '🌈', '🪄', '🐻', '🍀', '🌙', '🔥'];
 
@@ -112,6 +119,7 @@ const CanvasInner = () => {
   const boardSnapshotsRef = useRef<Record<string, BoardSnapshot>>({});
   const boardMessagesRef = useRef<Record<string, ChatMessage[]>>({});
   const boardsInitializedRef = useRef(false);
+  const canvasCacheLoadedRef = useRef(false);
 
   const providers = useProviderStore((state) => state.providers);
   const activeProviderId = useProviderStore((state) => state.activeProviderId);
@@ -122,6 +130,41 @@ const CanvasInner = () => {
   const resolvedAgentModel = agentModel || (fallbackProvider && getSelectedModel(fallbackProvider, 'language')
     ? `${fallbackProvider.id}::${getSelectedModel(fallbackProvider, 'language')}`
     : languageModels[0]?.value || '');
+
+  useEffect(() => {
+    let cancelled = false;
+    void workspaceCacheService.read<CanvasWorkspaceCache>('canvas-workspace')
+      .then((cached) => {
+        if (cancelled) return;
+        if (cached?.boards?.length) {
+          boardSnapshotsRef.current = cached.snapshots || {};
+          boardMessagesRef.current = cached.messages || {};
+          activeBoardRef.current = cached.activeBoard || cached.boards[0];
+          setBoards(cached.boards);
+          setActiveBoard(activeBoardRef.current);
+          const snapshot = boardSnapshotsRef.current[activeBoardRef.current] || { nodes: [], edges: [] };
+          const nextMessages = boardMessagesRef.current[activeBoardRef.current] || [createWelcomeMessage(activeBoardRef.current)];
+          setMessages(nextMessages);
+          restoreSnapshot(snapshot.nodes, snapshot.edges);
+        }
+        canvasCacheLoadedRef.current = true;
+      })
+      .catch(() => { canvasCacheLoadedRef.current = true; });
+    return () => { cancelled = true; };
+  }, [restoreSnapshot]);
+
+  useEffect(() => {
+    if (!canvasCacheLoadedRef.current || !boardsInitializedRef.current) return;
+    const timer = window.setTimeout(() => {
+      void workspaceCacheService.write('canvas-workspace', {
+        boards,
+        activeBoard: activeBoardRef.current,
+        snapshots: boardSnapshotsRef.current,
+        messages: boardMessagesRef.current,
+      }).catch(() => undefined);
+    }, 240);
+    return () => window.clearTimeout(timer);
+  }, [boards, activeBoard, edges, messages, nodes]);
 
   const beginProjectNameEdit = () => {
     setProjectNameDraft(activeProjectName);

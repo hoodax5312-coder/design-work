@@ -6,7 +6,6 @@ import {
   Clock,
   Copy,
   Film,
-  FolderPlus,
   Layers3,
   Loader2,
   Music,
@@ -462,6 +461,31 @@ type VideoProject = {
   thumbnail?: string;
 };
 
+const getProjectMeta = (project: VideoProject, assets: AssetSummary[]) => {
+  const projectNumber = Number(project.id.replace('project-', '')) || 1;
+  const sourceAsset = assets[projectNumber - 1] || assets[0];
+  const metadata = sourceAsset?.normalizedMetadata || {};
+  const fileSizeValue = metadata.fileSize ?? metadata.size ?? metadata.bytes;
+  const fileSize = typeof fileSizeValue === 'number' && fileSizeValue > 0
+    ? fileSizeValue >= 1024 ** 3
+      ? String((fileSizeValue / 1024 ** 3).toFixed(1)) + ' GB'
+      : fileSizeValue >= 1024 ** 2
+        ? String((fileSizeValue / 1024 ** 2).toFixed(1)) + ' MB'
+        : String(Math.round(fileSizeValue / 1024)) + ' KB'
+    : '—';
+  const updatedAt = sourceAsset?.updatedAt || sourceAsset?.createdAt;
+
+  return {
+    projectNumber,
+    sourceAsset,
+    fileSize,
+    updatedDate: updatedAt
+      ? new Intl.DateTimeFormat('zh-CN', { year: 'numeric', month: '2-digit', day: '2-digit' }).format(updatedAt)
+      : '—',
+    duration: String(26 + projectNumber * 3) + 's',
+  };
+};
+
 const PROJECT_SEEDS = [
   ['空心骑士', '@bakha', '940'],
   ['翡翠先锋', '@michelangelorobot1306', '182'],
@@ -471,6 +495,15 @@ const PROJECT_SEEDS = [
   ['新来的女孩', '@alishaqantaar', '1.5万'],
   ['沙漠来客', '@northbound', '68'],
   ['霓虹余晖', '@nightframe', '239'],
+] as const;
+
+const VISUAL_PROJECT_SEEDS = [
+  ['品牌视觉系统', '@designwork', '128'],
+  ['春季产品发布', '@studio', '86'],
+  ['社交媒体视觉套件', '@creative', '64'],
+  ['电商主图方案', '@commerce', '42'],
+  ['展览空间导视', '@atelier', '31'],
+  ['移动端界面探索', '@product', '18'],
 ] as const;
 
 const VideoLibraryTabs = ({
@@ -522,10 +555,13 @@ const VideoAssetLibrary = ({ onCreate }: { onCreate: () => void }) => {
   );
 };
 
-const VideoProjectLibrary = ({ onCreate, query }: { onCreate: () => void; query: string }) => {
+export const VideoProjectLibrary = ({ onCreate, query }: { onCreate: () => void; query: string }) => {
   const [assets, setAssets] = useState<AssetSummary[]>([]);
   const [selectedProjectId, setSelectedProjectId] = useState('project-1');
   const [isPlaying, setIsPlaying] = useState(false);
+  const [projectType, setProjectType] = useState<'visual' | 'video'>('video');
+  const [projectTypeOpen, setProjectTypeOpen] = useState(false);
+  const [projectPanelOpen, setProjectPanelOpen] = useState(true);
 
   useEffect(() => {
     let active = true;
@@ -535,7 +571,8 @@ const VideoProjectLibrary = ({ onCreate, query }: { onCreate: () => void; query:
     return () => { active = false; };
   }, []);
 
-  const projects: VideoProject[] = PROJECT_SEEDS.map(([title, author, views], index) => ({
+  const projectSeeds = projectType === 'visual' ? VISUAL_PROJECT_SEEDS : PROJECT_SEEDS;
+  const projects: VideoProject[] = projectSeeds.map(([title, author, views], index) => ({
     id: `project-${index + 1}`,
     code: `P-${String(index + 1).padStart(3, '0')}`,
     title,
@@ -546,15 +583,80 @@ const VideoProjectLibrary = ({ onCreate, query }: { onCreate: () => void; query:
   const normalizedQuery = query.trim().toLocaleLowerCase('zh-CN');
   const visibleProjects = projects.filter((project) => !normalizedQuery || `${project.title} ${project.author} ${project.code}`.toLocaleLowerCase('zh-CN').includes(normalizedQuery));
   const selectedProject = projects.find((project) => project.id === selectedProjectId) || projects[0];
+  const selectedProjectMeta = getProjectMeta(selectedProject, assets);
+  const projectTypeLabel = projectType === 'visual' ? '视觉设计' : '视频工程';
 
   return (
-    <main className="grid h-full min-w-0 grid-cols-1 gap-3 overflow-hidden text-foreground md:grid-cols-[260px_minmax(0,1fr)]">
-      <aside aria-label="视频工程列表" className="flex min-h-0 flex-col overflow-hidden rounded-lg bg-transparent p-3">
-        <div className="min-h-0 flex-1 space-y-2 overflow-y-auto p-1">
+    <main className={cn(
+      'grid h-full w-full min-w-0 flex-1 grid-cols-1 gap-3 overflow-hidden text-foreground',
+      projectPanelOpen && 'md:grid-cols-[260px_minmax(0,1fr)]',
+    )}>
+      {projectPanelOpen && <aside aria-label="视频工程列表" className="flex min-h-0 flex-col overflow-hidden rounded-lg bg-transparent">
+        <header className="relative flex h-11 shrink-0 items-center px-4">
+          <h1 className="text-sm font-semibold tracking-[-0.01em]">{projectTypeLabel}</h1>
+          <Button
+            type="button"
+            variant="ghost"
+            size="iconSm"
+            onClick={() => setProjectTypeOpen((open) => !open)}
+            aria-label="切换项目类型"
+            aria-expanded={projectTypeOpen}
+            aria-controls="project-type-menu"
+            title="切换项目类型"
+            className="ml-0.5 h-7 w-7 text-muted-foreground hover:bg-black/[0.05] hover:text-foreground dark:hover:bg-white/[0.08]"
+          >
+            <ChevronDown size={14} className={cn('transition-transform', projectTypeOpen && 'rotate-180')} />
+          </Button>
+          <Button
+            type="button"
+            variant="ghost"
+            size="iconSm"
+            onClick={onCreate}
+            aria-label="创建工程"
+            title="创建工程"
+            className="ml-auto h-7 w-7 text-muted-foreground hover:bg-black/[0.05] hover:text-foreground dark:hover:bg-white/[0.08]"
+          >
+            <Plus size={15} />
+          </Button>
+          {projectTypeOpen && (
+            <div
+              id="project-type-menu"
+              role="menu"
+              className="absolute left-4 top-10 z-30 w-36 rounded-lg border border-black/[0.05] bg-background p-1.5 shadow-lg dark:border-white/[0.07]"
+            >
+              {[
+                { id: 'visual' as const, label: '视觉设计' },
+                { id: 'video' as const, label: '视频工程' },
+              ].map((option) => (
+                <Button
+                  key={option.id}
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  role="menuitemradio"
+                  aria-checked={projectType === option.id}
+                  onClick={() => {
+                    setProjectType(option.id);
+                    setSelectedProjectId('project-1');
+                    setIsPlaying(false);
+                    setProjectTypeOpen(false);
+                  }}
+                  className={cn(
+                    'h-8 w-full justify-start px-2.5 text-xs font-medium hover:bg-black/[0.05] hover:text-foreground dark:hover:bg-white/[0.08]',
+                    projectType === option.id && 'bg-black/[0.06] text-foreground dark:bg-white/[0.1]',
+                  )}
+                >
+                  {option.label}
+                </Button>
+              ))}
+            </div>
+          )}
+        </header>
+        <div className="min-h-0 flex-1 space-y-2 overflow-y-auto px-3 pb-3">
           {visibleProjects.map((project) => {
             const isSelected = selectedProjectId === project.id;
             return (
-              <Button key={project.id} type="button" variant="ghost" onClick={() => { setSelectedProjectId(project.id); setIsPlaying(false); }} className={cn('group relative block h-auto w-full overflow-hidden rounded-lg border-0 bg-background/80 p-0 text-left shadow-none transition-[transform,box-shadow] hover:-translate-y-0.5 hover:bg-background hover:shadow-md focus-visible:ring-2 focus-visible:ring-foreground/30', isSelected && 'ring-2 ring-foreground/80 ring-offset-2 ring-offset-background')}>
+              <Button key={project.id} type="button" variant="ghost" onClick={() => { setSelectedProjectId(project.id); setIsPlaying(false); }} className={cn('group relative block h-auto w-full overflow-hidden rounded-lg border-0 bg-background/80 p-0 text-left shadow-none transition-[transform,box-shadow] hover:-translate-y-0.5 hover:bg-background hover:shadow-md focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-foreground/30', isSelected && 'ring-2 ring-inset ring-foreground/80')}>
                 <div className="relative aspect-video w-full overflow-hidden rounded-lg bg-[#121212]">
                   {project.thumbnail ? <img src={project.thumbnail} alt="视频封面" className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105" /> : <Film aria-hidden="true" className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 text-zinc-700" size={28} />}
                   <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/10 to-transparent opacity-0 transition-opacity duration-200 group-hover:opacity-100 group-focus-visible:opacity-100" />
@@ -565,9 +667,33 @@ const VideoProjectLibrary = ({ onCreate, query }: { onCreate: () => void; query:
           })}
           {!visibleProjects.length && <div className="px-2 py-8 text-center text-xs text-muted-foreground">没有匹配的视频工程</div>}
         </div>
-        <Button type="button" variant="secondary" onClick={onCreate} className="mt-3 h-8 w-full shrink-0 justify-center border-0 bg-background hover:bg-background/80"><FolderPlus aria-hidden="true" size={15} /> 创建工程</Button>
-      </aside>
-      {!visibleProjects.length ? <div className="flex items-center justify-center text-xs text-muted-foreground">没有匹配的视频工程</div> : <ProjectMaterials project={selectedProject} assets={assets} isPlaying={isPlaying} onTogglePlayback={() => setIsPlaying((playing) => !playing)} />}
+      </aside>}
+      <section className="flex min-h-0 min-w-0 flex-col overflow-hidden rounded-lg bg-background">
+        <header className="flex h-11 min-w-0 shrink-0 items-center border-b border-black/[0.03] px-6 dark:border-white/[0.04]">
+          <Button
+            type="button"
+            variant="ghost"
+            size="iconSm"
+            onClick={() => setProjectPanelOpen((open) => !open)}
+            aria-label={projectPanelOpen ? '收起项目列表' : '展开项目列表'}
+            title={projectPanelOpen ? '收起项目列表' : '展开项目列表'}
+            className="h-7 w-7 text-muted-foreground hover:bg-black/[0.05] dark:hover:bg-white/[0.08]"
+          >
+            {projectPanelOpen ? <PanelLeftClose size={15} /> : <PanelLeftOpen size={15} />}
+          </Button>
+          <span aria-hidden="true" className="mx-3 h-4 w-px bg-black/[0.06] dark:bg-white/[0.07]" />
+          <h2 className="shrink-0 text-sm font-semibold tracking-[-0.01em]">{selectedProject.title}</h2>
+          <div className="ml-4 flex min-w-0 items-center gap-4 overflow-hidden whitespace-nowrap text-xs text-muted-foreground">
+            <span>时间 {selectedProjectMeta.updatedDate}</span>
+            <span>时长 {selectedProjectMeta.duration}</span>
+            <span>分辨率 1920 × 1080</span>
+            <span>文件大小 {selectedProjectMeta.fileSize}</span>
+          </div>
+        </header>
+        <div className="min-h-0 flex-1 overflow-hidden">
+          {!visibleProjects.length ? <div className="flex h-full items-center justify-center text-xs text-muted-foreground">没有匹配的视频工程</div> : <ProjectMaterials project={selectedProject} assets={assets} isPlaying={isPlaying} onTogglePlayback={() => setIsPlaying((playing) => !playing)} />}
+        </div>
+      </section>
     </main>
   );
 };
@@ -583,22 +709,7 @@ const ProjectMaterials = ({
   isPlaying: boolean;
   onTogglePlayback: () => void;
 }) => {
-  const projectNumber = Number(project.id.replace('project-', '')) || 1;
-  const sourceAsset = assets[projectNumber - 1] || assets[0];
-  const metadata = sourceAsset?.normalizedMetadata || {};
-  const fileSizeValue = metadata.fileSize ?? metadata.size ?? metadata.bytes;
-  const fileSize = typeof fileSizeValue === 'number' && fileSizeValue > 0
-    ? fileSizeValue >= 1024 ** 3
-      ? String((fileSizeValue / 1024 ** 3).toFixed(1)) + ' GB'
-      : fileSizeValue >= 1024 ** 2
-        ? String((fileSizeValue / 1024 ** 2).toFixed(1)) + ' MB'
-        : String(Math.round(fileSizeValue / 1024)) + ' KB'
-    : '—';
-  const updatedAt = sourceAsset?.updatedAt || sourceAsset?.createdAt;
-  const updatedDate = updatedAt
-    ? new Intl.DateTimeFormat('zh-CN', { year: 'numeric', month: '2-digit', day: '2-digit' }).format(updatedAt)
-    : '—';
-  const duration = String(26 + projectNumber * 3) + 's';
+  const { projectNumber } = getProjectMeta(project, assets);
   const [activeDetailTab, setActiveDetailTab] = useState('character');
   const detailGroups = [
     { id: 'character', label: '角色', icon: UserRound, assets: assets.slice(0, 3) },
@@ -608,18 +719,8 @@ const ProjectMaterials = ({
   const scriptPrompt = `以“${project.title}”为核心，用电影化短片结构展开。开场建立角色与环境，中段通过行动与镜头调度推进冲突，结尾保留清晰的情绪记忆点。`;
 
   return (
-    <section aria-label={`${project.title} 工程详情`} className="min-h-0 min-w-0 overflow-y-auto rounded-lg bg-background">
+    <section aria-label={`${project.title} 工程详情`} className="min-h-0 min-w-0 w-full overflow-y-auto rounded-lg bg-background">
       <div className="w-full px-6 pb-5 pt-4">
-        <header className="mb-4 px-1">
-          <h2 className="text-lg font-semibold tracking-[-0.025em]">{project.title}</h2>
-          <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
-            <span>时间 {updatedDate}</span>
-            <span>时长 {duration}</span>
-            <span>分辨率 1920 × 1080</span>
-            <span>文件大小 {fileSize}</span>
-          </div>
-        </header>
-
         <div className="relative aspect-video w-full overflow-hidden rounded-lg bg-[#111]">
           {project.thumbnail
             ? <img src={project.thumbnail} alt={`${project.title} 视频封面`} className={cn('h-full w-full object-cover transition-transform duration-700', isPlaying && 'scale-[1.02]')} />
@@ -689,7 +790,7 @@ const ProjectMaterials = ({
   );
 };
 
-const VideoAssetCatalog = ({ query }: { query: string }) => {
+export const VideoAssetCatalog = ({ query }: { query: string }) => {
   const [sort, setSort] = useState<'updated' | 'title'>('updated');
   const [sortOpen, setSortOpen] = useState(false);
   const [filterPanelOpen, setFilterPanelOpen] = useState(true);

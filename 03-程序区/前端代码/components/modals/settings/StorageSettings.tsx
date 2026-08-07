@@ -122,12 +122,12 @@ export function StorageSettings() {
                 setSettings((current) => ({ ...current, dataDirectory: event.target.value }))
               }
               placeholder="/Users/you/Documents/Design Work"
-              className="min-w-0 flex-1 text-xs"
+              className="h-9 min-w-0 flex-1 text-xs"
             />
             <Button
               onClick={() => void chooseDirectory('data')}
               disabled={saving}
-              variant="secondary" size="sm"
+              variant="secondary" size="sm" className="h-9"
             >
               <FolderOpen size={16} />
               选择文件夹
@@ -161,12 +161,12 @@ export function StorageSettings() {
                 }
                 placeholder="/Users/you/Library/Caches/Design Work"
                 aria-label="缓存目录"
-                className="min-w-0 flex-1 text-xs"
+                className="h-9 min-w-0 flex-1 text-xs"
               />
               <Button
                 onClick={() => void chooseDirectory('cache')}
                 disabled={saving}
-                variant="secondary" size="sm"
+                variant="secondary" size="sm" className="h-9"
               >
                 <FolderOpen size={16} />
                 选择文件夹

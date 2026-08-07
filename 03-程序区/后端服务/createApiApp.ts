@@ -12,7 +12,7 @@ export const createApiApp = (projectRoot: string) => {
   const app = express();
   const getRuntime = createLibraryRuntimeProvider(projectRoot);
 
-  app.use(express.json({ limit: '20mb' }));
+  app.use(express.json({ limit: '250mb' }));
   app.get('/api/health', (_request, response) => {
     response.json({ ok: true, service: 'design-work-local' });
   });

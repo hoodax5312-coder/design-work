@@ -11,13 +11,22 @@ export interface GeneratedContentItem {
 
 const KEY = 'design-work-content-feed';
 
+// Large provider responses (notably Wan2.1 b64_json videos) can exceed the
+// browser's localStorage quota. Keep those entries in the current session
+// instead of dropping the completed generation or surfacing a quota error.
+let volatileItems: GeneratedContentItem[] = [];
+
+const persistedItems = (): GeneratedContentItem[] => {
+  try {
+    return JSON.parse(localStorage.getItem(KEY) || '[]') as GeneratedContentItem[];
+  } catch {
+    return [];
+  }
+};
+
 export const contentFeed = {
   list(): GeneratedContentItem[] {
-    try {
-      return JSON.parse(localStorage.getItem(KEY) || '[]') as GeneratedContentItem[];
-    } catch {
-      return [];
-    }
+    return [...volatileItems, ...persistedItems()];
   },
   add(item: Omit<GeneratedContentItem, 'id' | 'createdAt' | 'savedToAssets'>) {
     const next: GeneratedContentItem = {
@@ -26,13 +35,23 @@ export const contentFeed = {
       createdAt: Date.now(),
       savedToAssets: false,
     };
-    localStorage.setItem(KEY, JSON.stringify([next, ...contentFeed.list()].slice(0, 100)));
+    const existing = contentFeed.list().filter((item) => !volatileItems.some((volatileItem) => volatileItem.id === item.id));
+    try {
+      localStorage.setItem(KEY, JSON.stringify([next, ...existing].slice(0, 100)));
+    } catch {
+      volatileItems = [next, ...volatileItems].slice(0, 20);
+    }
     window.dispatchEvent(new Event('design-work:content-feed-updated'));
     return next;
   },
   markSaved(id: string) {
-    const next = contentFeed.list().map((item) => item.id === id ? { ...item, savedToAssets: true } : item);
-    localStorage.setItem(KEY, JSON.stringify(next));
+    volatileItems = volatileItems.map((item) => item.id === id ? { ...item, savedToAssets: true } : item);
+    const next = persistedItems().map((item) => item.id === id ? { ...item, savedToAssets: true } : item);
+    try {
+      localStorage.setItem(KEY, JSON.stringify(next));
+    } catch {
+      // The volatile result remains available in this session.
+    }
     window.dispatchEvent(new Event('design-work:content-feed-updated'));
   },
 };
