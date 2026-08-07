@@ -1,5 +1,6 @@
 import type { NextFunction, Request, Response } from 'express';
 import { Router } from 'express';
+import { Agent, fetch as undiciFetch } from 'undici';
 
 export type ProviderProtocol = 'responses' | 'chat-completions' | 'anthropic-messages';
 
@@ -15,6 +16,11 @@ interface ChatMessage {
   content: string;
 }
 
+const videoDispatcher = new Agent({
+  headersTimeout: 15 * 60 * 1000,
+  bodyTimeout: 15 * 60 * 1000,
+});
+
 const withoutTrailingSlash = (value: string) => value.trim().replace(/\/+$/, '');
 
 export const normalizeOpenAiBaseUrl = (value: string) => {
@@ -23,15 +29,15 @@ export const normalizeOpenAiBaseUrl = (value: string) => {
 
   try {
     const url = new URL(normalized);
+    const endpointSuffix = /\/(?:response|responses|models|messages|chat\/completions|images(?:\/360ai)?\/generations|video\/generations)$/;
+    url.pathname = url.pathname.replace(endpointSuffix, '');
     if (url.pathname === '' || url.pathname === '/') {
       url.pathname = '/v1';
-      return withoutTrailingSlash(url.toString());
     }
+    return withoutTrailingSlash(url.toString());
   } catch {
     return normalized;
   }
-
-  return normalized;
 };
 
 const defaultBaseUrl = (protocol: ProviderProtocol) => {
@@ -82,6 +88,12 @@ const providerError = (status: number, payload: any) => {
   return error;
 };
 
+const upstreamError = (status: number, payload: any) => {
+  const error = providerError(status, payload);
+  error.message = `${error.message}。请检查 Base URL、模型能力和供应商 Host 白名单。`;
+  return error;
+};
+
 const assertConfig = (config: ProviderRequestConfig) => {
   if (!config.apiKey) throw new Error('API Key 不能为空');
   if (!config.baseUrl) throw new Error('Base URL 不能为空');
@@ -90,6 +102,8 @@ const assertConfig = (config: ProviderRequestConfig) => {
 
 const openAiHeaders = (config: ProviderRequestConfig) => ({
   Authorization: `Bearer ${config.apiKey}`,
+  // 智汇云 API keys 鉴权要求使用 api-key；保留 Bearer 头以兼容其他 OpenAI 兼容供应商。
+  'api-key': config.apiKey,
   'Content-Type': 'application/json',
 });
 
@@ -302,11 +316,41 @@ export const createProviderRouter = () => {
         }),
       });
       const payload = await readJson(upstream);
-      if (!upstream.ok) throw providerError(upstream.status, payload);
+      if (!upstream.ok) throw upstreamError(upstream.status, payload);
       const image = payload?.data?.[0];
       const url = image?.url || (image?.b64_json ? `data:image/png;base64,${image.b64_json}` : '');
       if (!url) throw new Error('图像供应商没有返回图片');
       response.json({ url, revisedPrompt: image?.revised_prompt });
+    }),
+  );
+
+  router.post(
+    '/video',
+    asyncRoute(async (request, response) => {
+      const config = normalizeConfig(request.body?.config || {});
+      assertConfig(config);
+      const upstream = await undiciFetch(`${config.baseUrl}/video/generations`, {
+        method: 'POST',
+        headers: openAiHeaders(config),
+        body: JSON.stringify({
+          model: config.model,
+          prompt: String(request.body?.prompt || ''),
+          resolution: request.body?.resolution || '480x320',
+          response_format: 'b64_json',
+          n: 1,
+        }),
+        dispatcher: videoDispatcher,
+      });
+      const payload = await readJson(upstream);
+      if (!upstream.ok) throw upstreamError(upstream.status, payload);
+      const item = payload?.data?.[0] || payload?.output || payload;
+      const url = item?.url
+        || item?.video_url
+        || item?.output_url
+        || payload?.url
+        || (item?.b64_json ? `data:video/mp4;base64,${item.b64_json}` : '');
+      if (!url) throw new Error('视频供应商没有返回视频；需要返回 data[0].url 或 data[0].b64_json');
+      response.json({ url, id: item?.id || payload?.id });
     }),
   );
 

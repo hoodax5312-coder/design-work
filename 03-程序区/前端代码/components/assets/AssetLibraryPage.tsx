@@ -6,7 +6,6 @@ import {
   FileText,
   Film,
   FolderPlus,
-  FolderKanban,
   Image as ImageIcon,
   Pencil,
   PanelLeftClose,
@@ -32,6 +31,8 @@ import { AssetDetailPanel } from './AssetDetailPanel';
 import { AssetThumbnail } from './AssetThumbnail';
 import { ImportCenter } from './ImportCenter';
 import { TaskDrawer } from './TaskDrawer';
+import { VideoAssetCatalog, VideoProjectLibrary } from '../video-gen/VideoGeneration';
+import { useUIStore } from '../../stores/useUIStore';
 import { contentFeed, type GeneratedContentItem } from '../../services/contentFeed';
 import { Alert, AlertDescription, AlertTitle, Button, Input, Select, Skeleton } from '../ui';
 
@@ -56,6 +57,7 @@ const imageAspectRatio = (asset: AssetSummary) => {
 };
 
 export const AssetLibraryPage = () => {
+  const setActiveModule = useUIStore((state) => state.setActiveModule);
   const [page, setPage] = useState<AssetPage>({ items: [], total: 0, limit: 60, offset: 0 });
   const [folders, setFolders] = useState<AssetFolder[]>([]);
   const [tags, setTags] = useState<AssetTag[]>([]);
@@ -74,7 +76,7 @@ export const AssetLibraryPage = () => {
   const [notice, setNotice] = useState('');
   const [importSession, setImportSession] = useState<ImportSession | null>(null);
   const [tasksOpen, setTasksOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState<'assets' | 'projects'>('assets');
+  const [activeTab, setActiveTab] = useState<'images' | 'videos' | 'projects'>('images');
   const [sortOpen, setSortOpen] = useState(false);
   const [filterPanelOpen, setFilterPanelOpen] = useState(true);
   const [dropZoneOpen, setDropZoneOpen] = useState(false);
@@ -346,11 +348,12 @@ export const AssetLibraryPage = () => {
         <div className="flex min-h-14 w-full items-center justify-between gap-4">
           <div
             role="tablist"
-            aria-label="资产库类型"
+            aria-label="素材类型"
             className="order-1 flex h-8 shrink-0 items-center rounded-lg bg-[#f8f8f6] p-0.5 dark:bg-white/[0.035]"
           >
             {[
-              { id: 'assets' as const, label: '素材' },
+              { id: 'images' as const, label: '图片' },
+              { id: 'videos' as const, label: '视频' },
               { id: 'projects' as const, label: '项目' },
             ].map(({ id, label }) => {
               const active = activeTab === id;
@@ -391,7 +394,7 @@ export const AssetLibraryPage = () => {
       </header>
 
       <div className="mx-16 mb-0 mt-0 flex min-h-0 flex-1 overflow-hidden rounded-xl bg-[#f8f8f6] p-2 dark:bg-white/[0.035]">
-      {activeTab === 'assets' ? (
+      {activeTab === 'images' ? (
         <div className="flex min-h-0 flex-1 gap-3">
         {filterPanelOpen && <aside
           id="asset-filter-panel"
@@ -728,14 +731,13 @@ export const AssetLibraryPage = () => {
         </div>}
       </main>
         </div>
+      ) : activeTab === 'videos' ? (
+        <VideoAssetCatalog query={query} />
       ) : (
-        <div className="grid min-h-0 flex-1 place-items-center rounded-lg bg-background text-center">
-          <div className="max-w-xs px-6">
-            <FolderKanban size={28} className="mx-auto mb-3 text-muted-foreground/60" />
-            <h2 className="text-sm font-semibold">项目</h2>
-            <p className="mt-2 text-xs leading-5 text-muted-foreground">项目视图即将推出，后续可在这里整理项目和交付内容。</p>
-          </div>
-        </div>
+        <VideoProjectLibrary
+          query={query}
+          onCreate={() => setActiveModule('video-gen')}
+        />
       )}
       </div>
 

@@ -26,6 +26,14 @@ test('normalizes an OpenAI-compatible origin to its v1 API root', () => {
     normalizeOpenAiBaseUrl('https://example.com/custom/openai/v1'),
     'https://example.com/custom/openai/v1',
   );
+  assert.equal(
+    normalizeOpenAiBaseUrl('https://llm.api.zyuncs.com/v1/response'),
+    'https://llm.api.zyuncs.com/v1',
+  );
+  assert.equal(
+    normalizeOpenAiBaseUrl('https://llm.api.zyuncs.com/v1/chat/completions'),
+    'https://llm.api.zyuncs.com/v1',
+  );
 });
 
 test('rejects an HTML success page as an invalid OpenAI API response', async () => {
@@ -56,6 +64,23 @@ test('accepts a valid OpenAI model list', async () => {
 
   try {
     assert.deepEqual(await testOpenAi(config), ['gpt-4.1', 'gpt-5.5']);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test('sends the provider API key header alongside Bearer compatibility header', async () => {
+  const originalFetch = globalThis.fetch;
+  let capturedHeaders: Headers | undefined;
+  globalThis.fetch = async (_input, init) => {
+    capturedHeaders = new Headers(init?.headers);
+    return Response.json({ object: 'list', data: [{ id: 'test-model' }] });
+  };
+
+  try {
+    await testOpenAi(config);
+    assert.equal(capturedHeaders?.get('api-key'), 'test-key');
+    assert.equal(capturedHeaders?.get('authorization'), 'Bearer test-key');
   } finally {
     globalThis.fetch = originalFetch;
   }

@@ -31,8 +31,7 @@ const navigationGroups: Array<{ title: string; items: Array<{ module: ModuleType
     title: '资产',
     items: [
       { module: 'image-gen', label: '创作', icon: LayoutDashboard, workspaceMode: 'manager' },
-      { module: 'assets', label: '图片', icon: ImageIcon },
-      { module: 'video-gen', label: '视频', icon: Clapperboard },
+      { module: 'assets', label: '素材', icon: Boxes },
       { module: 'sources', label: '知识', icon: FileText },
       { module: 'tools', label: '工具', icon: Command },
     ],

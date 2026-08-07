@@ -47,6 +47,15 @@ export const generateProviderImage = (
     ...input,
   });
 
+export const generateProviderVideo = (
+  provider: ProviderConfig,
+  input: { prompt: string; resolution?: string },
+) =>
+  request<{ url: string; id?: string }>('/api/provider/video', {
+    config: configPayload(provider),
+    ...input,
+  });
+
 export const generateProviderText = (
   provider: ProviderConfig,
   prompt: string,

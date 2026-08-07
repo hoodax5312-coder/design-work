@@ -278,7 +278,7 @@ export const PersonalSpace = ({ embedded = false, query: externalQuery }: { embe
     <main className={cn('flex h-full min-h-0 flex-col text-foreground', embedded ? 'bg-transparent' : 'module-workspace bg-background')}>
       {!embedded && <header className="mx-16 flex h-14 shrink-0 items-center justify-between gap-4 border-0 px-0">
         <h1 className="text-base font-semibold tracking-[-0.02em]">知识</h1>
-        <label className="flex h-8 w-[240px] max-w-[48vw] items-center gap-2 rounded-md bg-muted px-2.5">
+        <label className="flex h-9 w-[240px] max-w-[48vw] items-center gap-2 rounded-md bg-muted px-2.5">
           <Search aria-hidden="true" size={15} className="shrink-0 text-muted-foreground" />
           <Input
             variant="ghost"
@@ -287,7 +287,7 @@ export const PersonalSpace = ({ embedded = false, query: externalQuery }: { embe
             value={query}
             onChange={(event) => setLocalQuery(event.target.value)}
             placeholder="搜索知识"
-            className="h-8 min-w-0 flex-1 text-xs"
+            className="h-9 min-w-0 flex-1 text-xs"
           />
         </label>
       </header>}
@@ -302,7 +302,7 @@ export const PersonalSpace = ({ embedded = false, query: externalQuery }: { embe
           </div>
         </div>
         <div
-          className={cn('min-h-0 flex-1 overflow-y-auto rounded-md transition-colors', rootDropActive && 'bg-black/[0.045] ring-1 ring-inset ring-black/10 dark:bg-white/[0.06] dark:ring-white/15')}
+          className={cn('knowledge-file-tree-scroll min-h-0 flex-1 overflow-y-auto rounded-md transition-colors', rootDropActive && 'bg-black/[0.045] ring-1 ring-inset ring-black/10 dark:bg-white/[0.06] dark:ring-white/15')}
           onDragOver={(event) => { if (!draggedEntryId) return; event.preventDefault(); event.dataTransfer.dropEffect = 'move'; if (event.target === event.currentTarget) setRootDropActive(true); }}
           onDragLeave={(event) => { if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setRootDropActive(false); }}
           onDrop={(event) => { if (event.target !== event.currentTarget) return; event.preventDefault(); const draggedId = draggedEntryId || event.dataTransfer.getData('text/plain'); if (draggedId) moveEntry(draggedId); }}
@@ -314,7 +314,7 @@ export const PersonalSpace = ({ embedded = false, query: externalQuery }: { embe
         <div role="tablist" aria-label="已打开的知识" className="flex h-10 shrink-0 items-end overflow-x-auto border-b border-black/[0.05] bg-background px-1 pt-1 dark:border-white/[0.06]">
           {openEntries.map((entry) => {
             const isActive = activeEntryId === entry.id;
-            return <div key={entry.id} className={cn('group flex h-9 min-w-[132px] max-w-[220px] items-center rounded-t-md border border-b-0 border-transparent', isActive && 'border-black/[0.05] bg-background dark:border-white/[0.06]')}>
+            return <div key={entry.id} className={cn('group flex h-9 min-w-[132px] max-w-[220px] items-center rounded-t-md border border-b-0 border-transparent', isActive && 'relative z-10 border-black/[0.05] bg-background after:absolute after:-bottom-px after:inset-x-0 after:h-px after:bg-background dark:border-white/[0.06]')}>
               <button type="button" role="tab" aria-selected={isActive} onClick={() => { setActiveEntryId(entry.id); if (entry.kind === 'project') setActiveProject(entry.id); }} className="flex h-full min-w-0 flex-1 items-center gap-2 px-3 text-xs text-muted-foreground outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"><FileText size={13} className="shrink-0" /><span className={cn('truncate', isActive && 'text-foreground')}>{entry.name}</span></button>
               <Button type="button" variant="ghost" size="iconSm" onClick={() => closeEntry(entry.id)} aria-label={`关闭 ${entry.name}`} title="关闭文件" className="mr-1 h-7 w-7 shrink-0 text-muted-foreground opacity-0 group-hover:opacity-100 group-focus-within:opacity-100"><X size={13} /></Button>
             </div>;

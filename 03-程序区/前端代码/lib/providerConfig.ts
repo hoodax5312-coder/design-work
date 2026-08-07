@@ -11,13 +11,13 @@ export const normalizeProviderBaseUrl = (
 
   try {
     const url = new URL(normalized);
+    const endpointSuffix = /\/(?:response|responses|models|messages|chat\/completions|images(?:\/360ai)?\/generations|video\/generations)$/;
+    url.pathname = url.pathname.replace(endpointSuffix, '');
     if (url.pathname === '' || url.pathname === '/') {
       url.pathname = '/v1';
-      return withoutTrailingSlash(url.toString());
     }
+    return withoutTrailingSlash(url.toString());
   } catch {
     return normalized;
   }
-
-  return normalized;
 };
