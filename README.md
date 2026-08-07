@@ -1,5 +1,7 @@
 # Design Work
 
+[在线预览](https://hoodax5312-coder.github.io/design-work/) · [版本规划](./ROADMAP.md) · [更新日志](./CHANGELOG.md) · [历史版本](https://github.com/hoodax5312-coder/design-work/releases)
+
 Design Work 是一个本地优先的 AI 创作工作台，包含真实模型对话、Agent 广场、图像生成、魔法画布、素材库和电商视觉工作流。
 
 ## 视频工程素材库
