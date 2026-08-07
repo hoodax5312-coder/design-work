@@ -49,6 +49,14 @@ output/
 .design-work/
 .gstack/
 
+# Local project materials (kept on this computer, never published)
+.trae/documents/
+00-老板入口/
+00-老板查看/
+01-项目管理/
+02-产品与设计/
+04-质量与验收/
+
 # Embedded Infinite Canvas local runtime
 vendor/infinite-canvas/.venv/
 vendor/infinite-canvas/assets/
