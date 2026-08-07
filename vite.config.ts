@@ -1,7 +1,7 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import path from 'path'
-import { createApiApp } from './03-程序区/后端服务/createApiApp'
+import { createApiApp } from './server/createApiApp'
 
 // https://vitejs.dev/config/
 export default defineConfig({
@@ -17,7 +17,7 @@ export default defineConfig({
   ],
   resolve: {
     alias: {
-      "@": path.resolve(__dirname, "./03-程序区/前端代码"),
+      "@": path.resolve(__dirname, "./src"),
     },
   },
 })

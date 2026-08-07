@@ -15,5 +15,5 @@
     "noFallthroughCasesInSwitch": true,
     "types": ["node"]
   },
-  "include": ["03-程序区/后端服务/**/*.ts"]
+  "include": ["server/**/*.ts"]
 }

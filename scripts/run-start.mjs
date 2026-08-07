@@ -1,6 +1,6 @@
 import { spawn } from 'node:child_process';
 
-const processes = [spawn(process.execPath, ['node_modules/tsx/dist/cli.mjs', '03-程序区/后端服务/index.ts'], { stdio: 'inherit' })];
+const processes = [spawn(process.execPath, ['node_modules/tsx/dist/cli.mjs', 'server/index.ts'], { stdio: 'inherit' })];
 
 let stopping = false;
 const stopAll = (signal = 'SIGTERM') => {
