@@ -23,9 +23,9 @@
     /* Path Aliases */
     "baseUrl": ".",
     "paths": {
-      "@/*": ["src/*"]
+      "@/*": ["03-程序区/前端代码/*"]
     }
   },
-  "include": ["src"],
+  "include": ["03-程序区/前端代码"],
   "references": [{ "path": "./tsconfig.node.json" }]
 }

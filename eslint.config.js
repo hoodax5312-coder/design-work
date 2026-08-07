@@ -7,9 +7,17 @@ import reactRefresh from 'eslint-plugin-react-refresh';
 
 export default [
   {
-    ignores: ['dist', 'node_modules', 'tapnow-ref', 'tapnow_ref'],
+    ignores: ['dist', '.vercel', 'node_modules', 'tapnow-ref', 'tapnow_ref'],
   },
   js.configs.recommended,
+  {
+    files: ['03-程序区/启动构建/**/*.mjs'],
+    languageOptions: {
+      ecmaVersion: 2022,
+      sourceType: 'module',
+      globals: globals.node,
+    },
+  },
   {
     files: ['**/*.{ts,tsx}'],
     languageOptions: {

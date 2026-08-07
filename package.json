@@ -1,17 +1,30 @@
 {
-  "name": "mboard",
+  "name": "design-work",
   "private": true,
-  "version": "0.0.0",
+  "version": "1.1.1",
   "type": "module",
+  "engines": {
+    "node": ">=22.22"
+  },
   "scripts": {
-    "dev": "vite",
+    "predev": "node 03-程序区/启动构建/check-node-version.mjs",
+    "dev": "node 03-程序区/启动构建/run-dev.mjs",
+    "dev:app": "vite",
+    "prebuild": "node 03-程序区/启动构建/check-node-version.mjs",
     "build": "tsc && vite build",
+    "build:html": "npm run build && node 03-程序区/启动构建/build-single-html.mjs",
+    "benchmark:assets": "tsx 03-程序区/后端服务/database.benchmark.ts",
     "lint": "npx eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
-    "test": "tsx --test server/*.test.ts",
+    "test": "tsx --test 03-程序区/后端服务/*.test.ts 03-程序区/后端服务/**/*.test.ts",
     "preview": "vite preview",
-    "start": "tsx server/index.ts"
+    "prestart": "node 03-程序区/启动构建/check-node-version.mjs",
+    "start": "node 03-程序区/启动构建/run-start.mjs",
+    "typecheck:client": "tsc --noEmit -p tsconfig.json",
+    "typecheck:server": "tsc --noEmit -p tsconfig.server.json",
+    "typecheck": "npm run typecheck:client && npm run typecheck:server"
   },
   "dependencies": {
+    "@radix-ui/react-checkbox": "^1.3.11",
     "@radix-ui/react-context-menu": "^2.2.16",
     "@radix-ui/react-dialog": "^1.1.15",
     "@radix-ui/react-popover": "^1.1.15",
@@ -31,13 +44,15 @@
     "lucide-react": "^0.344.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
+    "sharp": "^0.34.4",
     "tailwind-merge": "^2.2.1",
+    "undici": "^7.29.0",
     "zustand": "^5.0.10"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.4",
     "@types/express": "^5.0.6",
-    "@types/node": "^25.2.0",
+    "@types/node": "22.15.3",
     "@types/react": "^18.2.56",
     "@types/react-dom": "^18.2.19",
     "@typescript-eslint/eslint-plugin": "^8.55.0",

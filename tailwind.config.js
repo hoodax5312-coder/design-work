@@ -3,22 +3,31 @@ export default {
   darkMode: 'class',
   content: [
     "./index.html",
-    "./src/**/*.{js,ts,jsx,tsx}",
+    "./03-程序区/前端代码/**/*.{js,ts,jsx,tsx}",
   ],
   theme: {
+    fontFamily: {
+      sans: ['PingFang SC', 'PingFang TC', 'Hiragino Sans GB', 'Microsoft YaHei', 'Noto Sans CJK SC', 'Helvetica Neue', 'Arial', 'sans-serif'],
+      serif: ['PingFang SC', 'PingFang TC', 'Hiragino Sans GB', 'Microsoft YaHei', 'Noto Sans CJK SC', 'Helvetica Neue', 'Arial', 'sans-serif'],
+      mono: ['PingFang SC', 'PingFang TC', 'Hiragino Sans GB', 'Microsoft YaHei', 'Noto Sans CJK SC', 'Helvetica Neue', 'Arial', 'sans-serif'],
+    },
     extend: {
+      borderColor: {
+        DEFAULT: 'hsl(var(--border))',
+      },
       colors: {
-        background: '#000000',
-        foreground: '#ffffff',
-        card: {
-          DEFAULT: 'rgba(24, 24, 27, 0.9)', // zinc-900/90
-          foreground: '#ffffff',
-        },
-        border: 'rgba(255, 255, 255, 0.1)', // white/10
-        accent: {
-          cyan: '#06b6d4',
-          purple: '#a855f7',
-        }
+        border: 'hsl(var(--border))',
+        input: 'hsl(var(--input))',
+        ring: 'hsl(var(--ring))',
+        background: 'hsl(var(--background))',
+        foreground: 'hsl(var(--foreground))',
+        primary: { DEFAULT: 'hsl(var(--primary))', foreground: 'hsl(var(--primary-foreground))' },
+        secondary: { DEFAULT: 'hsl(var(--secondary))', foreground: 'hsl(var(--secondary-foreground))' },
+        destructive: { DEFAULT: 'hsl(var(--destructive))', foreground: 'hsl(var(--destructive-foreground))' },
+        muted: { DEFAULT: 'hsl(var(--muted))', foreground: 'hsl(var(--muted-foreground))' },
+        accent: { DEFAULT: 'hsl(var(--accent))', foreground: 'hsl(var(--accent-foreground))', cyan: '#c8ff00', purple: '#c8ff00' },
+        popover: { DEFAULT: 'hsl(var(--popover))', foreground: 'hsl(var(--popover-foreground))' },
+        card: { DEFAULT: 'hsl(var(--card))', foreground: 'hsl(var(--card-foreground))' },
       },
       backdropBlur: {
         xs: '2px',

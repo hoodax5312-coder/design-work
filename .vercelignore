@@ -1,7 +1,10 @@
 node_modules
 build
 dist
+output
 .git
 .trae
+.gstack
+.design-work
 .log
 .figma
