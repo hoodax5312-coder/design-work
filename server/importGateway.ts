@@ -11,8 +11,12 @@ import type { LibraryRuntime } from './libraryRuntime';
 import type { ImportDecision } from './repositories/ImportSessionRepository';
 
 const decisions = new Set<ImportDecision>(['import_new', 'merge_path', 'keep_separate', 'skip']);
-const supportedDroppedImageExtensions = new Set(['.png', '.jpg', '.jpeg', '.webp', '.gif', '.avif', '.heic']);
-const maxDroppedImageBytes = 100 * 1024 * 1024;
+const supportedDroppedAssetExtensions = new Set([
+  '.png', '.jpg', '.jpeg', '.webp', '.gif', '.avif', '.heic',
+  '.mp4', '.mov', '.webm',
+  '.mp3', '.wav', '.m4a', '.aac', '.flac', '.ogg',
+]);
+const maxDroppedAssetBytes = 500 * 1024 * 1024;
 
 const dedupeKeyForPaths = (paths: string[]) =>
   createHash('sha256')
@@ -56,15 +60,15 @@ export const createImportRouter = (
     const fileName = path.basename(decodedFileName);
     const extension = path.extname(fileName).toLowerCase();
 
-    if (!fileName || !supportedDroppedImageExtensions.has(extension)) {
-      response.status(400).json({ error: '仅支持拖入 PNG、JPG、WebP、GIF、AVIF 或 HEIC 图片' });
+    if (!fileName || !supportedDroppedAssetExtensions.has(extension)) {
+      response.status(400).json({ error: '仅支持拖入常见图片、视频或音频素材' });
       return;
     }
 
     let temporaryPath = '';
     try {
       const runtime = await getRuntime();
-      const uploadDirectory = path.join(runtime.paths.managedAssets, 'dropped-images');
+      const uploadDirectory = path.join(runtime.paths.managedAssets, 'dropped-assets');
       await mkdir(uploadDirectory, { recursive: true });
       const storedName = `${randomUUID()}${extension}`;
       const targetPath = path.join(uploadDirectory, storedName);
@@ -73,15 +77,15 @@ export const createImportRouter = (
       const limit = new Transform({
         transform(chunk, _encoding, callback) {
           receivedBytes += chunk.length;
-          if (receivedBytes > maxDroppedImageBytes) {
-            callback(new Error('单张拖入图片不能超过 100 MB'));
+          if (receivedBytes > maxDroppedAssetBytes) {
+            callback(new Error('单个拖入素材不能超过 500 MB'));
             return;
           }
           callback(null, chunk);
         },
       });
       await pipeline(request, limit, createWriteStream(temporaryPath, { flags: 'wx' }));
-      if (receivedBytes === 0) throw new Error('未接收到图片内容');
+      if (receivedBytes === 0) throw new Error('未接收到素材内容');
       await rename(temporaryPath, targetPath);
       temporaryPath = '';
       response.status(201).json({ path: targetPath, originalFileName: fileName });

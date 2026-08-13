@@ -5,7 +5,6 @@ import {
   Image as ImageIcon,
   Infinity as InfinityIcon,
   Presentation,
-  Sparkles,
   Video,
 } from 'lucide-react';
 import { AppShell } from './components/layout/AppShell';
@@ -17,7 +16,7 @@ import { AssetLibraryPage } from './components/assets/AssetLibraryPage';
 import { Ecommerce } from './components/ecommerce/Ecommerce';
 import { ExportCenter, SourceCenter } from './components/delivery/DeliveryCenter';
 import { WorkflowModal } from './components/modals/WorkflowModal';
-import { SettingsModal } from './components/modals/SettingsModal';
+import { SettingsPage } from './components/settings/SettingsPage';
 import { useUIStore } from './stores/useUIStore';
 import { type ModuleType } from './stores/useUIStore';
 import { Badge, Button, Card } from './components/ui';
@@ -82,10 +81,6 @@ const ToolsHub = () => {
     <div className="module-workspace h-full overflow-y-auto p-4 text-foreground sm:p-6 lg:p-8">
       <div className="mx-auto max-w-7xl">
         <div className="relative mb-6 border-b border-black/[0.06] px-1 pb-6 dark:border-white/[0.08]">
-          <div className="relative mb-4 inline-flex items-center gap-2 rounded-md bg-muted px-2 py-1 text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-            <Sparkles size={14} />
-            AI applications
-          </div>
           <h1 className="max-w-3xl text-3xl font-semibold leading-tight tracking-[-0.035em]">
             让 AI 帮你整理、理解和再利用设计资产。
           </h1>
@@ -104,8 +99,7 @@ const ToolsHub = () => {
 
         <div className="mb-4 flex items-end justify-between">
           <div>
-            <div className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">Create</div>
-            <h2 className="mt-1 text-xl font-semibold tracking-[-0.02em]">辅助创作能力</h2>
+            <h2 className="text-xl font-semibold tracking-[-0.02em]">辅助创作能力</h2>
           </div>
           <div className="hidden items-center gap-2 text-xs text-muted-foreground md:flex"><Film size={14} /> 所有产出自动进入资产库</div>
         </div>
@@ -160,12 +154,12 @@ function App() {
         {activeModule === 'tools' && <ToolsHub />}
         {activeModule === 'sources' && <SourceCenter />}
         {activeModule === 'exports' && <ExportCenter />}
+        {activeModule === 'settings' && <SettingsPage />}
         {/* Render Canvas as fallback or specific placeholders for other modules */}
-        {activeModule !== 'magic-canvas' && activeModule !== 'image-gen' && activeModule !== 'ppt-gen' && activeModule !== 'video-gen' && activeModule !== 'projects' && activeModule !== 'ecommerce' && activeModule !== 'assets' && activeModule !== 'tools' && activeModule !== 'sources' && activeModule !== 'exports' && (
+        {activeModule !== 'magic-canvas' && activeModule !== 'image-gen' && activeModule !== 'ppt-gen' && activeModule !== 'video-gen' && activeModule !== 'projects' && activeModule !== 'ecommerce' && activeModule !== 'assets' && activeModule !== 'tools' && activeModule !== 'sources' && activeModule !== 'exports' && activeModule !== 'settings' && (
           <ModulePlaceholder title="模块建设中" description="这个入口还没有接入具体页面。" />
         )}
         <WorkflowModal />
-        <SettingsModal />
     </AppShell>
   );
 }

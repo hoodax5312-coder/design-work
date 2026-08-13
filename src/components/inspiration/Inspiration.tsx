@@ -234,7 +234,7 @@ export const Inspiration = () => {
             {visiblePrompts.map((prompt) => {
               const isCopied = copiedId === prompt.id;
               return (
-                <article key={prompt.id} className="group relative flex min-h-[176px] min-w-0 flex-col rounded-lg border border-black/[0.045] bg-white p-4 transition-[background-color,box-shadow] hover:bg-[#fcfcfb] hover:shadow-[0_4px_14px_rgba(15,15,15,0.05)] focus-within:bg-[#fcfcfb] dark:border-white/[0.06] dark:bg-[#171717] dark:hover:bg-[#1a1a1a]">
+                <article key={prompt.id} className="group relative flex min-h-[176px] min-w-0 flex-col rounded-lg border border-black/[0.045] bg-white p-4 transition-[background-color,box-shadow] hover:bg-[#fcfcfb] hover:shadow-[0_4px_14px_rgba(15,15,15,0.05)] focus-within:bg-[#fcfcfb] dark:border-[var(--surface-border)] dark:bg-[var(--surface-bg)] dark:hover:bg-[var(--surface-hover)]">
                   <Button type="button" variant="ghost" size="iconSm"
                       onClick={() => copyPrompt(prompt)}
                       aria-label={`复制「${prompt.title}」提示词`}

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { File, FileText, Film, Image as ImageIcon, Loader2, Presentation } from 'lucide-react';
+import { AudioLines, File, FileText, Film, Image as ImageIcon, Loader2, Presentation } from 'lucide-react';
 import { assetService, waitForTask } from '../../services/assetService';
 import type { AssetSummary } from '../../types/asset.types';
 import { cn } from '../../lib/utils';
@@ -7,6 +7,7 @@ import { cn } from '../../lib/utils';
 const TypeIcon = ({ type }: { type: string }) => {
   if (type === 'image') return <ImageIcon size={24} />;
   if (type === 'video') return <Film size={24} />;
+  if (type === 'audio') return <AudioLines size={24} />;
   if (type === 'ppt') return <Presentation size={24} />;
   if (type === 'knowledge') return <FileText size={24} />;
   return <File size={24} />;
@@ -21,8 +22,11 @@ export const AssetThumbnail = ({
   onReady?: () => void;
   fit?: 'cover' | 'contain';
 }) => {
+  const generatedUrl = typeof asset.userMetadata?.generatedUrl === 'string'
+    ? asset.userMetadata.generatedUrl
+    : '';
   const [state, setState] = useState<'missing' | 'loading' | 'ready' | 'failed'>(
-    asset.previewStatus === 'ready' ? 'ready' : 'missing',
+    generatedUrl || asset.previewStatus === 'ready' ? 'ready' : 'missing',
   );
   const [version, setVersion] = useState(asset.updatedAt);
 
@@ -51,7 +55,7 @@ export const AssetThumbnail = ({
   if (state === 'ready' && asset.type === 'image') {
     return (
       <img
-        src={`/api/assets/${asset.id}/preview?size=512&v=${version}`}
+        src={generatedUrl || asset.previewUrl || `/api/assets/${asset.id}/preview?size=512&v=${version}`}
         alt=""
         loading="lazy"
         className={cn(

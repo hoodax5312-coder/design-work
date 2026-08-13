@@ -3,7 +3,7 @@ import { useUIStore } from '../../stores/useUIStore';
 import { Button, Separator } from '../ui';
 
 export const Header = () => {
-  const { theme, toggleProjectSidebar, toggleTheme, openModal } = useUIStore();
+  const { theme, toggleProjectSidebar, toggleTheme, setActiveModule } = useUIStore();
 
   return (
     <div className="relative z-[60] flex h-9 items-center justify-between border-b border-border bg-background px-4">
@@ -35,7 +35,7 @@ export const Header = () => {
           {theme === 'dark' ? <Sun size={14} /> : <Moon size={14} />}
         </Button>
         <Button variant="ghost" size="iconSm"
-          onClick={() => openModal('settings')}
+          onClick={() => setActiveModule('settings')}
           aria-label="打开设置" className="h-7 w-7"
         >
           <Settings size={14} />

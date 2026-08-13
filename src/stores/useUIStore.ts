@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 
 export type PanelType = 'assets' | 'workflow' | 'history' | 'tools' | null;
-export type ModalType = 'workflow' | 'settings' | null;
+export type ModalType = 'workflow' | null;
 export type WorkspaceMode = 'editor' | 'manager';
 export type GenerationMode = 'image' | 'video';
 
@@ -28,7 +28,8 @@ export type ModuleType =
   | 'tools'
   | 'ecommerce'
   | 'sources'
-  | 'exports';
+  | 'exports'
+  | 'settings';
 
 interface UIState {
   activePanel: PanelType;

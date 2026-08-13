@@ -19,7 +19,6 @@ import {
 import { cn } from '../../lib/utils';
 import { assetService } from '../../services/assetService';
 import type { FileIssue } from '../../types/asset.types';
-import { Inspiration } from '../inspiration/Inspiration';
 import { QuickNotes } from '../knowledge/QuickNotes';
 import { PersonalSpace } from '../spaces/PersonalSpace';
 import { Badge, Button, Card, Input, Tabs, TabsList, TabsTrigger } from '../ui';
@@ -223,21 +222,21 @@ export const KnowledgeSources = () => {
   );
 };
 
-export const SourceCenter = ({ initialSection = 'notes' }: { initialSection?: 'notes' | 'prompts' | 'documents' }) => {
-  const [activeSection, setActiveSection] = useState<'notes' | 'prompts' | 'documents'>(initialSection);
+export const SourceCenter = ({ initialSection = 'notes' }: { initialSection?: 'notes' | 'documents' }) => {
+  const [activeSection, setActiveSection] = useState<'notes' | 'documents'>(initialSection);
   const [query, setQuery] = useState('');
 
   return (
     <div className="module-workspace flex h-full min-h-0 flex-col">
-      <Tabs value={activeSection} onValueChange={(value) => setActiveSection(value as typeof activeSection)} className="ui-module-toolbar mx-16 h-14 shrink-0 border-0 px-0 shadow-none">
-        <TabsList aria-label="知识中心内容" className="h-9 gap-0 rounded-lg bg-muted p-0.5 shadow-none"><TabsTrigger value="notes" className="h-8 border-0 px-4 text-xs shadow-none data-[state=active]:bg-background data-[state=active]:shadow-sm">笔记</TabsTrigger><TabsTrigger value="documents" className="h-8 border-0 px-4 text-xs shadow-none data-[state=active]:bg-background data-[state=active]:shadow-sm">文件</TabsTrigger><TabsTrigger value="prompts" className="h-8 border-0 px-4 text-xs shadow-none data-[state=active]:bg-background data-[state=active]:shadow-sm">提示词</TabsTrigger></TabsList>
+      <Tabs value={activeSection} onValueChange={(value) => setActiveSection(value as typeof activeSection)} className="ui-module-toolbar mx-3 h-14 shrink-0 border-0 px-0 shadow-none">
+        <TabsList aria-label="知识中心内容" className="h-8 gap-1 rounded-none border-0 bg-transparent p-0 shadow-none"><TabsTrigger value="notes" className="h-8 border-0 bg-transparent px-4 py-0 text-sm text-muted-foreground shadow-none focus-visible:ring-offset-0 data-[state=inactive]:hover:text-foreground data-[state=active]:!bg-[var(--surface-control)] data-[state=active]:!text-foreground data-[state=active]:!shadow-none">笔记</TabsTrigger><TabsTrigger value="documents" className="h-8 border-0 bg-transparent px-4 py-0 text-sm text-muted-foreground shadow-none focus-visible:ring-offset-0 data-[state=inactive]:hover:text-foreground data-[state=active]:!bg-[var(--surface-control)] data-[state=active]:!text-foreground data-[state=active]:!shadow-none">文件</TabsTrigger></TabsList>
         <div className="relative ml-auto w-[240px] shrink-0">
           <Search size={16} className="pointer-events-none absolute left-3 top-1/2 z-10 -translate-y-1/2 text-muted-foreground" />
-          <Input value={query} onChange={(event) => setQuery(event.target.value)} aria-label="搜索知识内容" placeholder={activeSection === 'documents' ? '搜索文件和文件夹…' : activeSection === 'prompts' ? '搜索提示词…' : '搜索标题、描述和提取文字…'} className="h-9 border-0 bg-[#f3f3f1] py-0 pl-9 shadow-none focus-visible:ring-1 focus-visible:ring-black/10 dark:bg-white/[0.06] dark:focus-visible:ring-white/15" />
+          <Input value={query} onChange={(event) => setQuery(event.target.value)} aria-label="搜索知识内容" placeholder={activeSection === 'documents' ? '搜索文件和文件夹…' : '搜索标题、描述和提取文字…'} className="h-9 border-0 bg-[#f3f3f1] py-0 pl-9 shadow-none focus-visible:ring-1 focus-visible:ring-black/10 dark:bg-[var(--surface-control)] dark:focus-visible:ring-white/15" />
         </div>
       </Tabs>
-      <div className="mx-16 mb-0 min-h-0 flex-1 overflow-visible rounded-xl bg-[#f8f8f6] p-2 dark:bg-white/[0.035]">
-        {activeSection === 'notes' ? <QuickNotes /> : activeSection === 'prompts' ? <Inspiration /> : <PersonalSpace embedded query={query} />}
+      <div className="mx-3 mb-0 min-h-0 flex-1 overflow-visible rounded-xl bg-[#f8f8f6] p-2 dark:bg-[var(--surface-bg)]">
+        {activeSection === 'notes' ? <QuickNotes /> : <PersonalSpace embedded query={query} />}
       </div>
     </div>
   );

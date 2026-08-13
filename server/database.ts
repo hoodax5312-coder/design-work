@@ -24,6 +24,10 @@ const migrations: Migration[] = [
     version: 4,
     sql: fs.readFileSync(new URL('./migrations/004_preview_metadata.sql', import.meta.url), 'utf8'),
   },
+  {
+    version: 5,
+    sql: fs.readFileSync(new URL('./migrations/005_default_asset_tags.sql', import.meta.url), 'utf8'),
+  },
 ];
 
 export const withTransaction = <T>(database: DatabaseSync, operation: () => T): T => {

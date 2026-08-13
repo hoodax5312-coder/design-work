@@ -16,6 +16,7 @@ const typeForExtension = (extension: string) => {
   if (['.png', '.jpg', '.jpeg', '.webp', '.gif', '.avif', '.heic'].includes(extension))
     return 'image';
   if (['.mp4', '.mov', '.webm'].includes(extension)) return 'video';
+  if (['.mp3', '.wav', '.m4a', '.aac', '.flac', '.ogg'].includes(extension)) return 'audio';
   if (['.ppt', '.pptx'].includes(extension)) return 'ppt';
   if (['.txt', '.md', '.json'].includes(extension)) return 'knowledge';
   return 'file';

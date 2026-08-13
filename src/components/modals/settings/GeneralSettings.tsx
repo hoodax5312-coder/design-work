@@ -16,7 +16,7 @@ export function GeneralSettings() {
         <Card
           variant="solid"
           padding="none"
-          className="border-0 bg-[#fafaf8] shadow-none dark:bg-white/[0.025]"
+          className="border-0 bg-[#fafaf8] shadow-none dark:bg-[var(--surface-subtle)]"
         >
           <CardHeader className="w-full justify-between border-b-0 px-4 py-4">
             <div>

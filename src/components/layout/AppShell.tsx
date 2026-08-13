@@ -46,8 +46,6 @@ export const AppShell = ({ children }: AppShellProps) => {
   const filteredCommands = commands.filter((command) =>
     command.label.toLowerCase().includes(commandQuery.toLowerCase()),
   );
-  const showsCreationModeSwitch = activeModule === 'image-gen' || activeModule === 'magic-canvas';
-
   useEffect(() => {
     const handleShortcut = (event: KeyboardEvent) => {
       if (!(event.metaKey || event.ctrlKey)) {
@@ -91,32 +89,21 @@ export const AppShell = ({ children }: AppShellProps) => {
   };
 
   return (
-    <div className="flex h-[100dvh] w-screen overflow-hidden bg-background font-sans text-foreground">
+    <div className="flex h-[100dvh] w-screen overflow-hidden bg-[#f0f0ed] font-sans text-foreground dark:bg-[#151515]">
       <ProjectSidebar />
 
-      <div className="app-workspace relative flex min-w-0 flex-1 flex-col overflow-hidden bg-background">
+      <div className="app-workspace relative my-2 ml-0 mr-2 flex min-w-0 flex-1 flex-col overflow-hidden rounded-[16px] border border-[var(--surface-border)] bg-[var(--workspace-bg)] shadow-sm">
         <div className="relative flex min-h-0 flex-1 overflow-hidden">
           <main className="relative min-w-0 flex-1 overflow-hidden">
             <div className="absolute inset-0 overflow-hidden">
-              {children}
+              <div className={activeModule === 'image-gen' ? 'app-content-container pt-14' : 'app-content-container'}>
+                {children}
+              </div>
             </div>
-            {showsCreationModeSwitch && <CreationModeSwitch />}
+            {activeModule === 'image-gen' && <CreationModeSwitch />}
           </main>
         </div>
 
-        <footer className="flex h-7 shrink-0 items-center justify-between border-0 bg-background px-3 text-xs text-muted-foreground">
-          <div className="flex items-center gap-3">
-              <span className="flex items-center gap-1.5">
-              <span className="h-1.5 w-1.5 rounded-full bg-primary" /> 本地工作区
-            </span>
-            <span>自动保存已开启</span>
-          </div>
-          <div className="flex items-center gap-3">
-            <span>导出队列 空闲</span>
-            <span>缓存 按需</span>
-            <span>UTF-8</span>
-          </div>
-        </footer>
       </div>
 
       {commandOpen && (

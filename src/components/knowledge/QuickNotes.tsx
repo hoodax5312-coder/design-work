@@ -206,9 +206,9 @@ export const QuickNotes = () => {
       {composerOpen && <section className="relative z-20 flex max-h-[46vh] w-full shrink-0 flex-col overflow-visible bg-transparent p-3 shadow-none md:max-h-none md:w-[min(390px,38vw)] md:min-w-[300px] sm:p-4">
         <p className="mb-3 px-1 text-xs leading-5 text-muted-foreground">随手记下灵感，让创作有迹可循。</p>
         <div className="relative isolate shrink-0 pb-3">
-          <div aria-hidden="true" className="pointer-events-none absolute inset-x-3 bottom-0 top-3 z-0 rounded-lg border border-black/[0.045] bg-[#e6e6e3] shadow-[0_5px_14px_rgba(15,15,15,0.045)] dark:border-white/[0.05] dark:bg-white/[0.025]" />
-          <div aria-hidden="true" className="pointer-events-none absolute inset-x-1.5 bottom-1.5 top-1.5 z-[1] rounded-lg border border-black/[0.06] bg-[#f1f1ee] shadow-[0_3px_10px_rgba(15,15,15,0.04)] dark:border-white/[0.07] dark:bg-white/[0.045]" />
-        <Card className="relative z-10 flex flex-col border-black/[0.035] bg-white shadow-[0_2px_8px_rgba(15,15,15,0.055)] dark:border-white/[0.055] dark:bg-[#171717]" padding="md">
+          <div aria-hidden="true" className="pointer-events-none absolute inset-x-3 bottom-0 top-3 z-0 rounded-lg border border-black/[0.045] bg-[#e6e6e3] shadow-[0_5px_14px_rgba(15,15,15,0.045)] dark:border-[var(--surface-border)] dark:bg-[var(--surface-subtle)]" />
+          <div aria-hidden="true" className="pointer-events-none absolute inset-x-1.5 bottom-1.5 top-1.5 z-[1] rounded-lg border border-black/[0.06] bg-[#f1f1ee] shadow-[0_3px_10px_rgba(15,15,15,0.04)] dark:border-[var(--surface-border-strong)] dark:bg-[var(--surface-control)]" />
+        <Card className="relative z-10 flex flex-col border-black/[0.035] bg-white shadow-[0_2px_8px_rgba(15,15,15,0.055)] dark:border-[var(--surface-border)] dark:bg-[var(--surface-bg)]" padding="md">
           <div className="flex items-center gap-1 text-muted-foreground">
             <Button type="button" variant="ghost" size="iconSm" onClick={() => insertText('[图片]')} aria-label="插入图片标记"><ImagePlus size={17} /></Button>
             <Button type="button" variant="ghost" size="iconSm" onClick={() => insertText('- [ ] ')} aria-label="插入待办事项"><CheckSquare2 size={17} /></Button>
@@ -266,9 +266,8 @@ export const QuickNotes = () => {
         </div>
       </section>}
 
-      <section aria-label="小记列表" className="min-h-0 flex-1 overflow-y-auto rounded-lg bg-white p-3 dark:bg-[#121212] sm:p-4">
-        <div className="mx-auto max-w-4xl">
-          <div aria-label="按标签筛选小记" className="sticky top-0 z-20 mb-4 flex min-w-0 flex-nowrap items-center gap-2 overflow-hidden border-b border-black/[0.05] bg-white dark:border-white/[0.06] dark:bg-[#121212]">
+      <section aria-label="小记列表" className="min-h-0 flex-1 overflow-y-auto rounded-lg bg-white p-0 dark:bg-[var(--surface-subtle)]">
+          <div aria-label="按标签筛选小记" className="sticky top-0 z-20 flex h-12 min-w-0 flex-nowrap items-center gap-2 overflow-hidden border-b border-black/[0.05] bg-white px-4 dark:border-[var(--surface-border)] dark:bg-[var(--surface-subtle)]">
             <div className="flex shrink-0 items-center gap-2">
               <Button type="button" variant="ghost" size="iconSm" onClick={() => setComposerOpen((open) => !open)} aria-label={composerOpen ? '收起笔记输入区' : '展开笔记输入区'} title={composerOpen ? '收起笔记输入区' : '展开笔记输入区'} aria-expanded={composerOpen} className="h-8 w-8 shrink-0 text-muted-foreground hover:bg-black/[0.05] dark:hover:bg-white/[0.08]">
               {composerOpen ? <PanelLeftClose size={15} /> : <PanelLeftOpen size={15} />}
@@ -286,11 +285,12 @@ export const QuickNotes = () => {
                 ) : null}
               </div>
             </div>
-            <Button type="button" variant="ghost" size="sm" onClick={() => setTagManagerOpen(true)} className="shrink-0 gap-1.5 bg-white px-2 text-xs font-normal text-muted-foreground dark:bg-[#121212]"><TagsIcon size={14} /> 标签管理</Button>
+            <Button type="button" variant="ghost" size="sm" onClick={() => setTagManagerOpen(true)} className="shrink-0 gap-1.5 bg-white px-2 text-xs font-normal text-muted-foreground dark:bg-[var(--surface-subtle)]"><TagsIcon size={14} /> 标签管理</Button>
           </div>
+          <div className="mx-auto max-w-4xl px-4 pt-4">
           <div className="space-y-4 pb-2">
           {filteredNotes.map((note) => (
-            <Card key={note.id} padding="none" className="group relative border-black/[0.035] bg-white px-6 py-4 dark:border-white/[0.055] dark:bg-[#171717]">
+            <Card key={note.id} padding="none" className="group relative border-black/[0.035] bg-white px-6 py-4 dark:border-[var(--surface-border)] dark:bg-[var(--surface-bg)]">
               <header className="flex items-center justify-between gap-4">
                 <span className="text-xs text-muted-foreground">更新于 {formatUpdatedAt(note.updatedAt)}</span>
                 <div className="flex gap-1 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">

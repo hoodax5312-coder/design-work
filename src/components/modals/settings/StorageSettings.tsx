@@ -108,7 +108,7 @@ export function StorageSettings() {
           本地数据目录
         </h4>
 
-        <div className="rounded-xl border border-black/[0.028] bg-[#fafaf8] p-4 dark:border-white/[0.045] dark:bg-white/[0.025]">
+        <div className="rounded-xl border border-black/[0.028] bg-[#fafaf8] p-4 dark:border-[var(--surface-border)] dark:bg-[var(--surface-subtle)]">
           <div className="mb-2 text-sm font-medium text-slate-700 dark:text-slate-200">
             保存位置
           </div>
@@ -141,7 +141,7 @@ export function StorageSettings() {
             缓存位置
           </h4>
 
-          <div className="rounded-xl border border-black/[0.028] bg-[#fafaf8] p-4 dark:border-white/[0.045] dark:bg-white/[0.025]">
+          <div className="rounded-xl border border-black/[0.028] bg-[#fafaf8] p-4 dark:border-[var(--surface-border)] dark:bg-[var(--surface-subtle)]">
             <div className="mb-2 flex items-center justify-between gap-3">
               <span className="text-sm font-medium text-slate-700 dark:text-slate-200">
                 缓存目录
@@ -175,7 +175,7 @@ export function StorageSettings() {
           </div>
         </div>
 
-        <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-black/[0.028] bg-white p-4 dark:border-white/[0.045] dark:bg-white/[0.025]">
+        <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-black/[0.028] bg-white p-4 dark:border-[var(--surface-border)] dark:bg-[var(--surface-subtle)]">
           <Switch
             checked={settings.autoSaveGeneratedAssets}
             onCheckedChange={(checked) =>

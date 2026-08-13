@@ -292,7 +292,7 @@ export const PersonalSpace = ({ embedded = false, query: externalQuery }: { embe
         </label>
       </header>}
 
-      <div className={cn('mb-0 flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl bg-[#f8f8f6] dark:bg-white/[0.035] md:flex-row', !embedded && 'mx-16 p-2')}>
+      <div className={cn('mb-0 flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl bg-[#f8f8f6] dark:bg-[var(--surface-bg)] md:flex-row', !embedded && 'mx-16 p-2')}>
       <aside aria-label="知识文件树" className="flex max-h-[38vh] w-full shrink-0 flex-col overflow-hidden bg-transparent py-2 pr-2 shadow-none md:max-h-none md:w-[240px]">
         <div className="mb-2 flex h-8 shrink-0 items-center justify-between px-1">
           <button type="button" onClick={() => setActiveFolderId(undefined)} className="min-w-0 flex-1 truncate px-2 text-left text-xs font-semibold text-muted-foreground" title="在根目录新建">文件</button>

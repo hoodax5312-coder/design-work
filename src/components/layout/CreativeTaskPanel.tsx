@@ -27,6 +27,7 @@ const moduleNames = {
   ecommerce: '电商设计',
   sources: '知识',
   exports: '导出中心',
+  settings: '设置',
 } as const;
 
 export const CreativeTaskPanel = () => {

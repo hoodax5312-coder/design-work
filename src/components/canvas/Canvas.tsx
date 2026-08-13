@@ -91,7 +91,6 @@ const CanvasInner = () => {
   const [agentSettingsOpen, setAgentSettingsOpen] = useState(false);
   const [boards, setBoards] = useState(['画布 1', '画布 2']);
   const [activeBoard, setActiveBoard] = useState('画布 1');
-  const [boardNodeCounts, setBoardNodeCounts] = useState<Record<string, number>>({ '画布 1': 0, '画布 2': 0 });
   const activeBoardRef = useRef('画布 1');
   const [notice, setNotice] = useState<string | null>(null);
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
@@ -191,14 +190,12 @@ const CanvasInner = () => {
       '画布 1': messages,
       '画布 2': [createWelcomeMessage('画布 2')],
     };
-    setBoardNodeCounts({ '画布 1': nodes.length, '画布 2': 0 });
     boardsInitializedRef.current = true;
   }, [edges, messages, nodes]);
 
   useEffect(() => {
     if (!boardsInitializedRef.current) return;
     boardSnapshotsRef.current[activeBoardRef.current] = { nodes, edges };
-    setBoardNodeCounts((current) => ({ ...current, [activeBoardRef.current]: nodes.length }));
   }, [activeBoard, edges, nodes]);
 
   useEffect(() => {
@@ -211,7 +208,6 @@ const CanvasInner = () => {
     if (board === currentBoard) return;
     boardSnapshotsRef.current[currentBoard] = { nodes, edges };
     boardMessagesRef.current[currentBoard] = messages;
-    setBoardNodeCounts((current) => ({ ...current, [currentBoard]: nodes.length }));
     const nextSnapshot = boardSnapshotsRef.current[board] || { nodes: [], edges: [] };
     const nextMessages = boardMessagesRef.current[board] || [createWelcomeMessage(board)];
     activeBoardRef.current = board;
@@ -225,7 +221,6 @@ const CanvasInner = () => {
     const nextName = `画布 ${boards.length + 1}`;
     boardSnapshotsRef.current[nextName] = { nodes: [], edges: [] };
     boardMessagesRef.current[nextName] = [createWelcomeMessage(nextName)];
-    setBoardNodeCounts((current) => ({ ...current, [nextName]: 0 }));
     setBoards((current) => [...current, nextName]);
     switchBoard(nextName);
   }, [boards.length, switchBoard]);
@@ -339,9 +334,9 @@ const CanvasInner = () => {
   const visibleNodes = nodes;
 
   return (
-    <main className="absolute inset-x-0 bottom-0 top-14 min-h-0 overflow-hidden bg-white text-foreground dark:bg-[#0b0b0b]">
+    <main className="absolute inset-0 min-h-0 overflow-hidden bg-white text-foreground dark:bg-[#0b0b0b]">
       {showExplorer && (
-        <aside className="absolute bottom-3 left-3 top-3 z-40 flex w-[252px] flex-col rounded-xl bg-white/95 shadow-[0_8px_28px_rgba(15,15,15,0.08)] backdrop-blur-xl dark:bg-[#121212]/95 dark:shadow-[0_8px_28px_rgba(0,0,0,0.2)]">
+        <aside className="absolute bottom-3 left-3 top-3 z-40 flex w-[252px] flex-col rounded-xl bg-white/95 shadow-[0_8px_28px_rgba(15,15,15,0.08)] backdrop-blur-xl dark:bg-[var(--surface-subtle)] dark:shadow-[0_8px_28px_rgba(0,0,0,0.2)]">
           <div className="flex h-14 shrink-0 items-center gap-1 px-3">
             <div className="relative shrink-0">
               <Button type="button" variant="ghost" size="iconSm" onClick={() => setProjectEmojiOpen((open) => !open)} aria-label="选择项目表情" title="选择项目表情" className="h-8 w-8 rounded-lg bg-muted text-base">{activeProjectEmoji}</Button>
@@ -357,23 +352,23 @@ const CanvasInner = () => {
             <div className="mb-1 flex h-8 items-center justify-between px-2 text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground"><span>画布</span><Button type="button" variant="ghost" size="iconSm" onClick={createBoard} aria-label="新增画布" className="h-6 w-6"><Plus size={13} /></Button></div>
             <div className="space-y-1">
               {boards.map((board) => (
-                <Button key={board} type="button" variant="ghost" size="sm" onClick={() => switchBoard(board)} aria-pressed={activeBoard === board} className={cn('h-9 w-full justify-start gap-2 px-2 text-xs', activeBoard === board && 'bg-muted text-foreground hover:bg-muted')}>
-                  <LayoutGrid size={14} /><span className="flex-1 truncate text-left">{board}</span><span className="font-mono text-xs opacity-60">{boardNodeCounts[board] || 0}</span>
+                <Button key={board} type="button" variant="ghost" size="sm" onClick={() => switchBoard(board)} aria-pressed={activeBoard === board} className={cn('h-9 w-full justify-start gap-2 border-0 px-2 text-xs shadow-none hover:bg-black/[0.04] dark:hover:bg-white/[0.07]', activeBoard === board && 'bg-muted text-foreground hover:bg-muted')}>
+                  <LayoutGrid size={14} /><span className="flex-1 truncate text-left">{board}</span>
                 </Button>
               ))}
             </div>
           </div>
 
           <div className="flex min-h-0 flex-1 flex-col px-3 pb-3 pt-2">
-            <div className="mb-2 flex h-8 items-center px-2"><span className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">组件 <span className="ml-1 font-mono">{visibleNodes.length}</span></span></div>
+            <div className="mb-2 flex h-8 items-center px-2"><span className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">组件</span></div>
             <div className="min-h-0 flex-1 space-y-1 overflow-y-auto">
               {visibleNodes.length ? visibleNodes.map((node) => {
                 const type = (node.type || 'text') as CanvasNodeType;
                 const meta = NODE_META[type] || NODE_META.text;
                 const Icon = meta.icon;
                 const title = String(node.data?.prompt || node.data?.content || meta.label);
-                return <Button key={node.id} type="button" variant="ghost" size="sm" onClick={() => flowRef.current?.setCenter(node.position.x + 210, node.position.y + 130, { zoom: 1, duration: 240 })} className="group h-10 w-full justify-start gap-2 px-2 text-xs"><span className="grid h-6 w-6 shrink-0 place-items-center rounded-md bg-muted"><Icon size={12} /></span><span className="min-w-0 flex-1 truncate text-left">{title}</span><span className={cn('h-1.5 w-1.5 rounded-full', meta.dot)} /></Button>;
-              }) : <div className="px-3 py-8 text-center text-xs leading-5 text-muted-foreground">画布还是空的。使用底部工具栏或右侧 Agent 创建内容。</div>}
+                return <Button key={node.id} type="button" variant="ghost" size="sm" onClick={() => flowRef.current?.setCenter(node.position.x + 210, node.position.y + 130, { zoom: 1, duration: 240 })} className="group h-10 w-full justify-start gap-2 border-0 px-2 text-xs shadow-none hover:bg-black/[0.04] dark:hover:bg-white/[0.07]"><span className="grid h-6 w-6 shrink-0 place-items-center rounded-md bg-muted"><Icon size={12} /></span><span className="min-w-0 flex-1 truncate text-left">{title}</span><span className={cn('h-1.5 w-1.5 rounded-full', meta.dot)} /></Button>;
+              }) : <div className="px-3 py-8 text-center text-xs text-muted-foreground">暂无内容</div>}
             </div>
           </div>
         </aside>
@@ -381,7 +376,7 @@ const CanvasInner = () => {
 
       <section className="absolute inset-0 z-0 overflow-hidden">
         {!showExplorer && (
-          <div className="absolute left-3 top-3 z-30 flex h-10 max-w-[240px] items-center gap-1 rounded-lg border border-black/[0.05] bg-white/90 py-1 pl-3 pr-1 shadow-sm backdrop-blur-xl dark:border-white/[0.07] dark:bg-[#171717]/90">
+          <div className="absolute left-3 top-3 z-30 flex h-10 max-w-[240px] items-center gap-1 rounded-lg border border-black/[0.05] bg-white/90 py-1 pl-3 pr-1 shadow-sm backdrop-blur-xl dark:border-[var(--surface-border-strong)] dark:bg-[var(--surface-bg)]">
             <div className="relative shrink-0">
               <Button type="button" variant="ghost" size="iconSm" onClick={() => setProjectEmojiOpen((open) => !open)} aria-label="选择项目表情" title="选择项目表情" className="h-8 w-8 rounded-md text-base">{activeProjectEmoji}</Button>
               {projectEmojiOpen && <Card padding="none" className="absolute left-0 top-10 z-50 grid w-[176px] grid-cols-6 gap-1 p-2 shadow-xl">{PROJECT_EMOJIS.map((emoji) => <Button key={emoji} type="button" variant="ghost" size="iconSm" onClick={() => selectProjectEmoji(emoji)} aria-label={`使用${emoji}表情`} className="h-7 w-7 text-base">{emoji}</Button>)}</Card>}
@@ -438,7 +433,7 @@ const CanvasInner = () => {
 
         <input ref={mediaInputRef} type="file" accept="image/*,video/*,.txt,.md" className="sr-only" onChange={(event) => { importMedia(event.target.files?.[0]); event.target.value = ''; }} />
 
-        <Card ref={toolbarRef} padding="sm" className="absolute bottom-3 left-1/2 z-30 flex max-w-[calc(100%-24px)] -translate-x-1/2 items-center gap-2 overflow-visible border-black/[0.06] bg-white/94 p-1 shadow-[0_8px_28px_rgba(0,0,0,0.12)] backdrop-blur-xl dark:border-white/10 dark:bg-[#171717]/94">
+        <Card ref={toolbarRef} padding="sm" className="absolute bottom-3 left-1/2 z-30 flex max-w-[calc(100%-24px)] -translate-x-1/2 items-center gap-2 overflow-visible border-black/[0.06] bg-white/94 p-1 shadow-[0_8px_28px_rgba(0,0,0,0.12)] backdrop-blur-xl dark:border-[var(--surface-border-strong)] dark:bg-[var(--surface-bg)]">
           <div className="relative">
             <div role="group" aria-label="画布操作工具" className="flex h-8 overflow-hidden rounded-md bg-muted">
               <Button
@@ -523,7 +518,7 @@ const CanvasInner = () => {
             </div>
           </div>
           <span aria-hidden="true" className="h-6 w-px shrink-0 bg-black/[0.08] dark:bg-white/[0.1]" />
-          <div className="flex h-8 items-center gap-1 rounded-lg bg-black/[0.05] p-0.5 dark:bg-white/[0.07]">
+          <div className="flex h-8 items-center gap-1 rounded-lg bg-black/[0.05] p-0.5 dark:bg-[var(--surface-control)]">
             <CanvasToolButton icon={Map} label="小地图" active={showMinimap} onClick={() => setShowMinimap((visible) => !visible)} className="h-7 w-7" />
             <CanvasToolButton icon={Bot} label={showAgent ? '收起 Agent' : '展开 Agent'} active={showAgent} onClick={() => setShowAgent((visible) => !visible)} className="h-7 w-7" />
           </div>
@@ -539,7 +534,7 @@ const CanvasInner = () => {
       </section>
 
       {showAgent && (
-        <aside className="absolute bottom-3 right-3 top-3 z-40 flex w-[352px] flex-col rounded-xl bg-white/[0.96] shadow-[0_8px_28px_rgba(15,15,15,0.08)] backdrop-blur-xl dark:bg-[#121212]/[0.96] dark:shadow-[0_8px_28px_rgba(0,0,0,0.22)]">
+        <aside className="absolute bottom-3 right-3 top-3 z-40 flex w-[352px] flex-col rounded-xl bg-white/[0.96] shadow-[0_8px_28px_rgba(15,15,15,0.08)] backdrop-blur-xl dark:bg-[var(--surface-subtle)] dark:shadow-[0_8px_28px_rgba(0,0,0,0.22)]">
           <header className="flex h-14 shrink-0 items-center gap-2 px-3"><span className="grid h-8 w-8 place-items-center rounded-lg bg-muted text-foreground"><Bot size={16} /></span><div className="min-w-0 flex-1"><div className="text-xs font-semibold">Canvas Agent</div><div className="truncate text-xs text-muted-foreground">{agentWorking ? `正在操作 ${activeBoard}` : `当前画布：${activeBoard}`}</div></div><Button type="button" variant="ghost" size="iconSm" onClick={() => setAgentSettingsOpen((open) => !open)} aria-label="Agent 设置"><Settings2 size={15} /></Button></header>
 
           {agentSettingsOpen && <Card padding="sm" className="absolute right-3 top-12 z-40 w-[310px] p-3 shadow-xl"><div className="mb-2 text-xs font-semibold">Agent 模型</div><Select aria-label="Agent 模型" value={resolvedAgentModel} onChange={(event) => setAgentModel(event.target.value)} selectSize="sm" options={languageModels.length ? languageModels.map(({ value, label }) => ({ value, label })) : [{ value: '', label: '暂无语言模型' }]} disabled={!languageModels.length} /><div className="mb-2 mt-4 text-xs font-semibold">执行模式</div><div className="grid grid-cols-2 gap-1 rounded-lg bg-muted p-1"><Button type="button" variant={agentMode === 'auto' ? 'primary' : 'ghost'} size="sm" onClick={() => setAgentMode('auto')} className="text-xs">自动执行</Button><Button type="button" variant={agentMode === 'ask' ? 'primary' : 'ghost'} size="sm" onClick={() => setAgentMode('ask')} className="text-xs">询问执行</Button></div><p className="mt-2 text-xs leading-4 text-muted-foreground">自动执行会直接创建画布节点；询问执行会先确认任务。</p></Card>}

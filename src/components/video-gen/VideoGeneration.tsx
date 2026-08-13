@@ -461,6 +461,35 @@ type VideoProject = {
   thumbnail?: string;
 };
 
+const assetPreviewUrl = (asset?: { previewUrl?: string; userMetadata?: Record<string, unknown> }) => {
+  const generatedUrl = asset?.userMetadata?.generatedUrl;
+  return typeof generatedUrl === 'string' && generatedUrl ? generatedUrl : asset?.previewUrl;
+};
+
+const ProjectCover = ({
+  src,
+  alt,
+  className,
+}: {
+  src?: string;
+  alt: string;
+  className: string;
+}) => {
+  const [failed, setFailed] = useState(false);
+
+  useEffect(() => setFailed(false), [src]);
+
+  if (!src || failed) {
+    return (
+      <div className="absolute inset-0 grid place-items-center bg-[var(--surface-control)] text-muted-foreground">
+        <Film aria-hidden="true" size={28} />
+      </div>
+    );
+  }
+
+  return <img src={src} alt={alt} className={className} onError={() => setFailed(true)} />;
+};
+
 const getProjectMeta = (project: VideoProject, assets: AssetSummary[]) => {
   const projectNumber = Number(project.id.replace('project-', '')) || 1;
   const sourceAsset = assets[projectNumber - 1] || assets[0];
@@ -516,7 +545,7 @@ const VideoLibraryTabs = ({
   onProjects: () => void;
 }) => (
   <Tabs value={activeTab} onValueChange={(value) => value === 'assets' ? onAssets() : onProjects()}>
-    <TabsList aria-label="视频内容" className="h-8 gap-0 rounded-lg bg-[#f8f8f6] p-0.5 shadow-none dark:bg-white/[0.035]">
+    <TabsList aria-label="视频内容" className="h-8 gap-0 rounded-lg bg-[#f8f8f6] p-0.5 shadow-none dark:bg-[var(--surface-control)]">
       <TabsTrigger value="assets" className="h-7 border-0 px-3 text-xs font-semibold shadow-none data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm">素材</TabsTrigger>
       <TabsTrigger value="projects" className="h-7 border-0 px-3 text-xs font-semibold shadow-none data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm">工程</TabsTrigger>
     </TabsList>
@@ -528,7 +557,7 @@ const VideoAssetLibrary = ({ onCreate }: { onCreate: () => void }) => {
   const [query, setQuery] = useState('');
 
   return (
-    <div className="video-library-shell module-workspace flex h-full min-w-0 flex-col overflow-hidden !bg-white text-foreground dark:!bg-[#0b0b0b]">
+    <div className="video-library-shell module-workspace flex h-full min-w-0 flex-col overflow-hidden !bg-white text-foreground dark:!bg-[var(--workspace-bg)]">
       <header className="mx-16 flex h-14 shrink-0 items-center justify-between gap-4">
         <VideoLibraryTabs
           activeTab={activeTab}
@@ -541,12 +570,12 @@ const VideoAssetLibrary = ({ onCreate }: { onCreate: () => void }) => {
             value={query}
             onChange={(event) => setQuery(event.target.value)}
             placeholder={activeTab === 'assets' ? '搜索视频标题和描述…' : '搜索视频工程…'}
-            className="h-8 border-0 bg-[#f3f3f1] py-0 pl-9 pr-9 shadow-none focus-visible:ring-1 focus-visible:ring-black/10 dark:bg-white/[0.06] dark:focus-visible:ring-white/15"
+            className="h-8 border-0 bg-[#f3f3f1] py-0 pl-9 pr-9 shadow-none focus-visible:ring-1 focus-visible:ring-black/10 dark:bg-[var(--surface-control)] dark:focus-visible:ring-white/15"
           />
           {query && <Button type="button" variant="ghost" size="iconSm" onClick={() => setQuery('')} aria-label="清空搜索" className="absolute right-0.5 top-1/2 h-6 w-6 -translate-y-1/2"><X size={13} /></Button>}
         </div>
       </header>
-      <div className="mx-16 mb-0 flex min-h-0 flex-1 overflow-hidden rounded-xl bg-[#f8f8f6] p-2 dark:bg-white/[0.035]">
+      <div className="mx-16 mb-0 flex min-h-0 flex-1 overflow-hidden rounded-xl bg-[#f8f8f6] p-2 dark:bg-[var(--surface-bg)]">
         {activeTab === 'assets'
           ? <VideoAssetCatalog query={query} />
           : <VideoProjectLibrary onCreate={onCreate} query={query} />}
@@ -566,7 +595,30 @@ export const VideoProjectLibrary = ({ onCreate, query }: { onCreate: () => void;
   useEffect(() => {
     let active = true;
     assetService.list({ limit: 16 })
-      .then((result) => active && setAssets(result.items))
+      .then((result) => {
+        if (!active) return;
+        const generatedAssets = contentFeed
+          .list()
+          .filter((item) => item.type === 'image' && Boolean(item.previewUrl))
+          .map((item) => ({
+            id: item.id,
+            type: item.type,
+            title: item.title,
+            description: item.description,
+            primaryFolderId: null,
+            favorite: false,
+            rating: 0,
+            status: 'generated',
+            normalizedMetadata: {},
+            userMetadata: { feedItem: true, ...item.metadata },
+            createdAt: item.createdAt,
+            importedAt: item.createdAt,
+            updatedAt: item.createdAt,
+            previewUrl: item.previewUrl,
+            previewStatus: 'ready',
+          } satisfies AssetSummary));
+        setAssets([...generatedAssets, ...result.items]);
+      })
       .catch(() => undefined);
     return () => { active = false; };
   }, []);
@@ -578,7 +630,7 @@ export const VideoProjectLibrary = ({ onCreate, query }: { onCreate: () => void;
     title,
     author,
     views,
-    thumbnail: assets[index % Math.max(assets.length, 1)]?.previewUrl,
+    thumbnail: assetPreviewUrl(assets[index % Math.max(assets.length, 1)]),
   }));
   const normalizedQuery = query.trim().toLocaleLowerCase('zh-CN');
   const visibleProjects = projects.filter((project) => !normalizedQuery || `${project.title} ${project.author} ${project.code}`.toLocaleLowerCase('zh-CN').includes(normalizedQuery));
@@ -591,7 +643,7 @@ export const VideoProjectLibrary = ({ onCreate, query }: { onCreate: () => void;
       'grid h-full w-full min-w-0 flex-1 grid-cols-1 gap-3 overflow-hidden text-foreground',
       projectPanelOpen && 'md:grid-cols-[260px_minmax(0,1fr)]',
     )}>
-      {projectPanelOpen && <aside aria-label="视频工程列表" className="flex min-h-0 flex-col overflow-hidden rounded-lg bg-transparent">
+      {projectPanelOpen && <aside aria-label="视频工程列表" className="flex min-h-0 flex-col overflow-hidden bg-transparent">
         <header className="relative flex h-11 shrink-0 items-center px-4">
           <h1 className="text-sm font-semibold tracking-[-0.01em]">{projectTypeLabel}</h1>
           <Button
@@ -657,8 +709,8 @@ export const VideoProjectLibrary = ({ onCreate, query }: { onCreate: () => void;
             const isSelected = selectedProjectId === project.id;
             return (
               <Button key={project.id} type="button" variant="ghost" onClick={() => { setSelectedProjectId(project.id); setIsPlaying(false); }} className={cn('group relative block h-auto w-full overflow-hidden rounded-lg border-0 bg-background/80 p-0 text-left shadow-none transition-[transform,box-shadow] hover:-translate-y-0.5 hover:bg-background hover:shadow-md focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-foreground/30', isSelected && 'ring-2 ring-inset ring-foreground/80')}>
-                <div className="relative aspect-video w-full overflow-hidden rounded-lg bg-[#121212]">
-                  {project.thumbnail ? <img src={project.thumbnail} alt="视频封面" className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105" /> : <Film aria-hidden="true" className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 text-zinc-700" size={28} />}
+                <div className="relative aspect-video w-full overflow-hidden rounded-lg bg-[var(--surface-control)]">
+                  <ProjectCover src={project.thumbnail} alt={`${project.title} 视频封面`} className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105" />
                   <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/10 to-transparent opacity-0 transition-opacity duration-200 group-hover:opacity-100 group-focus-visible:opacity-100" />
                   <h2 className="absolute inset-x-3 bottom-3 translate-y-1 truncate text-sm font-semibold text-white opacity-0 transition-[opacity,transform] duration-200 group-hover:translate-y-0 group-hover:opacity-100 group-focus-visible:translate-y-0 group-focus-visible:opacity-100">{project.title}</h2>
                 </div>
@@ -669,7 +721,7 @@ export const VideoProjectLibrary = ({ onCreate, query }: { onCreate: () => void;
         </div>
       </aside>}
       <section className="flex min-h-0 min-w-0 flex-col overflow-hidden rounded-lg bg-background">
-        <header className="flex h-11 min-w-0 shrink-0 items-center border-b border-black/[0.03] px-6 dark:border-white/[0.04]">
+        <header className="flex h-11 min-w-0 shrink-0 items-center border-b border-black/[0.06] px-6 dark:border-white/[0.1]">
           <Button
             type="button"
             variant="ghost"
@@ -721,10 +773,8 @@ const ProjectMaterials = ({
   return (
     <section aria-label={`${project.title} 工程详情`} className="min-h-0 min-w-0 w-full overflow-y-auto rounded-lg bg-background">
       <div className="w-full px-6 pb-5 pt-4">
-        <div className="relative aspect-video w-full overflow-hidden rounded-lg bg-[#111]">
-          {project.thumbnail
-            ? <img src={project.thumbnail} alt={`${project.title} 视频封面`} className={cn('h-full w-full object-cover transition-transform duration-700', isPlaying && 'scale-[1.02]')} />
-            : <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_28%,#3f3f46_0%,#18181b_38%,#09090b_100%)]" />}
+        <div className="relative aspect-video w-full overflow-hidden rounded-lg bg-[var(--surface-control)]">
+          <ProjectCover src={project.thumbnail} alt={`${project.title} 视频封面`} className={cn('h-full w-full object-cover transition-transform duration-700', isPlaying && 'scale-[1.02]')} />
           <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/5 to-black/10" />
           <Button
             type="button"
@@ -758,8 +808,8 @@ const ProjectMaterials = ({
                   {(group.assets.length ? group.assets : Array.from({ length: groupIndex + 2 }, (_, index) => ({ id: `${group.id}-${index}`, title: `${group.label} ${index + 1}`, previewUrl: undefined }))).map((asset) => (
                     <article key={`${group.id}-${asset.id}`} className="overflow-hidden rounded-lg bg-muted/70">
                       <div className="relative aspect-video overflow-hidden bg-[#202020]">
-                        {asset.previewUrl
-                          ? <img src={asset.previewUrl} alt={asset.title} className="h-full w-full object-cover transition-transform duration-300 hover:scale-[1.03]" />
+                        {assetPreviewUrl(asset)
+                          ? <img src={assetPreviewUrl(asset)} alt={asset.title} className="h-full w-full object-cover transition-transform duration-300 hover:scale-[1.03]" />
                           : <Icon aria-hidden="true" className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 text-white/35" size={20} />}
                       </div>
                       <p className="truncate px-2.5 py-2 text-xs font-medium">{asset.title}</p>
@@ -965,7 +1015,7 @@ export const VideoAssetCatalog = ({ query }: { query: string }) => {
       </aside>}
 
       <main className="flex min-w-0 flex-1 flex-col overflow-hidden rounded-lg bg-background">
-        <header className="relative flex h-11 shrink-0 items-center justify-between border-b border-black/[0.03] px-6 dark:border-white/[0.04]">
+        <header className="relative flex h-11 shrink-0 items-center justify-between border-b border-black/[0.06] px-6 dark:border-white/[0.1]">
           <div className="flex items-center gap-3">
             <Button type="button" variant="ghost" size="iconSm" onClick={() => setFilterPanelOpen((open) => !open)} aria-label={filterPanelOpen ? '收起筛选' : '展开筛选'} className="h-7 w-7 text-muted-foreground hover:bg-black/[0.05] dark:hover:bg-white/[0.08]">
               {filterPanelOpen ? <PanelLeftClose size={15} /> : <PanelLeftOpen size={15} />}
@@ -1031,7 +1081,7 @@ export const VideoAssetCatalog = ({ query }: { query: string }) => {
         {dropZoneOpen && (
           <section
             className={cn(
-              'mx-6 mt-6 flex min-h-[220px] shrink-0 cursor-pointer flex-col items-center justify-center rounded-lg border border-dashed border-black/[0.12] bg-black/[0.02] px-6 text-center transition-colors dark:border-white/[0.14] dark:bg-white/[0.025]',
+              'mx-6 mt-6 flex min-h-[220px] shrink-0 cursor-pointer flex-col items-center justify-center rounded-lg border border-dashed border-black/[0.12] bg-black/[0.02] px-6 text-center transition-colors dark:border-[var(--surface-border-strong)] dark:bg-[var(--surface-subtle)]',
               draggingFiles && 'border-foreground/40 bg-black/[0.06] dark:bg-white/[0.08]',
             )}
             onClick={() => fileInputRef.current?.click()}

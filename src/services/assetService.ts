@@ -46,6 +46,7 @@ export interface AssetQuery {
   type?: string;
   folderId?: string;
   tagId?: string;
+  tagIds?: string[];
   favorite?: boolean;
   status?: string;
   sort?: string;
@@ -64,7 +65,11 @@ export const assetService = {
   list: async (query: AssetQuery = {}) => {
     const parameters = new URLSearchParams();
     Object.entries(query).forEach(([key, value]) => {
-      if (value !== undefined && value !== '') parameters.set(key, String(value));
+      if (key === 'tagIds' && Array.isArray(value)) {
+        value.forEach((tagId) => parameters.append('tagId', tagId));
+      } else if (value !== undefined && value !== '') {
+        parameters.set(key, String(value));
+      }
     });
     return normalizeAssetPage(await request<Partial<AssetPage>>(`/api/assets?${parameters}`));
   },
@@ -133,7 +138,7 @@ export const assetService = {
     });
     const payload = await response.json().catch(() => ({}));
     if (!response.ok)
-      throw new Error((payload as { error?: string }).error || `图片入库失败 (${response.status})`);
+      throw new Error((payload as { error?: string }).error || `素材入库失败 (${response.status})`);
     return payload as { path: string; originalFileName: string };
   },
   scan: (rootPaths: string[]) => request<{ id: string }>('/api/import/scan', json({ rootPaths })),

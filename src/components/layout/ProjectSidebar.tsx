@@ -2,7 +2,6 @@ import { useEffect, useRef, useState } from 'react';
 import {
   Boxes,
   Clapperboard,
-  Command,
   Database,
   FileText,
   FolderKanban,
@@ -10,30 +9,62 @@ import {
   GitBranch,
   Image as ImageIcon,
   Layers3,
-  LayoutDashboard,
-  Moon,
   PackageCheck,
   Pencil,
   Pin,
   Presentation,
-  Settings,
-  Sun,
   Trash2,
 } from 'lucide-react';
+import {
+  RiArchiveStackFill,
+  RiArchiveStackLine,
+  RiCommandFill,
+  RiFileTextFill,
+  RiFileTextLine,
+  RiImageAiFill,
+  RiImageAiLine,
+  RiInfinityFill,
+  RiInfinityLine,
+  RiMoonFill,
+  RiSettings3Fill,
+  RiSettings3Line,
+  RiSidebarFoldLine,
+  RiSidebarUnfoldLine,
+  RiSunFill,
+  RiToolsFill,
+  RiToolsLine,
+  type RemixiconComponentType,
+} from '@remixicon/react';
 import { cn } from '../../lib/utils';
 import { useProjectStore } from '../../stores/useProjectStore';
 import { useCanvasStore } from '../../stores/useCanvasStore';
 import { ModuleType, type WorkspaceMode, useUIStore } from '../../stores/useUIStore';
 import { Button, Card, Separator } from '../ui';
 
-const navigationGroups: Array<{ title: string; items: Array<{ module: ModuleType; label: string; icon: React.ElementType; workspaceMode?: WorkspaceMode }> }> = [
+const navigationGroups: Array<{
+  title: string;
+  items: Array<{
+    module: ModuleType;
+    label: string;
+    lineIcon: RemixiconComponentType;
+    fillIcon: RemixiconComponentType;
+    workspaceMode?: WorkspaceMode;
+  }>;
+}> = [
   {
-    title: '资产',
+    title: '创作',
     items: [
-      { module: 'image-gen', label: '创作', icon: LayoutDashboard, workspaceMode: 'manager' },
-      { module: 'assets', label: '素材', icon: Boxes },
-      { module: 'sources', label: '知识', icon: FileText },
-      { module: 'tools', label: '工具', icon: Command },
+      { module: 'image-gen', label: '生成', lineIcon: RiImageAiLine, fillIcon: RiImageAiFill },
+      { module: 'magic-canvas', label: '画布', lineIcon: RiInfinityLine, fillIcon: RiInfinityFill },
+    ],
+  },
+  {
+    title: '管理',
+    items: [
+      { module: 'assets', label: '资产', lineIcon: RiArchiveStackLine, fillIcon: RiArchiveStackFill },
+      { module: 'sources', label: '知识', lineIcon: RiFileTextLine, fillIcon: RiFileTextFill },
+      { module: 'tools', label: '工具', lineIcon: RiToolsLine, fillIcon: RiToolsFill },
+      { module: 'settings', label: '设置', lineIcon: RiSettings3Line, fillIcon: RiSettings3Fill },
     ],
   },
 ];
@@ -122,6 +153,7 @@ const explorerContent: Record<ModuleType, { title: string; section: string; entr
       { label: '发布版本', meta: '2', icon: PackageCheck },
     ],
   },
+  settings: { title: '设置', section: '工作台设置', entries: [] },
 };
 void explorerContent;
 
@@ -129,11 +161,12 @@ export const ProjectSidebar = () => {
   const {
     activeModule,
     workspaceMode,
+    projectSidebarOpen,
     theme,
     setActiveModule,
     setWorkspaceMode,
+    toggleProjectSidebar,
     toggleTheme,
-    openModal,
   } = useUIStore();
   const {
     projects,
@@ -155,7 +188,10 @@ export const ProjectSidebar = () => {
   const contextProject = projects.find((project) => project.id === contextMenu?.projectId);
   // 资产资料库是固定导航，不随上方生成/画板模块切换。
 
-  const openModule = (module: ModuleType, mode: WorkspaceMode = 'editor') => {
+  const openModule = (
+    module: ModuleType,
+    mode: WorkspaceMode = 'editor',
+  ) => {
     setWorkspaceMode(mode);
     setActiveModule(module);
   };
@@ -225,30 +261,51 @@ export const ProjectSidebar = () => {
   return (
     <aside
       className={cn(
-        'flex h-full w-16 shrink-0 flex-col overflow-hidden border-r border-black/[0.05] bg-card text-foreground dark:border-white/[0.06]',
+        'flex h-full shrink-0 flex-col overflow-hidden bg-transparent text-foreground transition-[width] duration-200 ease-out',
+        projectSidebarOpen ? 'w-[184px]' : 'w-16',
       )}
     >
-      <div className="flex h-[64px] shrink-0 items-center justify-center">
-        <Button type="button" variant="secondary" size="iconSm"
-          onClick={() => openModule('assets')}
-          aria-label="打开资产库"
-          title="Design Work"
-          className="relative h-9 w-9 shadow-sm"
+      <div className={cn('relative flex h-16 shrink-0 items-center', projectSidebarOpen ? 'gap-2 px-3' : 'justify-center')}>
+        {projectSidebarOpen && (
+          <>
+            <Button type="button" variant="secondary" size="iconSm"
+              onClick={() => openModule('assets')}
+              aria-label="打开资产库"
+              title="Design Work"
+              className="relative h-9 w-9 shadow-sm"
+            >
+              <RiCommandFill size={18} />
+            </Button>
+            <span className="min-w-0 flex-1 truncate text-sm font-semibold tracking-[-0.01em]">Design Work</span>
+          </>
+        )}
+        <Button
+          type="button"
+          variant="ghost"
+          size="iconSm"
+          onClick={toggleProjectSidebar}
+          aria-label={projectSidebarOpen ? '收起侧栏' : '展开侧栏'}
+          title={projectSidebarOpen ? '收起侧栏' : '展开侧栏'}
+          className="h-8 w-8 shrink-0 text-muted-foreground"
         >
-          <Command size={17} strokeWidth={2.3} />
+          {projectSidebarOpen ? <RiSidebarFoldLine size={17} /> : <RiSidebarUnfoldLine size={17} />}
         </Button>
       </div>
 
       <nav
         aria-label="主要功能"
-        className="flex shrink-0 flex-col items-stretch gap-1 px-2 py-2"
+        className={cn(
+          'flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto py-2',
+          projectSidebarOpen ? 'px-2' : 'px-1',
+        )}
       >
         {navigationGroups.map((group) => (
-          <div key={group.title} className="contents">
+          <section key={group.title} className={cn('flex flex-col gap-1', !projectSidebarOpen && 'items-center')}>
             {group.items.map((item) => {
-              const Icon = item.icon;
               const itemWorkspaceMode = item.workspaceMode || 'editor';
-              const active = workspaceMode === itemWorkspaceMode && activeModule === item.module;
+              const active = workspaceMode === itemWorkspaceMode
+                && activeModule === item.module;
+              const Icon = active ? item.fillIcon : item.lineIcon;
               return (
               <Button type="button" variant="ghost"
                 key={item.module}
@@ -256,33 +313,33 @@ export const ProjectSidebar = () => {
                 aria-label={item.label}
                 title={item.label}
                 className={cn(
-                  'h-12 w-full flex-col gap-1 text-center text-[10px]',
+                  projectSidebarOpen
+                    ? 'h-10 w-full justify-start gap-3 px-3 text-sm'
+                    : 'h-12 w-14 flex-col justify-center gap-1 px-0 text-[10px] leading-none',
                   active
-                    ? 'bg-muted text-foreground shadow-sm'
+                    ? 'bg-foreground text-background shadow-sm hover:bg-foreground hover:text-background'
                     : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground',
                 )}
               >
                 <Icon
-                  size={17}
-                  strokeWidth={active ? 2.2 : 1.8}
+                  size={18}
                   className="shrink-0"
                 />
-                <span className="truncate leading-3">{item.label}</span>
+                <span className={cn('truncate', !projectSidebarOpen && 'max-w-full')}>{item.label}</span>
               </Button>
               );
             })}
-          </div>
+          </section>
         ))}
       </nav>
 
       <div className="mt-auto flex shrink-0 flex-col items-stretch gap-1 px-2 py-2">
         {[
           {
-            label: theme === 'dark' ? '切换为明亮模式' : '切换为暗黑模式',
-            icon: theme === 'dark' ? Sun : Moon,
+            label: theme === 'dark' ? '浅色模式' : '深色模式',
+            icon: theme === 'dark' ? RiSunFill : RiMoonFill,
             action: toggleTheme,
           },
-          { label: '设置', icon: Settings, action: () => openModal('settings') },
         ].map(({ label, icon: Icon, action }) => (
           <Button type="button" variant="ghost"
             key={label}
@@ -290,10 +347,12 @@ export const ProjectSidebar = () => {
             aria-label={label}
             title={label}
             className={cn(
-              'h-10 w-full p-0 text-muted-foreground',
+              'h-10 w-full text-muted-foreground',
+              projectSidebarOpen ? 'justify-start gap-3 px-3' : 'justify-center px-0',
             )}
           >
             <Icon size={18} className="shrink-0" />
+            {projectSidebarOpen && <span className="truncate text-sm">{label}</span>}
           </Button>
         ))}
       </div>

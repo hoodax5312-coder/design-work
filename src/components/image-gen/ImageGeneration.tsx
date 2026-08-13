@@ -1,12 +1,17 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
+  AudioLines,
   BookmarkPlus,
+  Check,
+  ChevronDown,
   Clock3,
   Download,
   Loader2,
+  Pencil,
   Plus,
   RefreshCw,
   Sparkles,
+  Video,
   X,
 } from 'lucide-react';
 import { generateProviderImage, generateProviderVideo } from '../../services/providerService';
@@ -22,11 +27,44 @@ import { assetService } from '../../services/assetService';
 import { contentFeed } from '../../services/contentFeed';
 import { workspaceCacheService } from '../../services/workspaceCacheService';
 import { cn } from '../../lib/utils';
-import { Badge, Button, Card, Select, Textarea } from '../ui';
+import {
+  Button,
+  Input,
+  Textarea,
+} from '../ui';
 
 const RESOLUTION_OPTIONS = ['1k', '2k', '4k'] as const;
 const QUALITY_OPTIONS = ['低', '中', '高'] as const;
-const RATIO_OPTIONS = ['16:9', '4:3', '1:1', '3:4', '9:16'];
+const VIDEO_CLARITY_OPTIONS = ['480P', '720P', '1080P'] as const;
+const VIDEO_DURATION_OPTIONS = [5, 10, 15] as const;
+const GENERATION_COUNT_OPTIONS = [1, 2, 3, 4] as const;
+const RATIO_OPTIONS = [
+  { value: '1:1', width: 18, height: 18 },
+  { value: '2:3', width: 14, height: 21 },
+  { value: '3:2', width: 23, height: 15 },
+  { value: '4:5', width: 18, height: 22 },
+  { value: '5:4', width: 23, height: 18 },
+  { value: '16:9', width: 26, height: 15 },
+  { value: '9:16', width: 13, height: 23 },
+  { value: '21:9', width: 28, height: 12 },
+  { value: '3:4', width: 17, height: 22 },
+  { value: '4:3', width: 23, height: 17 },
+  { value: '自适应', width: 18, height: 18, adaptive: true },
+] as const;
+const VIDEO_RATIO_OPTIONS = [
+  { value: '16:9', label: '横屏', resolutionLabel: '1280×720', width: 26, height: 15 },
+  { value: '9:16', label: '竖屏', resolutionLabel: '720×1280', width: 13, height: 23 },
+  { value: '1:1', label: '方形', resolutionLabel: '1024×1024', width: 18, height: 18 },
+  { value: '7:4', label: '宽屏', resolutionLabel: '1792×1024', width: 26, height: 15 },
+  { value: '4:7', label: '长图', resolutionLabel: '1024×1792', width: 13, height: 23 },
+  { value: '自适应', label: '自动', resolutionLabel: '', width: 18, height: 18, adaptive: true },
+] as const;
+
+const segmentedOptionClass = (selected: boolean) => cn(
+  'h-8 w-full border-0 px-1 text-xs shadow-none ring-0',
+  'hover:bg-black/[0.04] dark:hover:bg-white/[0.08]',
+  selected && 'bg-black/[0.07] text-foreground hover:bg-black/[0.07] dark:bg-white/[0.14] dark:hover:bg-white/[0.14]'
+);
 
 interface ReferenceImage {
   id: string;
@@ -42,6 +80,7 @@ interface GenerationRecord {
   ratio: string;
   resolution: string;
   quality: string;
+  duration?: number;
   outputs: string[];
   mode?: 'image' | 'video';
 }
@@ -64,6 +103,7 @@ const feedHistory = (): GenerationHistoryCache => {
       ratio: String(metadata.ratio || '16:9'),
       resolution: String(metadata.resolution || (item.type === 'video' ? '480p' : '2k')),
       quality: String(metadata.quality || '中'),
+      duration: typeof metadata.duration === 'number' ? metadata.duration : undefined,
       outputs: item.previewUrl ? [item.previewUrl] : [],
       mode: item.type,
     });
@@ -75,16 +115,15 @@ const isImage = (file: File) => file.type.startsWith('image/');
 
 const imageSizeForRatio = (ratio: string, model: string) => {
   const isDallE3 = model.toLowerCase().includes('dall-e-3');
-  if (ratio === '9:16' || ratio === '3:4') return isDallE3 ? '1024x1792' : '1024x1536';
-  if (ratio === '16:9') return isDallE3 ? '1792x1024' : '1536x1024';
+  if (['2:3', '4:5', '3:4', '9:16'].includes(ratio)) return isDallE3 ? '1024x1792' : '1024x1536';
+  if (['3:2', '5:4', '4:3', '16:9', '21:9'].includes(ratio)) return isDallE3 ? '1792x1024' : '1536x1024';
   return '1024x1024';
 };
 
 const videoResolutionForRatio = (ratio: string) => {
   if (ratio === '9:16') return '320x480';
-  if (ratio === '3:4') return '360x480';
-  if (ratio === '4:3') return '480x360';
-  if (ratio === '1:1') return '480x480';
+  if (ratio === '4:7') return '360x480';
+  if (ratio === '1:1' || ratio === '自适应') return '480x480';
   return '480x320';
 };
 
@@ -101,21 +140,40 @@ export const ImageGeneration = () => {
   const [ratio, setRatio] = useState('16:9');
   const [resolution, setResolution] = useState<(typeof RESOLUTION_OPTIONS)[number]>('2k');
   const [quality, setQuality] = useState<(typeof QUALITY_OPTIONS)[number]>('中');
+  const [videoClarity, setVideoClarity] = useState<(typeof VIDEO_CLARITY_OPTIONS)[number]>('720P');
+  const [videoDuration, setVideoDuration] = useState<(typeof VIDEO_DURATION_OPTIONS)[number] | 'custom'>(5);
+  const [customVideoDuration, setCustomVideoDuration] = useState(20);
+  const [modelPanelOpen, setModelPanelOpen] = useState(false);
+  const [parameterPanelOpen, setParameterPanelOpen] = useState(false);
+  const [generationCountPanelOpen, setGenerationCountPanelOpen] = useState(false);
+  const [videoDurationPanelOpen, setVideoDurationPanelOpen] = useState(false);
+  const [generationCount, setGenerationCount] = useState<(typeof GENERATION_COUNT_OPTIONS)[number] | 'custom'>(1);
+  const [customGenerationCount, setCustomGenerationCount] = useState(5);
   const [referenceImages, setReferenceImages] = useState<ReferenceImage[]>([]);
+  const [referenceVideo, setReferenceVideo] = useState<File | null>(null);
+  const [referenceAudio, setReferenceAudio] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState('');
   const [history, setHistory] = useState<GenerationRecord[]>([]);
   const historyCacheRef = useRef<GenerationHistoryCache>({ image: [], video: [] });
   const historyLoadedRef = useRef(false);
   const [isGenerating, setIsGenerating] = useState(false);
-  const [settingsOpen, setSettingsOpen] = useState(false);
   const [error, setError] = useState('');
   const [assetNotice, setAssetNotice] = useState('');
   const [draggingReference, setDraggingReference] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const videoInputRef = useRef<HTMLInputElement>(null);
+  const audioInputRef = useRef<HTMLInputElement>(null);
+  const promptInputRef = useRef<HTMLTextAreaElement>(null);
   const referencesRef = useRef<ReferenceImage[]>([]);
+  const modelPanelRef = useRef<HTMLDivElement>(null);
+  const parameterPanelRef = useRef<HTMLDivElement>(null);
+  const generationCountPanelRef = useRef<HTMLFieldSetElement>(null);
+  const generationCountInputRef = useRef<HTMLInputElement>(null);
+  const videoDurationPanelRef = useRef<HTMLFieldSetElement>(null);
+  const videoDurationInputRef = useRef<HTMLInputElement>(null);
   const provider = useProviderStore(getActiveProvider);
   const setModelSelection = useProviderStore((state) => state.setModelSelection);
-  const openModal = useUIStore((state) => state.openModal);
+  const setActiveModule = useUIStore((state) => state.setActiveModule);
   const generationMode = useUIStore((state) => state.generationMode);
   const imageModel = getSelectedModel(provider, 'image');
   const videoModel = getSelectedModel(provider, 'video');
@@ -126,15 +184,88 @@ export const ImageGeneration = () => {
       .map((model) => model.id),
     [generationMode, provider],
   );
+  const ratioOptions = generationMode === 'video' ? VIDEO_RATIO_OPTIONS : RATIO_OPTIONS;
+  const selectedVideoDuration = videoDuration === 'custom' ? customVideoDuration : videoDuration;
+  const selectedGenerationCount = generationCount === 'custom' ? customGenerationCount : generationCount;
+  const parameterSummary = generationMode === 'video'
+    ? `${VIDEO_RATIO_OPTIONS.find((option) => option.value === ratio)?.label || ratio} · ${videoClarity}`
+    : `${ratio} · ${quality} · ${resolution}`;
 
   referencesRef.current = referenceImages;
   useEffect(() => () => referencesRef.current.forEach((item) => URL.revokeObjectURL(item.url)), []);
   useEffect(() => {
-    const closeSettings = (event: KeyboardEvent) => event.key === 'Escape' && setSettingsOpen(false);
-    window.addEventListener('keydown', closeSettings);
-    return () => window.removeEventListener('keydown', closeSettings);
-  }, []);
-
+    if (generationMode === 'video' && !VIDEO_RATIO_OPTIONS.some((option) => option.value === ratio)) {
+      setRatio('16:9');
+    }
+  }, [generationMode, ratio]);
+  useEffect(() => {
+    if (!modelPanelOpen) return;
+    const closeOnOutsidePress = (event: PointerEvent) => {
+      if (!modelPanelRef.current?.contains(event.target as Node)) setModelPanelOpen(false);
+    };
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setModelPanelOpen(false);
+    };
+    window.addEventListener('pointerdown', closeOnOutsidePress);
+    window.addEventListener('keydown', closeOnEscape);
+    return () => {
+      window.removeEventListener('pointerdown', closeOnOutsidePress);
+      window.removeEventListener('keydown', closeOnEscape);
+    };
+  }, [modelPanelOpen]);
+  useEffect(() => {
+    if (!parameterPanelOpen) return;
+    const closeOnOutsidePress = (event: PointerEvent) => {
+      if (!parameterPanelRef.current?.contains(event.target as Node)) setParameterPanelOpen(false);
+    };
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setParameterPanelOpen(false);
+    };
+    window.addEventListener('pointerdown', closeOnOutsidePress);
+    window.addEventListener('keydown', closeOnEscape);
+    return () => {
+      window.removeEventListener('pointerdown', closeOnOutsidePress);
+      window.removeEventListener('keydown', closeOnEscape);
+    };
+  }, [parameterPanelOpen]);
+  useEffect(() => {
+    if (!generationCountPanelOpen) return;
+    window.requestAnimationFrame(() => {
+      generationCountInputRef.current?.focus();
+      generationCountInputRef.current?.select();
+    });
+    const closeOnOutsidePress = (event: PointerEvent) => {
+      if (!generationCountPanelRef.current?.contains(event.target as Node)) setGenerationCountPanelOpen(false);
+    };
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setGenerationCountPanelOpen(false);
+    };
+    window.addEventListener('pointerdown', closeOnOutsidePress);
+    window.addEventListener('keydown', closeOnEscape);
+    return () => {
+      window.removeEventListener('pointerdown', closeOnOutsidePress);
+      window.removeEventListener('keydown', closeOnEscape);
+    };
+  }, [generationCountPanelOpen]);
+  useEffect(() => {
+    if (!videoDurationPanelOpen) return;
+    window.requestAnimationFrame(() => {
+      videoDurationInputRef.current?.focus();
+      videoDurationInputRef.current?.select();
+    });
+    const closeOnOutsidePress = (event: PointerEvent) => {
+      if (!videoDurationPanelRef.current?.contains(event.target as Node)) setVideoDurationPanelOpen(false);
+    };
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setVideoDurationPanelOpen(false);
+    };
+    window.addEventListener('pointerdown', closeOnOutsidePress);
+    window.addEventListener('keydown', closeOnEscape);
+    return () => {
+      window.removeEventListener('pointerdown', closeOnOutsidePress);
+      window.removeEventListener('keydown', closeOnEscape);
+    };
+  }, [videoDurationPanelOpen]);
   useEffect(() => {
     let cancelled = false;
     historyLoadedRef.current = false;
@@ -148,6 +279,7 @@ export const ImageGeneration = () => {
         };
         historyCacheRef.current = normalized;
         setHistory(normalized[generationMode]);
+        setPreviewUrl(normalized[generationMode][0]?.outputs[0] || '');
         historyLoadedRef.current = true;
       })
       .catch(() => {
@@ -190,11 +322,28 @@ export const ImageGeneration = () => {
     });
   };
 
+  const insertReferenceMention = (index: number) => {
+    const mention = `@图片${index + 1} `;
+    const input = promptInputRef.current;
+    if (!input) {
+      setPrompt((current) => `${current}${current ? ' ' : ''}${mention}`);
+      return;
+    }
+    const start = input.selectionStart ?? prompt.length;
+    const end = input.selectionEnd ?? start;
+    setPrompt(`${prompt.slice(0, start)}${mention}${prompt.slice(end)}`);
+    window.requestAnimationFrame(() => {
+      input.focus();
+      const cursor = start + mention.length;
+      input.setSelectionRange(cursor, cursor);
+    });
+  };
+
   const handleGenerate = async (promptOverride?: string) => {
     const generationPrompt = promptOverride ?? prompt;
     if (!provider?.apiKey || !selectedModel) {
       setError(`请先在设置中配置支持${generationMode === 'image' ? '图像' : '视频'}生成的 API Provider。`);
-      openModal('settings');
+      setActiveModule('settings');
       return;
     }
     if (!generationPrompt.trim()) {
@@ -206,6 +355,7 @@ export const ImageGeneration = () => {
     try {
       if (generationMode === 'video') {
         const result = await generateProviderVideo({ ...provider, model: videoModel }, { prompt: generationPrompt, resolution: videoResolutionForRatio(ratio) });
+        setPreviewUrl(result.url);
         contentFeed.add({
           type: 'video',
           title: `视频生成任务 · ${new Date().toLocaleDateString('zh-CN')}`,
@@ -215,9 +365,12 @@ export const ImageGeneration = () => {
             prompt: generationPrompt,
             model: videoModel,
             ratio,
-            resolution,
-            quality,
+            resolution: videoClarity,
+            quality: videoClarity,
+            duration: selectedVideoDuration,
             referenceImageNames: referenceImages.map((item) => item.file.name),
+            referenceVideoName: referenceVideo?.name,
+            referenceAudioName: referenceAudio?.name,
             status: 'completed',
             taskId: result.id,
           },
@@ -228,8 +381,9 @@ export const ImageGeneration = () => {
           createdAt: new Date().toISOString(),
           model: videoModel,
           ratio,
-          resolution,
-          quality,
+          resolution: videoClarity,
+          quality: videoClarity,
+          duration: selectedVideoDuration,
           outputs: [result.url],
           mode: 'video' as const,
         }, ...current].slice(0, 12));
@@ -237,43 +391,33 @@ export const ImageGeneration = () => {
         window.setTimeout(() => setAssetNotice(''), 3000);
         return;
       }
-      const result = await generateProviderImage({ ...provider, model: imageModel }, {
-        prompt: generationPrompt,
-        size: imageSizeForRatio(ratio, imageModel),
-        quality: imageModel.toLowerCase().includes('dall-e-3')
-          ? quality === '低'
-            ? 'standard'
-            : 'hd'
-          : quality === '低'
-            ? 'medium'
-            : 'high',
-      });
-      setPreviewUrl(result.url);
+      const results = await Promise.all(Array.from({ length: selectedGenerationCount }, () => generateProviderImage({ ...provider, model: imageModel }, {
+          prompt: generationPrompt,
+          size: imageSizeForRatio(ratio, imageModel),
+          quality: imageModel.toLowerCase().includes('dall-e-3')
+            ? quality === '低' ? 'standard' : 'hd'
+            : quality === '低' ? 'medium' : 'high',
+        })));
+      const outputs = results.map((result) => result.url);
+      setPreviewUrl(outputs[0] || '');
       setHistory((current) => [{
-        id: `${Date.now()}-${result.url}`,
+        id: `${Date.now()}-${outputs[0]}`,
         prompt: generationPrompt,
         createdAt: new Date().toISOString(),
         model: imageModel,
         ratio,
         resolution,
         quality,
-        outputs: [result.url],
+        outputs,
         mode: 'image' as const,
-      }, ...current.filter((item) => !item.outputs.includes(result.url))].slice(0, 12));
-      contentFeed.add({
-        type: 'image',
-        title: `图片生成 · ${new Date().toLocaleDateString('zh-CN')}`,
-        description: generationPrompt,
-        previewUrl: result.url,
-        metadata: {
-          prompt: generationPrompt,
-          model: imageModel,
-          ratio,
-          resolution,
-          quality,
-          referenceImageNames: referenceImages.map((item) => item.file.name),
-        },
-      });
+      }, ...current.filter((item) => !item.outputs.some((output) => outputs.includes(output)))].slice(0, 12));
+      outputs.forEach((output, index) => contentFeed.add({
+          type: 'image',
+          title: `图片生成${outputs.length > 1 ? ` ${index + 1}/${outputs.length}` : ''} · ${new Date().toLocaleDateString('zh-CN')}`,
+          description: generationPrompt,
+          previewUrl: output,
+          metadata: { prompt: generationPrompt, model: imageModel, ratio, resolution, quality, generationCount: selectedGenerationCount, referenceImageNames: referenceImages.map((item) => item.file.name) },
+        }));
     } catch (requestError) {
       setError(requestError instanceof Error ? requestError.message : '图像生成失败');
     } finally {
@@ -325,125 +469,463 @@ export const ImageGeneration = () => {
 
   const selectModel = (model: string) => {
     if (provider) setModelSelection(provider.id, generationMode, model);
+    setModelPanelOpen(false);
   };
 
-  const settingsSummary = `${ratio} · ${resolution} · ${quality}`;
+  const editRecordPrompt = (record: GenerationRecord) => {
+    setPrompt(record.prompt);
+    window.requestAnimationFrame(() => {
+      const promptInput = document.getElementById('flow-image-prompt');
+      promptInput?.focus();
+      promptInput?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    });
+  };
+
+  const selectRecord = (output: string, index: number) => {
+    setPreviewUrl(output);
+    document.getElementById(`generation-result-${index}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
 
   return (
-    <main className="module-workspace relative h-full min-h-0 overflow-hidden text-foreground">
-      <section className="absolute inset-0 overflow-y-auto pb-44">
-        {history.length > 0 ? (
-          <div className="creation-record-list mx-auto w-full max-w-[1720px] px-5 pb-12 pt-24 sm:px-8 lg:px-12">
-            <div className="mb-8 flex items-end justify-between pb-4">
-              <div>
-                <p className="text-xs font-medium uppercase tracking-[0.16em] text-muted-foreground">Generation log</p>
-                <h1 className="mt-1 text-2xl font-semibold tracking-tight">生成记录</h1>
-              </div>
-              <p className="hidden text-xs font-medium text-muted-foreground sm:block">按生成时间从新到旧排列</p>
-            </div>
+    <main className="module-workspace mx-3 mb-3 mt-0 grid h-[calc(100%-12px)] min-h-0 grid-cols-[480px_minmax(0,1fr)] gap-0 !bg-transparent p-0 text-foreground">
+      <section className="flex min-h-0 flex-col overflow-hidden rounded-l-lg border border-r-0 border-[var(--surface-border)] bg-white p-4 dark:bg-[var(--surface-subtle)]" aria-label="生成输入与参数">
+        <header className="mb-5 shrink-0">
+          <h1 className="text-xl font-semibold tracking-tight">{generationMode === 'image' ? '图片生成' : '视频生成'}</h1>
+        </header>
 
-            <div className="space-y-0">
-              {history.map((record) => (
-                <article key={record.id} className="creation-record-row py-6 first:pt-0">
-                  <header className="mb-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
-                    <time dateTime={record.createdAt} className="creation-record-time flex items-center gap-1.5 text-muted-foreground"><Clock3 size={13} /> {formatGenerationTime(record.createdAt)}</time>
-                    <Badge variant="subtle">{record.model || '未命名模型'}</Badge>
-                    <span className="text-muted-foreground">{record.ratio} · {record.resolution} · {record.quality}</span>
-                  </header>
+        <div className="min-h-0 flex-1 space-y-5 overflow-y-auto pr-1">
+          <div>
+            <label className="mb-2 block text-xs font-semibold" htmlFor="flow-image-prompt">创作描述</label>
+            <div
+              onDragOver={(event) => { event.preventDefault(); setDraggingReference(true); }}
+              onDragLeave={(event) => { if (!event.currentTarget.contains(event.relatedTarget as Node)) setDraggingReference(false); }}
+              onDrop={(event) => { event.preventDefault(); setDraggingReference(false); addReferences(event.dataTransfer.files); }}
+              className={cn('relative overflow-hidden rounded-lg bg-[var(--surface-control)] transition-colors focus-within:ring-1 focus-within:ring-ring', draggingReference && 'bg-[var(--surface-hover)] ring-2 ring-primary/20')}
+            >
+              <input ref={fileInputRef} type="file" accept="image/*" multiple className="sr-only" onChange={(event) => { if (event.target.files) addReferences(event.target.files); event.target.value = ''; }} />
+              <Textarea
+                ref={promptInputRef}
+                id="flow-image-prompt"
+                value={prompt}
+                onChange={(event) => setPrompt(event.target.value)}
+                onKeyDown={(event) => {
+                  if ((event.metaKey || event.ctrlKey) && event.key === 'Enter') { event.preventDefault(); void handleGenerate(); }
+                }}
+                placeholder={generationMode === 'image' ? '描述主体、场景、光线、构图与风格…' : '描述视频主题、动作与镜头节奏…'}
+                variant="ghost"
+                className="min-h-[260px] resize-none rounded-none border-0 bg-transparent p-4 text-sm leading-6 shadow-none focus-visible:ring-0"
+              />
 
-                  <div className="grid gap-4 lg:grid-cols-[minmax(230px,0.64fr)_minmax(0,1.7fr)]">
+              <div className="flex min-w-0 items-center gap-2 overflow-x-auto px-3 py-2">
+                  {referenceImages.map((image, index) => (
+                    <div key={image.id} className="group relative h-14 w-14 shrink-0 overflow-hidden rounded-md border border-[var(--surface-border)]">
+                      <Button type="button" variant="ghost" onClick={() => insertReferenceMention(index)} aria-label={`引用图片${index + 1}`} title={`在输入框中引用图片${index + 1}`} className="relative block h-full w-full rounded-none p-0">
+                        <img src={image.url} alt={`参考图：${image.file.name}`} className="h-full w-full object-cover" />
+                        <span className="absolute bottom-0 inset-x-0 bg-black/65 py-0.5 text-center text-[10px] font-medium text-white">图片{index + 1}</span>
+                      </Button>
+                      <Button type="button" variant="ghost" size="iconSm" onClick={() => removeReference(image.id)} aria-label={`移除参考图 ${image.file.name}`} className="absolute right-0.5 top-0.5 h-5 w-5 bg-black/70 p-0 text-white opacity-0 hover:bg-black group-hover:opacity-100 group-focus-within:opacity-100"><X size={10} /></Button>
+                    </div>
+                  ))}
+                  {referenceImages.length < 3 && (
                     <Button
                       type="button"
                       variant="ghost"
-                      onClick={() => { setPrompt(record.prompt); setPreviewUrl(record.outputs[0] || ''); }}
-                      className="creation-record-prompt h-auto justify-start whitespace-normal text-left"
+                      onClick={() => fileInputRef.current?.click()}
+                      aria-label="添加参考图片"
+                      className="h-14 w-14 shrink-0 justify-center rounded-md border border-dashed border-muted-foreground/40 bg-transparent p-0 text-muted-foreground hover:bg-[var(--surface-hover)] hover:text-foreground"
                     >
-                      <span className="line-clamp-6">{record.prompt}</span>
+                      <span className="flex flex-col items-center gap-0.5"><Plus size={18} className="shrink-0" /><span className="text-[10px]">添加</span></span>
                     </Button>
-                    <div className="flex min-w-0 gap-3 overflow-x-auto pb-1">
-                      {record.outputs.map((output, outputIndex) => (
-                        <div key={output} className="group relative aspect-[4/5] max-h-[360px] min-h-[190px] min-w-[150px] flex-1 overflow-hidden rounded-lg border border-border bg-card sm:min-w-[210px]">
-                          <Button type="button" variant="ghost" onClick={() => setPreviewUrl(output)} className="block h-full w-full rounded-none p-0" aria-label={`查看第 ${outputIndex + 1} 个生成${record.mode === 'video' ? '视频' : '图片'}`}>{record.mode === 'video' ? <video src={output} controls preload="metadata" className="h-full w-full object-cover" /> : <img src={output} alt={`生成结果 ${outputIndex + 1}：${record.prompt}`} className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.025]" />}</Button>
-                          {previewUrl === output && <Badge className="absolute left-2 top-2 text-xs">当前</Badge>}
-                        </div>
-                      ))}
+                  )}
+                </div>
+              {draggingReference && (
+                <div className="pointer-events-none absolute inset-0 grid place-items-center bg-background/75 text-sm font-medium backdrop-blur-sm">
+                  松开即可添加参考图片
+                </div>
+              )}
+            </div>
+          </div>
+
+          {generationMode === 'video' && (
+            <div className="grid grid-cols-2 gap-3">
+              <input
+                ref={videoInputRef}
+                type="file"
+                accept="video/*"
+                className="sr-only"
+                onChange={(event) => {
+                  setReferenceVideo(event.target.files?.[0] ?? null);
+                  event.target.value = '';
+                }}
+              />
+              <input
+                ref={audioInputRef}
+                type="file"
+                accept="audio/*"
+                className="sr-only"
+                onChange={(event) => {
+                  setReferenceAudio(event.target.files?.[0] ?? null);
+                  event.target.value = '';
+                }}
+              />
+              <Button
+                type="button"
+                variant="ghost"
+                onClick={() => videoInputRef.current?.click()}
+                aria-label={referenceVideo ? `替换参考视频：${referenceVideo.name}` : '上传参考视频'}
+                title={referenceVideo?.name}
+                className="h-20 min-w-0 flex-col justify-center gap-2 rounded-lg border border-dashed border-muted-foreground/40 bg-transparent px-3 text-muted-foreground shadow-none hover:bg-[var(--surface-hover)] hover:text-foreground"
+              >
+                <Video size={18} strokeWidth={1.5} />
+                <span className="max-w-full truncate text-xs">{referenceVideo?.name || '参考视频'}</span>
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                onClick={() => audioInputRef.current?.click()}
+                aria-label={referenceAudio ? `替换参考音频：${referenceAudio.name}` : '上传参考音频'}
+                title={referenceAudio?.name}
+                className="h-20 min-w-0 flex-col justify-center gap-2 rounded-lg border border-dashed border-muted-foreground/40 bg-transparent px-3 text-muted-foreground shadow-none hover:bg-[var(--surface-hover)] hover:text-foreground"
+              >
+                <AudioLines size={18} strokeWidth={1.5} />
+                <span className="max-w-full truncate text-xs">{referenceAudio?.name || '参考音频'}</span>
+              </Button>
+            </div>
+          )}
+
+          <div className="grid grid-cols-2 items-end gap-3">
+            <div ref={modelPanelRef} className="relative min-w-0">
+              <label className="mb-2 block text-xs font-semibold">生成模型</label>
+              <Button
+                type="button"
+                variant="ghost"
+                disabled={!modelOptions.length}
+                onClick={() => {
+                  setParameterPanelOpen(false);
+                  setGenerationCountPanelOpen(false);
+                  setVideoDurationPanelOpen(false);
+                  setModelPanelOpen((open) => !open);
+                }}
+                aria-haspopup="listbox"
+                aria-expanded={modelPanelOpen}
+                className="h-10 w-full justify-between rounded-lg border-0 bg-[var(--surface-control)] px-3 text-sm font-normal shadow-none hover:bg-[var(--surface-hover)]"
+              >
+                <span className="truncate">{selectedModel || `选择${generationMode === 'image' ? '图像' : '视频'}模型`}</span>
+                <ChevronDown size={15} className={cn('shrink-0 text-muted-foreground transition-transform', modelPanelOpen && 'rotate-180')} />
+              </Button>
+              {modelPanelOpen && (
+                <div role="listbox" aria-label={`${generationMode === 'image' ? '图像' : '视频'}生成模型`} className="absolute bottom-12 left-0 z-[90] max-h-[360px] w-full overflow-y-auto rounded-lg border border-[var(--surface-border-strong)] bg-popover p-1.5 text-popover-foreground shadow-xl">
+                  {modelOptions.map((model) => {
+                    const selected = selectedModel === model;
+                    return (
+                      <Button
+                        key={model}
+                        type="button"
+                        variant="ghost"
+                        role="option"
+                        aria-selected={selected}
+                        onClick={() => selectModel(model)}
+                        className={cn(
+                          'h-9 w-full min-w-0 justify-between rounded-md border-0 px-2.5 text-sm font-normal shadow-none',
+                          selected ? 'bg-[var(--surface-hover)] text-foreground' : 'hover:bg-[var(--surface-control)]',
+                        )}
+                      >
+                        <span className="truncate">{model}</span>
+                        {selected && <Check size={14} className="shrink-0" />}
+                      </Button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+            {generationMode === 'image' && (
+              <fieldset ref={generationCountPanelRef} className="relative min-w-0">
+                <legend className="mb-2 text-xs font-semibold">生成数量</legend>
+                <div className="grid h-10 grid-cols-5 rounded-lg bg-[var(--surface-control)] p-1">
+                  {GENERATION_COUNT_OPTIONS.map((option) => (
+                    <Button key={option} type="button" variant="ghost" aria-pressed={generationCount === option} onClick={() => { setGenerationCount(option); setGenerationCountPanelOpen(false); }} className={cn('h-8 min-w-0 whitespace-nowrap px-0 text-xs', generationCount === option && 'bg-black/[0.07] text-foreground hover:bg-black/[0.07] dark:bg-white/[0.14] dark:hover:bg-white/[0.14]')}>
+                      {option}张
+                    </Button>
+                  ))}
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    aria-pressed={generationCount === 'custom'}
+                    aria-haspopup="dialog"
+                    aria-expanded={generationCountPanelOpen}
+                    onClick={() => {
+                      setGenerationCount('custom');
+                      setModelPanelOpen(false);
+                      setParameterPanelOpen(false);
+                      setGenerationCountPanelOpen((open) => !open);
+                    }}
+                    className={cn('h-8 min-w-0 whitespace-nowrap px-0 text-xs', generationCount === 'custom' && 'bg-black/[0.07] text-foreground hover:bg-black/[0.07] dark:bg-white/[0.14] dark:hover:bg-white/[0.14]')}
+                  >
+                    {generationCount === 'custom' ? `${customGenerationCount}张 +` : '自定义'}
+                  </Button>
+                </div>
+                {generationCountPanelOpen && (
+                  <div role="dialog" aria-label="自定义生成张数" className="absolute bottom-12 right-0 z-[90] w-[180px] rounded-lg border border-[var(--surface-border-strong)] bg-popover p-3 text-popover-foreground shadow-xl">
+                    <label className="mb-2 block text-xs font-semibold" htmlFor="custom-generation-count">自定义数量</label>
+                    <div className="relative">
+                      <Input
+                        ref={generationCountInputRef}
+                        id="custom-generation-count"
+                        type="number"
+                        min={1}
+                        max={10}
+                        value={customGenerationCount}
+                        onChange={(event) => setCustomGenerationCount(Math.min(10, Math.max(1, Number(event.target.value) || 1)))}
+                        onKeyDown={(event) => {
+                          if (event.key === 'Enter') setGenerationCountPanelOpen(false);
+                        }}
+                        inputSize="sm"
+                        aria-label="自定义生成张数"
+                        className="border-0 bg-[var(--surface-control)] pr-8 shadow-none"
+                      />
+                      <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">张</span>
                     </div>
                   </div>
-
-                  <div className="mt-3 flex items-center justify-end gap-1">
-                    <Button variant="ghost" size="sm" type="button" onClick={() => { setPrompt(record.prompt); void handleGenerate(record.prompt); }}><RefreshCw size={13} /> 再次生成</Button>
-                    <Button variant="ghost" size="sm" type="button" onClick={() => downloadImage(record.outputs[0] || '')}><Download size={13} /> 下载</Button>
-                    <Button variant="ghost" size="sm" type="button" onClick={() => { setPrompt(record.prompt); setPreviewUrl(record.outputs[0] || ''); void handleAddToAssets(record.outputs[0] || '', record.prompt); }}><BookmarkPlus size={13} /> 存入资产</Button>
+                )}
+              </fieldset>
+            )}
+            {generationMode === 'video' && (
+              <fieldset ref={videoDurationPanelRef} className="relative min-w-0">
+                <legend className="mb-2 text-xs font-semibold">秒数</legend>
+                <div className="grid h-10 grid-cols-4 rounded-lg bg-[var(--surface-control)] p-1">
+                  {VIDEO_DURATION_OPTIONS.map((option) => (
+                    <Button key={option} type="button" variant="ghost" aria-pressed={videoDuration === option} onClick={() => { setVideoDuration(option); setVideoDurationPanelOpen(false); }} className={segmentedOptionClass(videoDuration === option)}>
+                      {option}s
+                    </Button>
+                  ))}
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    aria-pressed={videoDuration === 'custom'}
+                    aria-haspopup="dialog"
+                    aria-expanded={videoDurationPanelOpen}
+                    onClick={() => {
+                      setVideoDuration('custom');
+                      setModelPanelOpen(false);
+                      setParameterPanelOpen(false);
+                      setGenerationCountPanelOpen(false);
+                      setVideoDurationPanelOpen((open) => !open);
+                    }}
+                    className={segmentedOptionClass(videoDuration === 'custom')}
+                  >
+                    {videoDuration === 'custom' ? `${customVideoDuration}s +` : '自定义'}
+                  </Button>
+                </div>
+                {videoDurationPanelOpen && (
+                  <div role="dialog" aria-label="自定义视频秒数" className="absolute bottom-12 right-0 z-[90] w-[180px] rounded-lg border border-[var(--surface-border-strong)] bg-popover p-3 text-popover-foreground shadow-xl">
+                    <label className="mb-2 block text-xs font-semibold" htmlFor="custom-video-duration">自定义秒数</label>
+                    <div className="relative">
+                      <Input
+                        ref={videoDurationInputRef}
+                        id="custom-video-duration"
+                        type="number"
+                        min={1}
+                        max={60}
+                        value={customVideoDuration}
+                        onChange={(event) => setCustomVideoDuration(Math.min(60, Math.max(1, Number(event.target.value) || 1)))}
+                        onKeyDown={(event) => {
+                          if (event.key === 'Enter') setVideoDurationPanelOpen(false);
+                        }}
+                        inputSize="sm"
+                        aria-label="自定义视频秒数"
+                        className="border-0 bg-[var(--surface-control)] pr-8 shadow-none"
+                      />
+                      <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">s</span>
+                    </div>
                   </div>
-                </article>
-              ))}
-              {isGenerating && <div className="flex items-center gap-3 py-6 text-sm text-muted-foreground"><Loader2 size={17} className="animate-spin text-foreground" /> 正在生成新的画面…</div>}
-            </div>
+                )}
+              </fieldset>
+            )}
           </div>
-        ) : isGenerating ? (
-          <div className="flex min-h-full flex-col items-center justify-center gap-4 text-center">
-            <span className="grid h-12 w-12 place-items-center rounded-lg bg-muted"><Loader2 size={22} className="animate-spin text-foreground" /></span>
-            <div><div className="text-sm font-semibold">{generationMode === 'image' ? '正在生成画面' : '正在创建视频任务'}</div><p className="mt-1 text-xs text-slate-500 dark:text-zinc-500">{generationMode === 'image' ? '任务会直接显示在这块画布上' : '任务创建后会进入视频素材库'}</p></div>
-          </div>
-        ) : (
-          <div className="flex min-h-full flex-col items-center justify-center text-center">
-            <span className="grid h-14 w-14 place-items-center rounded-lg bg-muted text-muted-foreground"><Sparkles size={23} strokeWidth={1.5} /></span>
-            <p className="mt-4 text-sm text-slate-500 dark:text-zinc-500">{generationMode === 'image' ? '开始创作或拖放媒体' : '描述你想生成的视频片段'}</p>
-          </div>
-        )}
-      </section>
 
-      <div className="absolute bottom-5 left-1/2 z-20 w-[min(1040px,calc(100%-32px))] -translate-x-1/2">
-        <div
-          onDragOver={(event) => { event.preventDefault(); setDraggingReference(true); }}
-          onDragLeave={(event) => { if (!event.currentTarget.contains(event.relatedTarget as Node)) setDraggingReference(false); }}
-          onDrop={(event) => { event.preventDefault(); setDraggingReference(false); addReferences(event.dataTransfer.files); }}
-            className={cn('rounded-lg bg-[#f8f8f6] p-2 shadow-sm transition-colors dark:bg-white/[0.05]', draggingReference ? 'ring-2 ring-primary/20' : '')}
-        >
-          <label className="sr-only" htmlFor="flow-image-prompt">{generationMode === 'image' ? '描述想生成的画面' : '描述想生成的视频'}</label>
-          {referenceImages.length > 0 && <div className="mb-2 flex gap-2 overflow-x-auto px-1">{referenceImages.map((image) => <div key={image.id} className="group relative h-12 w-12 shrink-0 overflow-hidden rounded-md border"><img src={image.url} alt={`参考图：${image.file.name}`} className="h-full w-full object-cover" /><Button type="button" variant="ghost" size="iconSm" onClick={() => removeReference(image.id)} aria-label={`移除参考图 ${image.file.name}`} className="absolute right-0.5 top-0.5 h-5 w-5 bg-background/85 p-0 text-foreground opacity-0 shadow-sm hover:bg-background group-hover:opacity-100 group-focus-within:opacity-100"><X size={10} /></Button></div>)}</div>}
-          <Textarea
-            id="flow-image-prompt"
-            value={prompt}
-            onChange={(event) => setPrompt(event.target.value)}
-            onKeyDown={(event) => {
-              if ((event.metaKey || event.ctrlKey) && event.key === 'Enter') { event.preventDefault(); void handleGenerate(); }
-            }}
-            placeholder={draggingReference ? '松开即可添加参考图' : generationMode === 'image' ? '你希望创作什么内容？' : '描述视频主题、动作与镜头节奏…'}
-            variant="ghost" className="block h-[58px] min-h-0 text-sm leading-6"
-          />
-          <div className="flex items-center gap-2 pt-2">
-            <input ref={fileInputRef} type="file" accept="image/*" multiple className="sr-only" onChange={(event) => { if (event.target.files) addReferences(event.target.files); event.target.value = ''; }} />
-            <Button type="button" variant="ghost" size="iconSm" onClick={() => fileInputRef.current?.click()} aria-label="添加图片" title="添加图片（可选）" className="h-8 w-8 bg-transparent text-foreground hover:bg-white hover:text-black"><Plus size={18} /></Button>
-            <div className="relative ml-auto w-auto min-w-0">
-              <label className="sr-only" htmlFor="flow-generation-model">{generationMode === 'image' ? '图像模型' : '视频模型'}</label>
-              <Select
-                id="flow-generation-model"
-                value={selectedModel}
-                onChange={(event) => selectModel(event.target.value)}
-                disabled={!modelOptions.length}
-                selectSize="sm" className="h-8 w-auto max-w-[220px] truncate border-0 bg-transparent pl-3 pr-9 text-xs font-semibold shadow-none hover:bg-black/[0.05] focus-visible:ring-1 focus-visible:ring-black/10 dark:bg-transparent dark:hover:bg-white/[0.08] dark:focus-visible:ring-white/15"
-                options={modelOptions.length ? [
-                  ...(!selectedModel ? [{ value: '', label: `选择${generationMode === 'image' ? '图像' : '视频'}模型` }] : []),
-                  ...modelOptions.map((model) => ({ value: model, label: model })),
-                ] : [{ value: '', label: `暂无${generationMode === 'image' ? '图像' : '视频'}模型` }]}
-              />
-            </div>
-            <div className="relative">
-              <Button type="button" variant="ghost" size="sm" onClick={() => setSettingsOpen((open) => !open)} aria-expanded={settingsOpen} aria-controls="flow-image-settings" className="h-8 w-auto max-w-[260px] bg-transparent text-xs shadow-none hover:bg-black/[0.05] hover:text-foreground dark:hover:bg-white/[0.08]"><Sparkles size={13} /> <span className="truncate">{settingsSummary}</span></Button>
-              {settingsOpen && <Card id="flow-image-settings" aria-label={`${generationMode === 'image' ? '图片' : '视频'}生成参数`} padding="sm" className="absolute bottom-12 right-0 w-[min(360px,calc(100vw-32px))] shadow-lg">
-                <div className="text-xs font-bold uppercase tracking-[0.14em] text-muted-foreground">{generationMode === 'image' ? '图片比例' : '画面比例'}</div>
-                <div className="mt-2 grid grid-cols-5 gap-1.5">{RATIO_OPTIONS.map((option) => <Button key={option} type="button" variant={ratio === option ? 'primary' : 'ghost'} size="sm" onClick={() => setRatio(option)} className="px-1 text-xs">{option}</Button>)}</div>
-                <div className="mt-4 grid grid-cols-2 gap-3"><fieldset><legend className="mb-2 text-xs font-bold uppercase tracking-[0.14em] text-muted-foreground">分辨率</legend><div className="grid grid-cols-3 rounded-md bg-muted p-1">{RESOLUTION_OPTIONS.map((option) => <Button key={option} type="button" variant={resolution === option ? 'secondary' : 'ghost'} size="sm" onClick={() => setResolution(option)} className="px-1 text-xs">{option}</Button>)}</div></fieldset><fieldset><legend className="mb-2 text-xs font-bold uppercase tracking-[0.14em] text-muted-foreground">质量</legend><div className="grid grid-cols-3 rounded-md bg-muted p-1">{QUALITY_OPTIONS.map((option) => <Button key={option} type="button" variant={quality === option ? 'secondary' : 'ghost'} size="sm" onClick={() => setQuality(option)} className="px-1 text-xs">{option}</Button>)}</div></fieldset></div>
-              </Card>}
-            </div>
-            <Button type="button" variant="ghost" size="iconSm" onClick={() => void handleGenerate()} disabled={isGenerating || !prompt.trim()} aria-label={isGenerating ? `正在生成${generationMode === 'image' ? '图片' : '视频'}` : `生成${generationMode === 'image' ? '图片' : '视频'}`} className="h-8 w-8 bg-black text-white hover:bg-black/85 hover:text-white"><Loader2 size={16} className={cn(isGenerating && 'animate-spin')} /><span className="sr-only">生成</span></Button>
+          <div ref={parameterPanelRef} className="relative">
+            <label className="mb-2 block text-xs font-semibold">参数设置</label>
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={() => {
+                setModelPanelOpen(false);
+                setGenerationCountPanelOpen(false);
+                setVideoDurationPanelOpen(false);
+                setParameterPanelOpen((open) => !open);
+              }}
+              aria-haspopup="true"
+              aria-expanded={parameterPanelOpen}
+              className="h-10 w-full justify-between rounded-lg border-0 bg-[var(--surface-control)] px-3 text-sm font-normal shadow-none hover:bg-[var(--surface-hover)]"
+            >
+              <span className="truncate">{parameterSummary}</span>
+              <ChevronDown size={15} className={cn('shrink-0 text-muted-foreground transition-transform', parameterPanelOpen && 'rotate-180')} />
+            </Button>
+
+            {parameterPanelOpen && (
+              <div role="dialog" aria-label="参数设置" className="absolute bottom-12 left-0 z-[90] w-full rounded-lg border border-[var(--surface-border-strong)] bg-popover p-4 text-popover-foreground shadow-xl">
+                <div className="space-y-4">
+                  <fieldset>
+                    <legend className="mb-2 text-xs font-semibold">画面比例</legend>
+                    <div className={cn('grid rounded-lg bg-[var(--surface-control)]', generationMode === 'video' ? 'grid-cols-3 gap-2 p-2' : 'grid-cols-6 gap-1 p-1.5')}>
+                      {ratioOptions.map((option) => {
+                        const selected = ratio === option.value;
+                        return (
+                          <Button
+                            key={option.value}
+                            type="button"
+                            variant="ghost"
+                            aria-pressed={selected}
+                            onClick={() => setRatio(option.value)}
+                            className={cn(
+                              'w-full flex-col rounded-md border-0 px-1 text-xs shadow-none ring-0',
+                              generationMode === 'video' ? 'h-20 gap-2 py-2' : 'h-14 gap-1 py-1',
+                              'hover:bg-black/[0.04] dark:hover:bg-white/[0.08]',
+                              selected && 'bg-black/[0.08] text-foreground shadow-sm hover:bg-black/[0.08] dark:bg-white/[0.14] dark:hover:bg-white/[0.14]',
+                            )}
+                          >
+                            <span
+                              aria-hidden="true"
+                              className={cn('shrink-0 rounded-[2px] border-[1.5px] border-current', selected ? 'text-foreground' : 'text-muted-foreground')}
+                              style={{ width: Math.max(10, Math.round(option.width * 0.82)), height: Math.max(10, Math.round(option.height * 0.82)) }}
+                            />
+                            {'label' in option ? (
+                              <span className="flex flex-col items-center leading-none">
+                                <span>{option.label}</span>
+                                {option.resolutionLabel && <span className="mt-1 text-[10px] font-normal text-muted-foreground">{option.resolutionLabel}</span>}
+                              </span>
+                            ) : <span>{option.value}</span>}
+                          </Button>
+                        );
+                      })}
+                    </div>
+                  </fieldset>
+
+                  {generationMode === 'video' ? (
+                    <fieldset>
+                      <legend className="mb-2 text-xs font-semibold">清晰度</legend>
+                      <div className="grid grid-cols-3 rounded-lg bg-[var(--surface-control)] p-1">
+                        {VIDEO_CLARITY_OPTIONS.map((option) => (
+                          <Button key={option} type="button" variant="ghost" aria-pressed={videoClarity === option} onClick={() => setVideoClarity(option)} className={segmentedOptionClass(videoClarity === option)}>
+                            {option}
+                          </Button>
+                        ))}
+                      </div>
+                    </fieldset>
+                  ) : (
+                    <div className="grid grid-cols-2 gap-3">
+                      <fieldset>
+                        <legend className="mb-2 text-xs font-semibold">质量</legend>
+                        <div className="grid grid-cols-3 rounded-lg bg-[var(--surface-control)] p-1">
+                          {QUALITY_OPTIONS.map((option) => (
+                            <Button key={option} type="button" variant="ghost" aria-pressed={quality === option} onClick={() => setQuality(option)} className={segmentedOptionClass(quality === option)}>
+                              {option}
+                            </Button>
+                          ))}
+                        </div>
+                      </fieldset>
+                      <fieldset>
+                        <legend className="mb-2 text-xs font-semibold">分辨率</legend>
+                        <div className="grid grid-cols-3 rounded-lg bg-[var(--surface-control)] p-1">
+                          {RESOLUTION_OPTIONS.map((option) => (
+                            <Button key={option} type="button" variant="ghost" aria-pressed={resolution === option} onClick={() => setResolution(option)} className={segmentedOptionClass(resolution === option)}>
+                              {option}
+                            </Button>
+                          ))}
+                        </div>
+                      </fieldset>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
         </div>
-        {error && <p role="alert" className="mt-2 text-center text-xs text-red-600 dark:text-red-300">{error}</p>}
-      </div>
 
-      {assetNotice && <div role="status" className="absolute bottom-5 right-5 rounded-lg bg-foreground px-3 py-2 text-xs font-semibold text-background shadow-lg">{assetNotice}</div>}
+        <div className="shrink-0 pt-4">
+          {error && <p role="alert" className="mb-3 text-xs text-red-600 dark:text-red-300">{error}</p>}
+          {assetNotice && <p role="status" className="mb-3 text-xs font-medium text-foreground">{assetNotice}</p>}
+          <Button type="button" variant="primary" onClick={() => void handleGenerate()} disabled={isGenerating || !prompt.trim()} className="h-11 w-full border-0 text-sm font-semibold shadow-none">
+            {isGenerating ? <><Loader2 size={16} className="animate-spin" /> 正在生成</> : <><Sparkles size={16} /> 生成{generationMode === 'image' ? '图片' : '视频'}</>}
+          </Button>
+        </div>
+      </section>
+
+      <section className="flex min-h-0 overflow-hidden rounded-r-lg border border-[var(--surface-border)] bg-white dark:bg-[var(--surface-subtle)]" aria-label="生成结果列表">
+        <div className="min-w-0 flex-1 overflow-y-auto scroll-smooth">
+          {isGenerating && (
+            <div className="flex min-h-40 items-center justify-center gap-3 pb-4 text-sm text-muted-foreground">
+              <Loader2 size={18} className="animate-spin text-foreground" /> 正在生成新的{generationMode === 'image' ? '图片' : '视频'}…
+            </div>
+          )}
+
+          {history.length > 0 ? history.map((record, index) => {
+            const output = record.outputs[0] || '';
+            const isVideoRecord = record.mode === 'video';
+            return (
+              <article id={`generation-result-${index}`} key={record.id} className="scroll-mt-0 pb-4 last:pb-0">
+                <header className="px-4 pb-3 pt-4">
+                  <div className="flex items-center gap-3">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2">
+                        <h2 className="text-sm font-semibold">{isVideoRecord ? '视频生成' : '图片生成'}</h2>
+                        <span className="text-xs text-muted-foreground">{record.ratio} · {record.resolution}{isVideoRecord && record.duration ? ` · ${record.duration}s` : ` · ${record.quality}`}</span>
+                        <time dateTime={record.createdAt} className="flex items-center gap-1.5 whitespace-nowrap text-xs text-muted-foreground"><Clock3 size={12} /> {formatGenerationTime(record.createdAt)}</time>
+                      </div>
+                    </div>
+                    <Button variant="ghost" size="sm" type="button" onClick={() => editRecordPrompt(record)} aria-label={`编辑提示词：${record.prompt}`}><Pencil size={13} /> 编辑</Button>
+                    <Button variant="ghost" size="sm" type="button" onClick={() => { setPrompt(record.prompt); void handleGenerate(record.prompt); }}><RefreshCw size={13} /> 再次生成</Button>
+                    <Button variant="ghost" size="sm" type="button" onClick={() => downloadImage(output)}><Download size={13} /> 下载</Button>
+                    {!isVideoRecord && <Button variant="ghost" size="sm" type="button" onClick={() => void handleAddToAssets(output, record.prompt)}><BookmarkPlus size={13} /> 存入资产</Button>}
+                  </div>
+
+                  <div className="group/prompt relative">
+                    <p tabIndex={0} title={record.prompt} className="truncate rounded-md bg-[var(--surface-control)] px-3 py-2 text-sm text-muted-foreground outline-none focus-visible:ring-1 focus-visible:ring-ring">{record.prompt}</p>
+                    <div role="tooltip" className="pointer-events-none absolute inset-x-0 top-full z-30 mt-1 hidden rounded-md border border-[var(--surface-border-strong)] bg-popover px-3 py-2 text-sm leading-6 text-popover-foreground shadow-lg group-hover/prompt:block group-focus-within/prompt:block">
+                      {record.prompt}
+                    </div>
+                  </div>
+                </header>
+
+                <div className="mx-4 flex min-h-[360px] items-center justify-center overflow-hidden rounded-lg bg-[#0b0b0b]">
+                  {isVideoRecord
+                    ? <video src={output} controls preload="metadata" className="max-h-[680px] w-full object-contain" />
+                    : <img src={output} alt={record.prompt} className="max-h-[680px] w-full object-contain" />}
+                </div>
+
+              </article>
+            );
+          }) : !isGenerating && (
+            <div className="flex h-full min-h-80 flex-col items-center justify-center text-center text-sm text-muted-foreground">
+              <Sparkles size={24} className="mb-3 opacity-40" />
+              生成的图片或视频将在这里按时间排列
+            </div>
+          )}
+        </div>
+
+        <aside className="w-[84px] shrink-0 overflow-y-auto border-l border-[var(--surface-border)] bg-[#f4f4f2] p-2 dark:bg-[#0b0b0b]" aria-label="快速切换生成结果">
+          <div className="space-y-2">
+            {history.map((record, index) => {
+              const output = record.outputs[0] || '';
+              return (
+                <button
+                  key={record.id}
+                  type="button"
+                  onClick={() => selectRecord(output, index)}
+                  aria-label={`切换到第 ${index + 1} 条生成结果`}
+                  aria-current={previewUrl === output ? 'true' : undefined}
+                  className={cn('block aspect-square w-full overflow-hidden rounded-md border-2 bg-[#111] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring', previewUrl === output ? 'border-foreground' : 'border-transparent hover:border-[var(--surface-border-strong)]')}
+                >
+                  {record.mode === 'video'
+                    ? <video src={output} preload="metadata" className="h-full w-full object-cover" />
+                    : <img src={output} alt="" className="h-full w-full object-cover" />}
+                </button>
+              );
+            })}
+          </div>
+        </aside>
+      </section>
+
     </main>
   );
 };

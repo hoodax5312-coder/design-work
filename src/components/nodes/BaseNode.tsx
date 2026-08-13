@@ -1,5 +1,5 @@
 import { type ElementType, type ReactNode } from 'react';
-import { Handle, Position } from '@xyflow/react';
+import { Handle, NodeResizer, Position } from '@xyflow/react';
 import { Copy, Trash2 } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { Button } from '../ui';
@@ -47,6 +47,15 @@ export function BaseNode({
           className,
         )}
       >
+        {selected && (
+          <NodeResizer
+            isVisible
+            minWidth={280}
+            minHeight={180}
+            lineClassName="!border-primary/60"
+            handleClassName="!h-2 !w-2 !border-2 !border-background !bg-primary"
+          />
+        )}
         <header className="flex h-10 items-center justify-between px-3">
           <div className="flex min-w-0 items-center gap-2">
             <span className="grid h-6 w-6 shrink-0 place-items-center rounded-md bg-muted text-muted-foreground"><Icon size={13} /></span>

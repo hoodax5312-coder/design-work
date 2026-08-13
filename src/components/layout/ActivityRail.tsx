@@ -1,29 +1,39 @@
 import {
-  Boxes,
-  Clapperboard,
-  Command,
-  Image as ImageIcon,
-  Infinity as InfinityIcon,
-  Moon,
-  Presentation,
-  Settings,
-  Sun,
-} from 'lucide-react';
+  RiArchiveStackFill,
+  RiArchiveStackLine,
+  RiCommandFill,
+  RiImageAiFill,
+  RiImageAiLine,
+  RiInfinityFill,
+  RiInfinityLine,
+  RiMoonFill,
+  RiSettings3Fill,
+  RiSettings3Line,
+  RiSlideshowFill,
+  RiSlideshowLine,
+  RiSunFill,
+  RiToolsFill,
+  RiToolsLine,
+  RiVideoFill,
+  RiVideoLine,
+  type RemixiconComponentType,
+} from '@remixicon/react';
 import { cn } from '../../lib/utils';
 import { ModuleType, useUIStore } from '../../stores/useUIStore';
 import { Button } from '../ui';
 
-const editorTools: Array<{ icon: React.ElementType; label: string; module: ModuleType }> = [
-  { icon: Boxes, label: '资产库', module: 'assets' },
-  { icon: ImageIcon, label: '图片生成', module: 'image-gen' },
-  { icon: Clapperboard, label: '视频生成', module: 'video-gen' },
-  { icon: Presentation, label: 'PPT 生成', module: 'ppt-gen' },
-  { icon: InfinityIcon, label: '无限画板', module: 'magic-canvas' },
-  { icon: Command, label: 'AI 应用', module: 'tools' },
+const editorTools: Array<{ lineIcon: RemixiconComponentType; fillIcon: RemixiconComponentType; label: string; module: ModuleType }> = [
+  { lineIcon: RiArchiveStackLine, fillIcon: RiArchiveStackFill, label: '资产库', module: 'assets' },
+  { lineIcon: RiImageAiLine, fillIcon: RiImageAiFill, label: '图片生成', module: 'image-gen' },
+  { lineIcon: RiVideoLine, fillIcon: RiVideoFill, label: '视频生成', module: 'video-gen' },
+  { lineIcon: RiSlideshowLine, fillIcon: RiSlideshowFill, label: 'PPT 生成', module: 'ppt-gen' },
+  { lineIcon: RiInfinityLine, fillIcon: RiInfinityFill, label: '无限画板', module: 'magic-canvas' },
+  { lineIcon: RiToolsLine, fillIcon: RiToolsFill, label: 'AI 应用', module: 'tools' },
+  { lineIcon: RiSettings3Line, fillIcon: RiSettings3Fill, label: '设置', module: 'settings' },
 ];
 
 export const ActivityRail = () => {
-  const { activeModule, workspaceMode, theme, setActiveModule, setWorkspaceMode, toggleTheme, openModal } = useUIStore();
+  const { activeModule, workspaceMode, theme, setActiveModule, setWorkspaceMode, toggleTheme } = useUIStore();
 
   const openEditor = (module: ModuleType) => {
     setWorkspaceMode('editor');
@@ -37,7 +47,7 @@ export const ActivityRail = () => {
         aria-label="Design Work 资产库"
         className="relative mb-4 h-8 w-8 shadow-sm"
       >
-        <Command size={16} strokeWidth={2.3} />
+        <RiCommandFill size={17} />
         <span className="absolute -bottom-0.5 h-[3px] w-4 rounded-full bg-[#c8ff00]" />
       </Button>
 
@@ -46,7 +56,8 @@ export const ActivityRail = () => {
           <div key={tool.module} className="flex flex-col items-center gap-1">
             {index === 1 && <div className="my-1 h-px w-5 bg-black/10 dark:bg-white/10" />}
             <RailButton
-              icon={tool.icon}
+              lineIcon={tool.lineIcon}
+              fillIcon={tool.fillIcon}
               label={tool.label}
               active={workspaceMode === 'editor' && activeModule === tool.module}
               onClick={() => openEditor(tool.module)}
@@ -57,27 +68,30 @@ export const ActivityRail = () => {
       </div>
 
       <div className="flex w-full flex-col items-center gap-1 pb-1">
-        <RailButton icon={theme === 'dark' ? Sun : Moon} label={theme === 'dark' ? '切换为明亮模式' : '切换为暗黑模式'} active={false} onClick={toggleTheme} utility />
-        <RailButton icon={Settings} label="设置" active={false} onClick={() => openModal('settings')} utility />
+        <RailButton lineIcon={theme === 'dark' ? RiSunFill : RiMoonFill} fillIcon={theme === 'dark' ? RiSunFill : RiMoonFill} label={theme === 'dark' ? '切换为明亮模式' : '切换为暗黑模式'} active={false} onClick={toggleTheme} utility />
       </div>
     </nav>
   );
 };
 
 const RailButton = ({
-  icon: Icon,
+  lineIcon,
+  fillIcon,
   label,
   active,
   onClick,
   utility = false,
 }: {
-  icon: React.ElementType;
+  lineIcon: RemixiconComponentType;
+  fillIcon: RemixiconComponentType;
   label: string;
   active: boolean;
   onClick: () => void;
   utility?: boolean;
-}) => (
-  <Button type="button" variant="ghost" size="iconSm"
+}) => {
+  const Icon = active ? fillIcon : lineIcon;
+  return (
+    <Button type="button" variant="ghost" size="iconSm"
     onClick={onClick}
     aria-label={label}
     title={label}
@@ -89,6 +103,7 @@ const RailButton = ({
         : 'text-slate-400 hover:bg-black/[0.045] hover:text-slate-800 dark:text-zinc-600 dark:hover:bg-white/[0.06] dark:hover:text-zinc-200',
     )}
   >
-    <Icon size={utility ? 20 : 18} strokeWidth={active ? 2.2 : 1.8} />
-  </Button>
-);
+      <Icon size={utility ? 20 : 18} />
+    </Button>
+  );
+};

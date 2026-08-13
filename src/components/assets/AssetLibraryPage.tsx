@@ -1,15 +1,18 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Archive,
+  AudioLines,
   CheckSquare2,
   ChevronDown,
   FileText,
   Film,
   FolderPlus,
+  Globe2,
+  Hash,
   Image as ImageIcon,
-  Pencil,
   PanelLeftClose,
   PanelLeftOpen,
+  Pencil,
   Plus,
   Presentation,
   Search,
@@ -31,8 +34,6 @@ import { AssetDetailPanel } from './AssetDetailPanel';
 import { AssetThumbnail } from './AssetThumbnail';
 import { ImportCenter } from './ImportCenter';
 import { TaskDrawer } from './TaskDrawer';
-import { VideoAssetCatalog, VideoProjectLibrary } from '../video-gen/VideoGeneration';
-import { useUIStore } from '../../stores/useUIStore';
 import { contentFeed, type GeneratedContentItem } from '../../services/contentFeed';
 import { Alert, AlertDescription, AlertTitle, Button, Input, Select, Skeleton } from '../ui';
 
@@ -41,6 +42,16 @@ const sortOptions = [
   { id: 'title', label: '名字', hint: 'A–Z' },
 ];
 
+type AssetSource = 'uploaded' | 'online';
+type AssetTypeFilter = '' | 'image' | 'video' | 'audio' | 'project';
+
+const assetTypeOptions: Array<{ id: AssetTypeFilter; label: string; icon: React.ElementType }> = [
+  { id: '', label: '全部', icon: Archive },
+  { id: 'image', label: '图片', icon: ImageIcon },
+  { id: 'video', label: '视频', icon: Film },
+  { id: 'audio', label: '音频', icon: AudioLines },
+];
+const visibleAssetTypes = new Set(['image', 'video', 'audio']);
 const formatDate = (value: number) =>
   new Intl.DateTimeFormat('zh-CN', {
     month: '2-digit',
@@ -57,15 +68,15 @@ const imageAspectRatio = (asset: AssetSummary) => {
 };
 
 export const AssetLibraryPage = () => {
-  const setActiveModule = useUIStore((state) => state.setActiveModule);
   const [page, setPage] = useState<AssetPage>({ items: [], total: 0, limit: 60, offset: 0 });
   const [folders, setFolders] = useState<AssetFolder[]>([]);
   const [tags, setTags] = useState<AssetTag[]>([]);
   const [query, setQuery] = useState('');
   const [debouncedQuery, setDebouncedQuery] = useState('');
-  const [type, setType] = useState('');
+  const [source, setSource] = useState<AssetSource>('uploaded');
+  const [type, setType] = useState<AssetTypeFilter>('');
   const [folderId, setFolderId] = useState('');
-  const [tagId, setTagId] = useState('');
+  const [tagIds, setTagIds] = useState<string[]>([]);
   const [favoritesOnly, setFavoritesOnly] = useState(false);
   const [sort, setSort] = useState('updatedAt');
   const [offset, setOffset] = useState(0);
@@ -76,7 +87,6 @@ export const AssetLibraryPage = () => {
   const [notice, setNotice] = useState('');
   const [importSession, setImportSession] = useState<ImportSession | null>(null);
   const [tasksOpen, setTasksOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState<'images' | 'videos' | 'projects'>('images');
   const [sortOpen, setSortOpen] = useState(false);
   const [filterPanelOpen, setFilterPanelOpen] = useState(true);
   const [dropZoneOpen, setDropZoneOpen] = useState(false);
@@ -115,17 +125,18 @@ export const AssetLibraryPage = () => {
     try {
       const result = await assetService.list({
         query: debouncedQuery,
-        type,
+        type: type === 'project' ? '' : type,
         folderId,
-        tagId,
+        tagIds,
         favorite: favoritesOnly || undefined,
         sort,
         limit: 60,
         offset,
       });
       const generated = generatedItems
+        .filter((item) => visibleAssetTypes.has(item.type))
         .filter((item) => !type || item.type === type)
-        .filter(() => !tagId)
+        .filter(() => !tagIds.length)
         .filter((item) => {
           const needle = debouncedQuery.trim().toLowerCase();
           return !needle || `${item.title} ${item.description} ${String(item.metadata.prompt || '')}`.toLowerCase().includes(needle);
@@ -139,11 +150,29 @@ export const AssetLibraryPage = () => {
         } satisfies AssetSummary));
       // 生成内容与资产库使用同一张首页卡片：保存后不再追加一张重复的数据库卡片。
       const generatedUrls = new Set(generatedItems.map((item) => item.previewUrl));
+      const generatedAssets = result.items.filter((asset) => {
+        if (!visibleAssetTypes.has(asset.type)) return false;
+        const metadataSource = asset.userMetadata?.source;
+        return typeof asset.userMetadata?.generatedUrl === 'string'
+          || metadataSource === 'image-generation'
+          || metadataSource === 'video-generation';
+      });
       const importedAssets = result.items.filter((asset) => {
+        if (!visibleAssetTypes.has(asset.type)) return false;
+        const generatedUrl = asset.userMetadata?.generatedUrl;
+        const metadataSource = asset.userMetadata?.source;
+        return typeof generatedUrl !== 'string'
+          && metadataSource !== 'image-generation'
+          && metadataSource !== 'video-generation';
+      });
+      const generatedDatabaseItems = generatedAssets.filter((asset) => {
         const generatedUrl = asset.userMetadata?.generatedUrl;
         return typeof generatedUrl !== 'string' || !generatedUrls.has(generatedUrl);
       });
-      const combinedItems = [...generated, ...importedAssets].sort((a, b) => {
+      const sourceItems = source === 'uploaded'
+        ? [...generated, ...generatedDatabaseItems, ...importedAssets]
+        : [];
+      const combinedItems = sourceItems.sort((a, b) => {
         if (sort === 'title') return a.title.localeCompare(b.title, 'zh-CN');
         if (sort === 'rating') return b.rating - a.rating;
         if (sort === 'createdAt') return b.createdAt - a.createdAt;
@@ -159,7 +188,7 @@ export const AssetLibraryPage = () => {
     } finally {
       setLoading(false);
     }
-  }, [debouncedQuery, favoritesOnly, folderId, generatedItems, offset, sort, tagId, type]);
+  }, [debouncedQuery, favoritesOnly, folderId, generatedItems, offset, sort, source, tagIds, type]);
 
   useEffect(() => {
     loadTaxonomy().catch(() => undefined);
@@ -173,13 +202,13 @@ export const AssetLibraryPage = () => {
       if (destination === 'all') {
         setType('');
         setFolderId('');
-        setTagId('');
+        setTagIds([]);
         setFavoritesOnly(false);
         setOffset(0);
       } else if (destination.startsWith('folder:')) {
         setFolderId(destination.slice('folder:'.length));
         setType('');
-        setTagId('');
+        setTagIds([]);
         setFavoritesOnly(false);
         setOffset(0);
       } else {
@@ -231,7 +260,7 @@ export const AssetLibraryPage = () => {
         session.items.map((item) => ({ itemId: item.id, decision: item.decision || 'import_new' })),
       );
       const commit = await assetService.confirmImport(session.id);
-      setNotice(`已接收 ${session.items.length} 张图片，正在自动入库`);
+      setNotice(`已接收 ${session.items.length} 个素材，正在自动入库`);
       trackCommit(commit.id, targetTagId);
       return;
     }
@@ -247,10 +276,10 @@ export const AssetLibraryPage = () => {
     await startImport(picked.paths);
   };
 
-  const importDroppedImages = async (files: File[]) => {
+  const importDroppedAssets = async (files: File[]) => {
     setError('');
     const uploaded = await Promise.all(files.map((file) => assetService.dropImage(file)));
-    await startImport(uploaded.map((item) => item.path), true, tagId);
+    await startImport(uploaded.map((item) => item.path), true, tagIds[0] || null);
   };
 
   const trackCommit = (taskId: string, targetTagId: string | null = null) => {
@@ -279,46 +308,6 @@ export const AssetLibraryPage = () => {
     });
   };
 
-  const createTag = async () => {
-    const name = window.prompt('新标签名称');
-    if (!name?.trim()) return;
-    try {
-      await assetService.createTag(name.trim());
-      await loadTaxonomy();
-      setNotice(`已创建标签「${name.trim()}」`);
-      window.setTimeout(() => setNotice(''), 1800);
-    } catch (caught) {
-      setError(caught instanceof Error ? caught.message : '创建标签失败');
-    }
-  };
-
-  const renameTag = async (tag: AssetTag) => {
-    const name = window.prompt('重命名标签', tag.name);
-    if (!name?.trim() || name.trim() === tag.name) return;
-    try {
-      await assetService.renameTag(tag.id, name.trim());
-      await loadTaxonomy();
-      setNotice(`标签已重命名为「${name.trim()}」`);
-      window.setTimeout(() => setNotice(''), 1800);
-    } catch (caught) {
-      setError(caught instanceof Error ? caught.message : '重命名标签失败');
-    }
-  };
-
-  const deleteTag = async (tag: AssetTag) => {
-    if (!window.confirm(`删除标签「${tag.name}」？图片不会被删除。`)) return;
-    try {
-      await assetService.deleteTag(tag.id);
-      if (tagId === tag.id) setTagId('');
-      setOffset(0);
-      await loadTaxonomy();
-      setNotice(`已删除标签「${tag.name}」`);
-      window.setTimeout(() => setNotice(''), 1800);
-    } catch (caught) {
-      setError(caught instanceof Error ? caught.message : '删除标签失败');
-    }
-  };
-
   const removeSelected = async () => {
     const ids = [...selectedIds];
     if (!ids.length || !window.confirm(`将 ${ids.length} 项资产移入回收站？`)) return;
@@ -328,47 +317,87 @@ export const AssetLibraryPage = () => {
     refresh();
   };
 
-  const selectedCount = selectedIds.size;
-  const activeFilterCount = [type, folderId, tagId, favoritesOnly ? 'favorites' : '', sort === 'updatedAt' ? '' : sort].filter(Boolean).length;
-  const showingAll = !type && !folderId && !tagId && !favoritesOnly;
-  const activeCollectionTitle = tags.find((tag) => tag.id === tagId)?.name || '全部';
-  const showEmptyImport = !loading && !error && !page.items.length && !activeFilterCount && !debouncedQuery;
-  const showDropZone = dropZoneOpen || showEmptyImport;
-  const showAll = () => {
-    setType('');
-    setFolderId('');
-    setTagId('');
-    setFavoritesOnly(false);
-    setOffset(0);
+  const createTag = async () => {
+    const name = window.prompt('请输入新标签名称');
+    if (!name?.trim()) return;
+    try {
+      const created = await assetService.createTag(name.trim());
+      await loadTaxonomy();
+      setTagIds([created.id]);
+      setOffset(0);
+      setNotice(`已创建标签「${created.name}」`);
+      window.setTimeout(() => setNotice(''), 1800);
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : '创建标签失败');
+    }
   };
 
+  const renameTag = async (tag: AssetTag) => {
+    const name = window.prompt('修改标签名称', tag.name);
+    if (!name?.trim() || name.trim() === tag.name) return;
+    try {
+      const renamed = await assetService.renameTag(tag.id, name.trim());
+      await loadTaxonomy();
+      setNotice(`已重命名为「${renamed.name}」`);
+      window.setTimeout(() => setNotice(''), 1800);
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : '重命名标签失败');
+    }
+  };
+
+  const deleteTag = async (tag: AssetTag) => {
+    if (!window.confirm(`删除标签「${tag.name}」？\n资产本身不会被删除。`)) return;
+    try {
+      await assetService.deleteTag(tag.id);
+      if (tagIds.includes(tag.id)) setTagIds([]);
+      await loadTaxonomy();
+      setOffset(0);
+      setNotice(`已删除标签「${tag.name}」`);
+      window.setTimeout(() => setNotice(''), 1800);
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : '删除标签失败');
+    }
+  };
+
+  const selectedCount = selectedIds.size;
+  const activeFilterCount = [type, folderId, tagIds.length ? 'tags' : '', favoritesOnly ? 'favorites' : '', sort === 'updatedAt' ? '' : sort].filter(Boolean).length;
+  const showEmptyImport = source === 'uploaded' && type !== 'project' && !loading && !error && !page.items.length && !activeFilterCount && !debouncedQuery;
+  const showDropZone = source === 'uploaded' && type !== 'project' && (dropZoneOpen || showEmptyImport);
   return (
     <div className="module-workspace relative flex h-full min-w-0 flex-col bg-background text-foreground">
-      <header className="mx-16 shrink-0 p-0">
+      <header className="mx-3 shrink-0 p-0">
         <div className="flex min-h-14 w-full items-center justify-between gap-4">
           <div
             role="tablist"
-            aria-label="素材类型"
-            className="order-1 flex h-8 shrink-0 items-center rounded-lg bg-[#f8f8f6] p-0.5 dark:bg-white/[0.035]"
+            aria-label="素材来源"
+            className="order-1 flex h-8 shrink-0 items-center gap-1 bg-transparent p-0"
           >
             {[
-              { id: 'images' as const, label: '图片' },
-              { id: 'videos' as const, label: '视频' },
-              { id: 'projects' as const, label: '项目' },
+              { id: 'uploaded' as const, label: '我的资产' },
+              { id: 'online' as const, label: '在线资源' },
             ].map(({ id, label }) => {
-              const active = activeTab === id;
+              const active = source === id;
               return (
                 <button
                   key={id}
                   type="button"
                   role="tab"
                   aria-selected={active}
-                  onClick={() => setActiveTab(id)}
+                  onClick={() => {
+                    setSource(id);
+                    setType(id === 'uploaded' && type !== 'project' ? type : '');
+                    setFolderId('');
+                    setTagIds([]);
+                    setDropZoneOpen(false);
+                    setSelectedIds(new Set());
+                    setSelectedId(null);
+                    setOffset(0);
+                  }}
                   className={cn(
-                    'flex h-7 items-center gap-1.5 rounded-md px-3 text-xs font-semibold transition-colors hover:bg-black/[0.05] dark:hover:bg-white/[0.08]',
+                    'flex h-8 items-center rounded-md border-0 bg-transparent px-4 text-sm font-medium text-muted-foreground shadow-none transition-colors',
                     active
-                      ? 'bg-background text-foreground shadow-sm'
-                      : 'text-muted-foreground hover:text-foreground',
+                      ? 'bg-[var(--surface-control)] text-foreground'
+                      : 'hover:text-foreground',
                   )}
                 >
                   {label}
@@ -383,7 +412,7 @@ export const AssetLibraryPage = () => {
               value={query}
               onChange={(event) => setQuery(event.target.value)}
               placeholder="搜索标题、描述和提取文字…"
-              className="h-8 border-0 bg-[#f3f3f1] py-0 pl-9 pr-9 shadow-none focus-visible:ring-1 focus-visible:ring-black/10 dark:bg-white/[0.06] dark:focus-visible:ring-white/15"
+              className="h-8 border-0 bg-[#f3f3f1] py-0 pl-9 pr-9 shadow-none focus-visible:ring-1 focus-visible:ring-black/10 dark:bg-[var(--surface-control)] dark:focus-visible:ring-white/15"
             />
             {query && (
               <Button variant="ghost" size="iconSm" onClick={() => setQuery('')} aria-label="清空搜索" className="absolute right-0.5 top-1/2 h-6 w-6 -translate-y-1/2"><X size={13} /></Button>
@@ -393,83 +422,71 @@ export const AssetLibraryPage = () => {
         </div>
       </header>
 
-      <div className="mx-16 mb-0 mt-0 flex min-h-0 flex-1 overflow-hidden rounded-xl bg-[#f8f8f6] p-2 dark:bg-white/[0.035]">
-      {activeTab === 'images' ? (
-        <div className="flex min-h-0 flex-1 gap-3">
-        {filterPanelOpen && <aside
+      <div className="mx-3 mb-0 mt-0 flex min-h-0 flex-1 overflow-hidden rounded-xl bg-[#f8f8f6] p-2 dark:bg-[var(--surface-bg)]">
+        <div className="flex min-h-0 flex-1 gap-2">
+        {source === 'uploaded' && filterPanelOpen && <aside
           id="asset-filter-panel"
           aria-label="资产筛选"
           className="asset-filter-panel flex h-full w-[200px] shrink-0 flex-col overflow-hidden bg-transparent text-card-foreground"
         >
-          <header className="flex h-11 shrink-0 items-center px-4">
-            <h2 className="text-sm font-semibold tracking-[-0.01em]">筛选</h2>
-          </header>
-
-          <nav className="min-h-0 flex-1 space-y-3 overflow-y-auto px-4 pb-3" aria-label="图片筛选条件">
+          <nav className="min-h-0 flex-1 overflow-y-auto px-2 pb-3 pt-0" aria-label="素材标签筛选">
             <section className="px-0 py-1" data-filter-section="tags">
-              <div className="flex h-8 items-center justify-between px-0">
-                <span className="text-[12px] font-semibold tracking-[0.04em] text-muted-foreground">标签</span>
+              <div className="flex h-10 items-center gap-2 text-foreground">
+                <Hash size={15} className="shrink-0 text-muted-foreground" aria-hidden="true" />
+                <span className="text-sm font-semibold">标签</span>
                 <Button
                   type="button"
                   variant="ghost"
                   size="iconSm"
                   onClick={() => void createTag()}
                   aria-label="新建标签"
-                  className="-mr-3 h-7 w-7 hover:bg-black/[0.05] hover:text-foreground dark:hover:bg-white/[0.08]"
+                  title="新建标签"
+                  className="ml-auto h-8 w-8 text-muted-foreground hover:bg-black/[0.05] hover:text-foreground dark:hover:bg-white/[0.08]"
                 >
-                  <Plus size={14} />
+                  <Plus size={15} />
                 </Button>
               </div>
-
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                onClick={showAll}
-                aria-current={showingAll ? 'page' : undefined}
-                className={cn(
-                  '-mx-3 h-8 w-[calc(100%+1.5rem)] justify-between px-3 text-sm font-semibold hover:bg-black/[0.08] hover:text-foreground dark:hover:bg-white/[0.12]',
-                  showingAll && 'bg-foreground text-background hover:bg-foreground/90 hover:text-background',
-                )}
-              >
-                <span>全部</span>
-                <span className="w-6 text-right text-sm font-semibold tabular-nums text-muted-foreground">{page.total}</span>
-              </Button>
-
-              {tags.length ? (
-                <div className="mt-1 space-y-1">
-                  {tags.map((tag) => (
+              <div className="ml-[7px] border-l border-black/[0.06] pl-[9px] dark:border-white/[0.08]">
+                <button
+                  type="button"
+                  onClick={() => { setTagIds([]); setOffset(0); }}
+                  aria-pressed={!tagIds.length}
+                  className={cn(
+                    'flex h-7 w-full items-center rounded-md px-2.5 text-left text-xs font-medium text-foreground transition-colors hover:bg-black/[0.04] dark:hover:bg-white/[0.07]',
+                    !tagIds.length && 'bg-black/[0.06] dark:bg-white/[0.1]',
+                  )}
+                >
+                  All
+                </button>
+                {tags.map((tag) => {
+                  const selected = tagIds.includes(tag.id);
+                  return (
                     <div
                       key={tag.id}
                       className={cn(
-                        'group -mx-3 flex min-h-8 items-center rounded-md px-3 transition-colors',
-                        tagId === tag.id
-                          ? 'bg-foreground text-background'
-                          : 'hover:bg-black/[0.08] hover:text-foreground dark:hover:bg-white/[0.12]',
+                        'group/tag mt-0.5 flex h-7 w-full items-center rounded-md transition-colors hover:bg-black/[0.04] focus-within:bg-black/[0.04] dark:hover:bg-white/[0.07] dark:focus-within:bg-white/[0.07]',
+                        selected && 'bg-black/[0.045] dark:bg-white/[0.08]',
                       )}
                     >
-                      <Button type="button" variant="ghost"
-                        onClick={() => {
-                          setTagId(tagId === tag.id ? '' : tag.id);
-                          setOffset(0);
-                        }}
-                        aria-pressed={tagId === tag.id}
-                        className="h-auto min-w-0 flex-1 justify-start gap-2 self-stretch rounded-none bg-transparent px-0 text-left hover:bg-transparent hover:text-inherit"
+                      <button
+                        type="button"
+                        onClick={() => { setTagIds([tag.id]); setOffset(0); }}
+                        aria-pressed={selected}
+                        className="min-w-0 flex-1 truncate px-2.5 text-left text-xs font-medium text-foreground focus-visible:outline-none"
                       >
-                        <span className="truncate text-sm font-semibold">
-                          {tag.name}
-                        </span>
-                      </Button>
-                      <div className="flex shrink-0 items-center pr-1 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
+                        {tag.name}
+                      </button>
+                      <span className="mr-0.5 flex shrink-0 items-center transition-opacity">
                         <Button
                           type="button"
                           variant="ghost"
                           size="iconSm"
                           onClick={() => void renameTag(tag)}
-                          aria-label={`重命名标签 ${tag.name}`}
-                          className="h-7 w-7 text-muted-foreground"
+                          aria-label={`编辑标签 ${tag.name}`}
+                          title="编辑标签"
+                          className="h-6 w-6 text-muted-foreground opacity-0 transition-opacity group-hover/tag:opacity-100 group-focus-within/tag:opacity-100 hover:bg-black/[0.06] hover:text-foreground dark:hover:bg-white/[0.1]"
                         >
-                          <Pencil size={12} />
+                          <Pencil size={13} />
                         </Button>
                         <Button
                           type="button"
@@ -477,38 +494,39 @@ export const AssetLibraryPage = () => {
                           size="iconSm"
                           onClick={() => void deleteTag(tag)}
                           aria-label={`删除标签 ${tag.name}`}
-                          className="h-7 w-7 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+                          title="删除标签"
+                          className="h-6 w-6 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
                         >
-                          <Trash2 size={12} />
+                          <Trash2 size={13} />
                         </Button>
-                      </div>
-                      <span className={cn('w-6 shrink-0 text-right text-sm font-semibold tabular-nums', tagId === tag.id ? 'text-background/70' : 'text-muted-foreground')}>
-                        {tag.assetCount}
                       </span>
                     </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="mt-2 px-2 py-2 text-xs leading-5 text-muted-foreground">
-                  暂无标签
-                  <Button
-                    type="button"
-                    variant="link"
-                    size="sm"
-                    onClick={() => void createTag()}
-                    className="ml-1 h-auto px-1 py-0 text-xs"
-                  >
-                    新建
-                  </Button>
-                </div>
-              )}
+                  );
+                })}
+                {!tags.length && <div className="px-3 py-3 text-xs text-muted-foreground">暂无标签，点击右上角添加</div>}
+              </div>
             </section>
           </nav>
         </aside>}
-      <main className="flex min-w-0 flex-1 flex-col overflow-hidden rounded-lg bg-background">
-        <header className="relative flex h-11 shrink-0 items-center justify-between border-b border-black/[0.03] px-6 dark:border-white/[0.04]">
+      {source === 'online' ? (
+        <main className="flex min-w-0 flex-1 flex-col overflow-hidden rounded-lg bg-background">
+          <header className="flex h-12 shrink-0 items-center border-b border-black/[0.06] px-6 dark:border-white/[0.1]">
+            <h1 className="text-sm font-semibold tracking-[-0.01em]">在线资源</h1>
+          </header>
+          <div className="flex min-h-0 flex-1 items-center justify-center px-6">
+            <div className="flex max-w-sm flex-col items-center text-center">
+              <span className="grid h-11 w-11 place-items-center rounded-full bg-[var(--surface-control)] text-muted-foreground">
+                <Globe2 size={20} aria-hidden="true" />
+              </span>
+              <h2 className="mt-4 text-sm font-semibold">暂无在线资源</h2>
+              <p className="mt-1.5 text-xs leading-5 text-muted-foreground">接入在线资源来源后，内容会显示在这里。</p>
+            </div>
+          </div>
+        </main>
+      ) : <main className="flex min-w-0 flex-1 flex-col overflow-hidden rounded-lg bg-background">
+        <header className="relative flex h-12 shrink-0 items-center justify-between border-b border-black/[0.06] px-6 dark:border-white/[0.1]">
           <div className="flex items-center gap-3">
-            <Button
+            {source === 'uploaded' && <Button
               type="button"
               variant="ghost"
               size="iconSm"
@@ -518,9 +536,37 @@ export const AssetLibraryPage = () => {
               className="h-7 w-7 text-muted-foreground hover:bg-black/[0.05] dark:hover:bg-white/[0.08]"
             >
               {filterPanelOpen ? <PanelLeftClose size={15} /> : <PanelLeftOpen size={15} />}
-            </Button>
+            </Button>}
             <span aria-hidden="true" className="h-4 w-px bg-black/[0.06] dark:bg-white/[0.07]" />
-            <h1 className="text-sm font-semibold tracking-[-0.01em]">{activeCollectionTitle}</h1>
+            <div className="flex items-center gap-1" aria-label="按资产类型筛选">
+              {assetTypeOptions
+                .filter((option) => option.id !== 'project')
+                .map((option) => {
+                  const Icon = option.icon;
+                  const active = type === option.id;
+                  return (
+                    <Button
+                      key={option.id || 'all'}
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => {
+                        setType(option.id);
+                        setFolderId('');
+                        setOffset(0);
+                      }}
+                      aria-pressed={active}
+                      className={cn(
+                        'h-8 gap-1.5 px-2.5 text-xs font-medium text-muted-foreground hover:bg-black/[0.04] hover:text-foreground dark:hover:bg-white/[0.07]',
+                        active && 'bg-black/[0.06] text-foreground dark:bg-white/[0.1]',
+                      )}
+                    >
+                      <Icon size={14} className="shrink-0" />
+                      <span>{option.label}</span>
+                    </Button>
+                  );
+                })}
+            </div>
           </div>
           <div className="relative flex items-center gap-2">
             <Button
@@ -548,7 +594,7 @@ export const AssetLibraryPage = () => {
               <ChevronDown size={13} className={cn('transition-transform', sortOpen && 'rotate-180')} />
             </Button>
             {sortOpen && (
-              <div id="asset-sort-menu" className="absolute right-0 top-10 z-30 w-48 rounded-lg border border-black/[0.04] bg-background p-1.5 shadow-lg dark:border-white/[0.06]">
+              <div id="asset-sort-menu" className="absolute right-0 top-10 z-30 w-48 rounded-lg border border-black/[0.04] bg-background p-1.5 shadow-lg dark:border-[var(--surface-border)]">
                 {sortOptions.map((option) => (
                   <Button
                     key={option.id}
@@ -577,7 +623,7 @@ export const AssetLibraryPage = () => {
         {showDropZone && (
           <section
             className={cn(
-              'mx-6 flex cursor-pointer flex-col items-center justify-center rounded-lg border border-dashed border-black/[0.12] bg-black/[0.02] px-6 text-center transition-colors dark:border-white/[0.14] dark:bg-white/[0.025]',
+              'mx-6 flex cursor-pointer flex-col items-center justify-center rounded-lg border border-dashed border-black/[0.12] bg-black/[0.02] px-6 text-center transition-colors dark:border-[var(--surface-border-strong)] dark:bg-[var(--surface-subtle)]',
               showEmptyImport ? 'my-6 min-h-[330px] flex-1' : 'mt-6 min-h-[220px] shrink-0',
               draggingFiles && 'border-foreground/40 bg-black/[0.06] dark:bg-white/[0.08]',
             )}
@@ -594,7 +640,7 @@ export const AssetLibraryPage = () => {
               event.preventDefault();
               setDraggingFiles(false);
               const files = Array.from(event.dataTransfer.files);
-              if (files.length) void importDroppedImages(files);
+              if (files.length) void importDroppedAssets(files);
             }}
           >
             <input
@@ -605,14 +651,14 @@ export const AssetLibraryPage = () => {
               onChange={(event) => {
                 const files = Array.from(event.target.files || []);
                 event.target.value = '';
-                if (files.length) void importDroppedImages(files);
+                if (files.length) void importDroppedAssets(files);
               }}
             />
             <span className="mb-3 grid h-11 w-11 place-items-center rounded-full bg-muted text-muted-foreground">
               <UploadCloud size={21} />
             </span>
-            <p className="text-sm font-semibold">{draggingFiles ? '松开即可自动入库' : '把图片拖到这里'}</p>
-            <p className="mt-1 text-xs leading-5 text-muted-foreground">支持 PNG、JPG、WebP、GIF、AVIF 和 HEIC，可一次导入多张图片</p>
+            <p className="text-sm font-semibold">{draggingFiles ? '松开即可自动入库' : '把素材拖到这里'}</p>
+            <p className="mt-1 text-xs leading-5 text-muted-foreground">支持批量选择文件或文件夹，导入后可按类型与标签筛选</p>
             <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
               <Button
                 type="button"
@@ -623,7 +669,7 @@ export const AssetLibraryPage = () => {
                   fileInputRef.current?.click();
                 }}
               >
-                <UploadCloud size={14} aria-hidden="true" /> 从电脑选择图片
+                <UploadCloud size={14} aria-hidden="true" /> 从电脑选择素材
               </Button>
               <Button
                 type="button"
@@ -637,7 +683,7 @@ export const AssetLibraryPage = () => {
                 <FolderPlus size={14} aria-hidden="true" /> 选择文件夹
               </Button>
             </div>
-            <p className="mt-4 text-xs text-muted-foreground">图片会保存到 Design Work 本地管理目录，不会上传到第三方服务</p>
+            <p className="mt-4 text-xs text-muted-foreground">素材会保存到 Design Work 本地管理目录，不会上传到第三方服务</p>
           </section>
         )}
         {selectedCount > 0 && (
@@ -730,15 +776,8 @@ export const AssetLibraryPage = () => {
           )}
         </div>}
       </main>
+      }
         </div>
-      ) : activeTab === 'videos' ? (
-        <VideoAssetCatalog query={query} />
-      ) : (
-        <VideoProjectLibrary
-          query={query}
-          onCreate={() => setActiveModule('video-gen')}
-        />
-      )}
       </div>
 
       <AssetDetailPanel
@@ -819,7 +858,7 @@ const AssetCard = ({
       }
     }}
     className={cn(
-      'group relative mb-4 break-inside-avoid overflow-hidden rounded-lg border bg-white text-left transition-all duration-200 focus:outline-none dark:bg-[#151515]',
+      'group relative mb-4 break-inside-avoid overflow-hidden rounded-lg border bg-white text-left transition-all duration-200 focus:outline-none dark:bg-[var(--surface-bg)]',
       selected
         ? 'border-[#c8ff00] shadow-[0_0_0_2px_rgba(169,199,47,0.18)]'
         : 'border-black/[0.07] shadow-[0_8px_26px_rgba(20,24,28,0.035)] hover:-translate-y-0.5 hover:border-black/15 hover:shadow-[0_16px_34px_rgba(20,24,28,0.09)] dark:border-white/10',
@@ -828,7 +867,7 @@ const AssetCard = ({
     <div
       className={cn(
         'relative overflow-hidden',
-        asset.type === 'image' ? 'bg-[#ebeae4] dark:bg-[#171717]' : 'aspect-[16/10]',
+        asset.type === 'image' ? 'bg-[#ebeae4] dark:bg-[var(--surface-control)]' : 'aspect-[16/10]',
       )}
       style={asset.type === 'image' ? { aspectRatio: imageAspectRatio(asset) } : undefined}
     >
