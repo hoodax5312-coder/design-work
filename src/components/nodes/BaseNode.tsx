@@ -1,6 +1,6 @@
 import { type ElementType, type ReactNode } from 'react';
 import { Handle, NodeResizer, Position } from '@xyflow/react';
-import { Copy, Trash2 } from 'lucide-react';
+import { Copy, Trash2 } from '@/lib/remixIconShim';
 import { cn } from '../../lib/utils';
 import { Button } from '../ui';
 

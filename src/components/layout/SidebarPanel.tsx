@@ -1,6 +1,6 @@
 import { motion, AnimatePresence } from 'framer-motion';
 import { useUIStore, PanelType } from '../../stores/useUIStore';
-import { X } from 'lucide-react';
+import { X } from '@/lib/remixIconShim';
 import { Button, Card, Skeleton } from '../ui';
 
 const PanelContent = ({ type }: { type: PanelType }) => {
@@ -19,7 +19,7 @@ const PanelContent = ({ type }: { type: PanelType }) => {
         <div className="p-4 flex flex-col gap-2">
           {/* Mock Workflows */}
           {['项目 Alpha', '营销活动', '社交媒体'].map((name) => (
-            <Card key={name} padding="sm" className="cursor-pointer hover:bg-accent"><div className="text-sm font-medium">{name}</div><div className="text-xs text-muted-foreground">上次编辑 2小时前</div></Card>
+            <Card key={name} padding="sm" className="cursor-pointer transition-[border-color] hover:border-foreground/20"><div className="text-sm font-medium">{name}</div><div className="text-xs text-muted-foreground">上次编辑 2小时前</div></Card>
           ))}
         </div>
       );
@@ -28,11 +28,11 @@ const PanelContent = ({ type }: { type: PanelType }) => {
         <div className="p-4 space-y-4">
           <div className="text-xs font-medium text-muted-foreground uppercase tracking-wider">今天</div>
           <div className="space-y-2">
-            <div className="flex cursor-pointer items-center gap-3 rounded-md p-2 hover:bg-accent">
+            <div className="flex cursor-pointer items-center gap-3 rounded-md border border-transparent p-2 transition-[border-color] hover:border-border">
               <div className="h-2 w-2 rounded-full bg-primary" />
               <span className="text-sm text-foreground">添加了视频节点</span>
             </div>
-            <div className="flex cursor-pointer items-center gap-3 rounded-md p-2 hover:bg-accent">
+            <div className="flex cursor-pointer items-center gap-3 rounded-md border border-transparent p-2 transition-[border-color] hover:border-border">
               <div className="h-2 w-2 rounded-full bg-primary/55" />
               <span className="text-sm text-foreground">连接了节点</span>
             </div>

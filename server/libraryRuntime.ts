@@ -10,6 +10,7 @@ import { SmartCollectionRepository } from './repositories/SmartCollectionReposit
 import { PreviewService } from './previews/PreviewService';
 import { readStorageSettings } from './storageSettings';
 import { TaskRunner } from './tasks/TaskRunner';
+import { migrateLegacyGeneratedAssets } from './generatedAssetMigration';
 
 export interface LibraryRuntime {
   database: DatabaseSync;
@@ -57,6 +58,12 @@ export const createLibraryRuntime = async (projectRoot: string): Promise<Library
     context.updateProgress(0.95, '写入预览缓存');
     return { assetId: input.assetId, size, reused: result.reused };
   });
+  const migration = await migrateLegacyGeneratedAssets({ database, paths, assets, previews });
+  if (migration.restored || migration.markedUnrecoverable) {
+    console.info(
+      `[资产兼容迁移] 扫描 ${migration.scanned} 条，恢复 ${migration.restored} 条，标记不可恢复 ${migration.markedUnrecoverable} 条`,
+    );
+  }
   return { database, paths, tasks, imports, assets, folders, tags, smartCollections, previews };
 };
 

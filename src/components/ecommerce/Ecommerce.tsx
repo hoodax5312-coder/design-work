@@ -14,7 +14,7 @@ import {
   Upload,
   Wand2,
   Zap,
-} from 'lucide-react';
+} from '@/lib/remixIconShim';
 import { cn } from '../../lib/utils';
 import {
   ASPECT_RATIOS,
@@ -96,7 +96,7 @@ const parsePosterMarkdown = (markdown: string): ParsedPoster[] => {
 
 const EmptyState = ({ title, desc, icon: Icon }: { title: string; desc: string; icon: React.ElementType }) => (
   <div className="flex h-full min-h-[420px] flex-col items-center justify-center px-8 text-center">
-    <div className="mb-5 flex h-14 w-14 items-center justify-center rounded-md bg-primary/15 text-foreground">
+    <div className="mb-5 flex h-14 w-14 items-center justify-center rounded-md bg-muted text-muted-foreground">
       <Icon size={30} />
     </div>
     <h2 className="text-lg font-semibold tracking-tight text-foreground">{title}</h2>
@@ -359,7 +359,7 @@ export const Ecommerce = () => {
                     role="button"
                     tabIndex={0}
                     onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') fileInputRef.current?.click(); }}
-                    className="flex min-h-36 cursor-pointer flex-col items-center justify-center rounded-lg border border-dashed bg-muted/25 px-4 py-6 text-center transition-colors hover:border-foreground/30 hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    className="flex min-h-36 cursor-pointer flex-col items-center justify-center rounded-lg border border-dashed bg-muted/25 px-4 py-6 text-center transition-[border-color] hover:border-foreground/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                   >
                     <Upload className="mb-3 text-foreground" size={26} />
                     <p className="text-sm font-semibold">上传商品素材</p>

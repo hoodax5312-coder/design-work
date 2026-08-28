@@ -1,3 +1,9 @@
+const themeColor = (variable) => ({ opacityValue }) => (
+  opacityValue === undefined
+    ? `var(${variable})`
+    : `color-mix(in srgb, transparent, var(${variable}) calc(${opacityValue} * 100%))`
+);
+
 /** @type {import('tailwindcss').Config} */
 export default {
   darkMode: 'class',
@@ -7,27 +13,48 @@ export default {
   ],
   theme: {
     fontFamily: {
-      sans: ['PingFang SC', 'PingFang TC', 'Hiragino Sans GB', 'Microsoft YaHei', 'Noto Sans CJK SC', 'Helvetica Neue', 'Arial', 'sans-serif'],
-      serif: ['PingFang SC', 'PingFang TC', 'Hiragino Sans GB', 'Microsoft YaHei', 'Noto Sans CJK SC', 'Helvetica Neue', 'Arial', 'sans-serif'],
-      mono: ['PingFang SC', 'PingFang TC', 'Hiragino Sans GB', 'Microsoft YaHei', 'Noto Sans CJK SC', 'Helvetica Neue', 'Arial', 'sans-serif'],
+      sans: ['var(--font-pingfang)'],
+      serif: ['var(--font-pingfang)'],
+      mono: ['var(--font-pingfang)'],
     },
     extend: {
+      borderRadius: {
+        lg: 'var(--radius)',
+        md: 'max(0px, calc(var(--radius) - 2px))',
+        sm: 'max(0px, calc(var(--radius) - 4px))',
+      },
       borderColor: {
-        DEFAULT: 'hsl(var(--border))',
+        DEFAULT: themeColor('--border'),
       },
       colors: {
-        border: 'hsl(var(--border))',
-        input: 'hsl(var(--input))',
-        ring: 'hsl(var(--ring))',
-        background: 'hsl(var(--background))',
-        foreground: 'hsl(var(--foreground))',
-        primary: { DEFAULT: 'hsl(var(--primary))', foreground: 'hsl(var(--primary-foreground))' },
-        secondary: { DEFAULT: 'hsl(var(--secondary))', foreground: 'hsl(var(--secondary-foreground))' },
-        destructive: { DEFAULT: 'hsl(var(--destructive))', foreground: 'hsl(var(--destructive-foreground))' },
-        muted: { DEFAULT: 'hsl(var(--muted))', foreground: 'hsl(var(--muted-foreground))' },
-        accent: { DEFAULT: 'hsl(var(--accent))', foreground: 'hsl(var(--accent-foreground))', cyan: '#c8ff00', purple: '#c8ff00' },
-        popover: { DEFAULT: 'hsl(var(--popover))', foreground: 'hsl(var(--popover-foreground))' },
-        card: { DEFAULT: 'hsl(var(--card))', foreground: 'hsl(var(--card-foreground))' },
+        neutral: {
+          surface: themeColor('--neutral-surface'),
+          'surface-subtle': themeColor('--neutral-surface-subtle'),
+          foreground: themeColor('--neutral-foreground'),
+          border: themeColor('--neutral-border'),
+        },
+        border: themeColor('--border'),
+        input: themeColor('--input'),
+        ring: themeColor('--ring'),
+        background: themeColor('--background'),
+        foreground: themeColor('--foreground'),
+        primary: { DEFAULT: themeColor('--primary'), foreground: themeColor('--primary-foreground') },
+        secondary: { DEFAULT: themeColor('--secondary'), foreground: themeColor('--secondary-foreground') },
+        destructive: { DEFAULT: themeColor('--destructive'), foreground: themeColor('--destructive-foreground') },
+        muted: { DEFAULT: themeColor('--muted'), foreground: themeColor('--muted-foreground') },
+        accent: { DEFAULT: themeColor('--accent'), foreground: themeColor('--accent-foreground') },
+        popover: { DEFAULT: themeColor('--popover'), foreground: themeColor('--popover-foreground') },
+        card: { DEFAULT: themeColor('--card'), foreground: themeColor('--card-foreground') },
+        sidebar: {
+          DEFAULT: themeColor('--sidebar'),
+          foreground: themeColor('--sidebar-foreground'),
+          primary: themeColor('--sidebar-primary'),
+          'primary-foreground': themeColor('--sidebar-primary-foreground'),
+          accent: themeColor('--sidebar-accent'),
+          'accent-foreground': themeColor('--sidebar-accent-foreground'),
+          border: themeColor('--sidebar-border'),
+          ring: themeColor('--sidebar-ring'),
+        },
       },
       backdropBlur: {
         xs: '2px',

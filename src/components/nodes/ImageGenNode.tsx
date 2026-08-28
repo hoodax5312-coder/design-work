@@ -1,6 +1,6 @@
 import { memo } from 'react';
 import { type Node, type NodeProps } from '@xyflow/react';
-import { Image as ImageIcon, Loader2, Sparkles } from 'lucide-react';
+import { Image as ImageIcon, Loader2, Sparkles } from '@/lib/remixIconShim';
 import { BaseNode } from './BaseNode';
 import { type ImageGenNodeData } from '../../types/node.types';
 import { useCanvasStore } from '../../stores/useCanvasStore';

@@ -5,21 +5,23 @@ import {
   Check,
   ChevronDown,
   Clock3,
+  Copy,
   Download,
   Loader2,
+  Maximize2,
   Pencil,
   Plus,
-  RefreshCw,
   Sparkles,
+  Trash2,
   Video,
   X,
-} from 'lucide-react';
+} from '@/lib/remixIconShim';
 import { generateProviderImage, generateProviderVideo } from '../../services/providerService';
 import {
-  getActiveProvider,
   getConfiguredModels,
-  modelSupportsCategory,
   getSelectedModel,
+  providerSupportsCategory,
+  resolveModelConnection,
   useProviderStore,
 } from '../../stores/useProviderStore';
 import { useUIStore } from '../../stores/useUIStore';
@@ -62,8 +64,8 @@ const VIDEO_RATIO_OPTIONS = [
 
 const segmentedOptionClass = (selected: boolean) => cn(
   'h-8 w-full border-0 px-1 text-xs shadow-none ring-0',
-  'hover:bg-black/[0.04] dark:hover:bg-white/[0.08]',
-  selected && 'bg-black/[0.07] text-foreground hover:bg-black/[0.07] dark:bg-white/[0.14] dark:hover:bg-white/[0.14]'
+  'hover:bg-[var(--neutral-surface-subtle)] hover:text-[var(--neutral-foreground)]',
+  selected && 'bg-[var(--neutral-surface-subtle)] text-[var(--neutral-foreground)] hover:bg-[var(--neutral-surface-subtle)]'
 );
 
 interface ReferenceImage {
@@ -135,6 +137,94 @@ const formatGenerationTime = (value: string) => new Intl.DateTimeFormat('zh-CN',
   hour12: false,
 }).format(new Date(value));
 
+const ActionIcon = ({ kind }: { kind: 'download' | 'save' | 'fullscreen' }) => {
+  const Icon = kind === 'download' ? Download : kind === 'save' ? BookmarkPlus : Maximize2;
+  // Remix icons share a 24px viewBox, but their paths have different optical bounds.
+  const opticalScale = kind === 'save' ? 'scale-[1.15]' : kind === 'fullscreen' ? 'scale-[0.95]' : 'scale-[1.05]';
+  return (
+    <span className="grid h-6 w-6 shrink-0 place-items-center">
+      <Icon size={20} className={opticalScale} aria-hidden="true" />
+    </span>
+  );
+};
+
+const ImageActionOverlay = ({
+  onDownload,
+  onSave,
+  saved = false,
+  onFullscreen,
+}: {
+  onDownload: () => void;
+  onSave?: () => void;
+  saved?: boolean;
+  onFullscreen: () => void;
+}) => (
+  <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center bg-black/20 opacity-0 transition-opacity group-hover:pointer-events-auto group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:opacity-100">
+    <div className="pointer-events-none absolute inset-x-0 bottom-0 z-0 h-3/4 bg-gradient-to-t from-black/85 via-black/45 to-transparent" aria-hidden="true" />
+    <div className="relative z-10 flex items-center gap-3">
+      <Button type="button" variant="ghost" size="iconSm" onClick={onDownload} aria-label="下载图片" title="下载图片" className="h-10 w-10 bg-black/60 p-0 text-white shadow-lg hover:bg-black/85 hover:text-white"><ActionIcon kind="download" /></Button>
+      {onSave && <>
+        <Button type="button" variant="ghost" size="iconSm" onClick={onSave} disabled={saved} aria-label={saved ? '已存入资产' : '保存至资产'} title={saved ? '已存入资产' : '保存至资产'} className={cn('h-10 w-10 bg-black/60 p-0 text-white shadow-lg hover:bg-black/85 hover:text-white', saved && 'cursor-default bg-white/20 text-white/45 hover:bg-white/20 hover:text-white/45')}><ActionIcon kind="save" /></Button>
+      </>}
+      <Button type="button" variant="ghost" size="iconSm" onClick={onFullscreen} aria-label="全屏预览" title="全屏预览" className="h-10 w-10 bg-black/60 p-0 text-white shadow-lg hover:bg-black/85 hover:text-white"><ActionIcon kind="fullscreen" /></Button>
+    </div>
+  </div>
+);
+
+const SavedAssetBadge = ({ saved }: { saved?: boolean }) => saved ? (
+  <span className="pointer-events-none absolute right-2 top-2 z-20 rounded-md bg-[var(--neutral-surface-subtle)] px-2 py-1 text-[11px] font-semibold leading-none text-[var(--neutral-foreground)] shadow-sm">
+    已存入资产
+  </span>
+) : null;
+
+const GeneratedImagePreview = ({
+  src,
+  alt,
+  onDownload,
+  onSave,
+  saved,
+  onFullscreen,
+}: {
+  src: string;
+  alt: string;
+  onDownload: () => void;
+  onSave: () => void;
+  saved?: boolean;
+  onFullscreen: () => void;
+}) => {
+  const [imageRatio, setImageRatio] = useState<number | null>(null);
+
+  return (
+    <div
+      className={cn(
+        'group relative mx-2 flex max-h-[680px] min-h-[240px] items-center justify-center overflow-hidden rounded-lg bg-[#0b0b0b]',
+      )}
+      style={{ aspectRatio: imageRatio || 4 / 3 }}
+    >
+      <img
+        src={src}
+        alt={alt}
+        onLoad={(event) => setImageRatio(Math.max(4 / 3, event.currentTarget.naturalWidth / event.currentTarget.naturalHeight))}
+        className="h-auto max-h-full max-w-full object-contain"
+      />
+      <SavedAssetBadge saved={saved} />
+      <ImageActionOverlay onDownload={onDownload} onSave={onSave} saved={saved} onFullscreen={onFullscreen} />
+    </div>
+  );
+};
+
+const GeneratedImageTile = ({ src, alt, onRatioChange }: { src: string; alt: string; onRatioChange: (ratio: number) => void }) => {
+
+  return (
+    <img
+      src={src}
+      alt={alt}
+      onLoad={(event) => onRatioChange(Math.max(4 / 3, event.currentTarget.naturalWidth / event.currentTarget.naturalHeight))}
+      className="block h-auto max-h-full max-w-full object-contain"
+    />
+  );
+};
+
 export const ImageGeneration = () => {
   const [prompt, setPrompt] = useState('');
   const [ratio, setRatio] = useState('16:9');
@@ -153,12 +243,18 @@ export const ImageGeneration = () => {
   const [referenceVideo, setReferenceVideo] = useState<File | null>(null);
   const [referenceAudio, setReferenceAudio] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState('');
+  const [fullscreenImage, setFullscreenImage] = useState<string | null>(null);
   const [history, setHistory] = useState<GenerationRecord[]>([]);
   const historyCacheRef = useRef<GenerationHistoryCache>({ image: [], video: [] });
   const historyLoadedRef = useRef(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const [error, setError] = useState('');
   const [assetNotice, setAssetNotice] = useState('');
+  const [copiedPromptId, setCopiedPromptId] = useState<string | null>(null);
+  const [outputRatios, setOutputRatios] = useState<Record<string, number>>({});
+  const [savedAssetUrls, setSavedAssetUrls] = useState<Set<string>>(
+    () => new Set(contentFeed.list().filter((item) => item.savedToAssets).map((item) => item.previewUrl)),
+  );
   const [draggingReference, setDraggingReference] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const videoInputRef = useRef<HTMLInputElement>(null);
@@ -171,17 +267,19 @@ export const ImageGeneration = () => {
   const generationCountInputRef = useRef<HTMLInputElement>(null);
   const videoDurationPanelRef = useRef<HTMLFieldSetElement>(null);
   const videoDurationInputRef = useRef<HTMLInputElement>(null);
-  const provider = useProviderStore(getActiveProvider);
-  const setModelSelection = useProviderStore((state) => state.setModelSelection);
+  const providers = useProviderStore((state) => state.providers);
+  const activeProviderIds = useProviderStore((state) => state.activeProviderIds);
+  const setSelectedModel = useProviderStore((state) => state.setSelectedModel);
   const setActiveModule = useUIStore((state) => state.setActiveModule);
   const generationMode = useUIStore((state) => state.generationMode);
-  const imageModel = getSelectedModel(provider, 'image');
-  const videoModel = getSelectedModel(provider, 'video');
+  const imageProvider = providers.find((item) => item.id === activeProviderIds.image && providerSupportsCategory(item, 'image'));
+  const videoProvider = providers.find((item) => item.id === activeProviderIds.video && providerSupportsCategory(item, 'video'));
+  const provider = generationMode === 'image' ? imageProvider : videoProvider;
+  const imageModel = getSelectedModel(imageProvider, 'image');
+  const videoModel = getSelectedModel(videoProvider, 'video');
   const selectedModel = generationMode === 'image' ? imageModel : videoModel;
   const modelOptions = useMemo(
-    () => getConfiguredModels(provider)
-      .filter((model) => modelSupportsCategory(model, generationMode))
-      .map((model) => model.id),
+    () => getConfiguredModels(provider, generationMode).map((model) => model.id),
     [generationMode, provider],
   );
   const ratioOptions = generationMode === 'video' ? VIDEO_RATIO_OPTIONS : RATIO_OPTIONS;
@@ -198,6 +296,12 @@ export const ImageGeneration = () => {
       setRatio('16:9');
     }
   }, [generationMode, ratio]);
+  useEffect(() => {
+    const syncSavedAssets = () => setSavedAssetUrls(new Set(contentFeed.list().filter((item) => item.savedToAssets).map((item) => item.previewUrl)));
+    syncSavedAssets();
+    window.addEventListener('design-work:content-feed-updated', syncSavedAssets);
+    return () => window.removeEventListener('design-work:content-feed-updated', syncSavedAssets);
+  }, []);
   useEffect(() => {
     if (!modelPanelOpen) return;
     const closeOnOutsidePress = (event: PointerEvent) => {
@@ -341,7 +445,7 @@ export const ImageGeneration = () => {
 
   const handleGenerate = async (promptOverride?: string) => {
     const generationPrompt = promptOverride ?? prompt;
-    if (!provider?.apiKey || !selectedModel) {
+    if (!provider || !resolveModelConnection(provider, generationMode, selectedModel)?.apiKey || !selectedModel) {
       setError(`请先在设置中配置支持${generationMode === 'image' ? '图像' : '视频'}生成的 API Provider。`);
       setActiveModule('settings');
       return;
@@ -354,7 +458,7 @@ export const ImageGeneration = () => {
     setIsGenerating(true);
     try {
       if (generationMode === 'video') {
-        const result = await generateProviderVideo({ ...provider, model: videoModel }, { prompt: generationPrompt, resolution: videoResolutionForRatio(ratio) });
+        const result = await generateProviderVideo(provider, { prompt: generationPrompt, resolution: videoResolutionForRatio(ratio) }, videoModel);
         setPreviewUrl(result.url);
         contentFeed.add({
           type: 'video',
@@ -391,13 +495,13 @@ export const ImageGeneration = () => {
         window.setTimeout(() => setAssetNotice(''), 3000);
         return;
       }
-      const results = await Promise.all(Array.from({ length: selectedGenerationCount }, () => generateProviderImage({ ...provider, model: imageModel }, {
+      const results = await Promise.all(Array.from({ length: selectedGenerationCount }, () => generateProviderImage(provider, {
           prompt: generationPrompt,
           size: imageSizeForRatio(ratio, imageModel),
           quality: imageModel.toLowerCase().includes('dall-e-3')
             ? quality === '低' ? 'standard' : 'hd'
             : quality === '低' ? 'medium' : 'high',
-        })));
+        }, imageModel)));
       const outputs = results.map((result) => result.url);
       setPreviewUrl(outputs[0] || '');
       setHistory((current) => [{
@@ -447,6 +551,7 @@ export const ImageGeneration = () => {
         type: 'image',
         title: `图片生成 · ${new Date().toLocaleDateString('zh-CN')}`,
         description: promptOverride,
+        sourceUrl: urlOverride,
         userMetadata: {
           source: 'image-generation',
           prompt: promptOverride,
@@ -460,6 +565,7 @@ export const ImageGeneration = () => {
       });
       const generated = contentFeed.list().find((item) => item.previewUrl === urlOverride);
       if (generated) contentFeed.markSaved(generated.id);
+      setSavedAssetUrls((current) => new Set(current).add(urlOverride));
       setAssetNotice('已添加到资产库');
       window.setTimeout(() => setAssetNotice(''), 2200);
     } catch (requestError) {
@@ -467,8 +573,27 @@ export const ImageGeneration = () => {
     }
   };
 
+  const copyPrompt = async (record: GenerationRecord) => {
+    try {
+      await navigator.clipboard.writeText(record.prompt);
+      setCopiedPromptId(record.id);
+      window.setTimeout(() => setCopiedPromptId((current) => current === record.id ? null : current), 1800);
+    } catch {
+      setError('复制提示词失败，请检查浏览器剪贴板权限。');
+    }
+  };
+
+  const deleteRecord = (record: GenerationRecord) => {
+    if (!window.confirm('删除这条生成记录？')) return;
+    setHistory((current) => current.filter((item) => item.id !== record.id));
+    contentFeed.removeByPreviewUrls(record.outputs);
+    if (record.outputs.includes(previewUrl)) {
+      setPreviewUrl('');
+    }
+  };
+
   const selectModel = (model: string) => {
-    if (provider) setModelSelection(provider.id, generationMode, model);
+    if (provider) setSelectedModel(provider.id, generationMode, model);
     setModelPanelOpen(false);
   };
 
@@ -486,9 +611,13 @@ export const ImageGeneration = () => {
     document.getElementById(`generation-result-${index}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   };
 
+  const fullscreenRecord = fullscreenImage
+    ? history.find((record) => record.outputs.includes(fullscreenImage))
+    : null;
+
   return (
-    <main className="module-workspace mx-3 mb-3 mt-0 grid h-[calc(100%-12px)] min-h-0 grid-cols-[480px_minmax(0,1fr)] gap-0 !bg-transparent p-0 text-foreground">
-      <section className="flex min-h-0 flex-col overflow-hidden rounded-l-lg border border-r-0 border-[var(--surface-border)] bg-white p-4 dark:bg-[var(--surface-subtle)]" aria-label="生成输入与参数">
+    <main className="module-workspace mx-3 mb-3 mt-0 grid h-[calc(100%-12px)] min-h-0 grid-cols-[minmax(0,480px)_minmax(0,1fr)] gap-0 !bg-transparent p-0 text-foreground">
+      <section className="flex min-h-0 min-w-0 flex-col overflow-hidden rounded-l-lg border border-border bg-card p-4 text-card-foreground" aria-label="生成输入与参数">
         <header className="mb-5 shrink-0">
           <h1 className="text-xl font-semibold tracking-tight">{generationMode === 'image' ? '图片生成' : '视频生成'}</h1>
         </header>
@@ -500,7 +629,7 @@ export const ImageGeneration = () => {
               onDragOver={(event) => { event.preventDefault(); setDraggingReference(true); }}
               onDragLeave={(event) => { if (!event.currentTarget.contains(event.relatedTarget as Node)) setDraggingReference(false); }}
               onDrop={(event) => { event.preventDefault(); setDraggingReference(false); addReferences(event.dataTransfer.files); }}
-              className={cn('relative overflow-hidden rounded-lg bg-[var(--surface-control)] transition-colors focus-within:ring-1 focus-within:ring-ring', draggingReference && 'bg-[var(--surface-hover)] ring-2 ring-primary/20')}
+              className={cn('relative overflow-hidden rounded-lg bg-[var(--neutral-surface-subtle)] text-[var(--neutral-foreground)] transition-colors focus-within:ring-1 focus-within:ring-inset focus-within:ring-[var(--neutral-border)]', draggingReference && 'bg-[var(--neutral-surface)] text-[var(--neutral-foreground)] ring-2 ring-inset ring-[var(--neutral-border)]')}
             >
               <input ref={fileInputRef} type="file" accept="image/*" multiple className="sr-only" onChange={(event) => { if (event.target.files) addReferences(event.target.files); event.target.value = ''; }} />
               <Textarea
@@ -520,7 +649,7 @@ export const ImageGeneration = () => {
                   {referenceImages.map((image, index) => (
                     <div key={image.id} className="group relative h-14 w-14 shrink-0 overflow-hidden rounded-md border border-[var(--surface-border)]">
                       <Button type="button" variant="ghost" onClick={() => insertReferenceMention(index)} aria-label={`引用图片${index + 1}`} title={`在输入框中引用图片${index + 1}`} className="relative block h-full w-full rounded-none p-0">
-                        <img src={image.url} alt={`参考图：${image.file.name}`} className="h-full w-full object-cover" />
+                        <img src={image.url} alt={`参考图：${image.file.name}`} className="h-full w-full object-contain" />
                         <span className="absolute bottom-0 inset-x-0 bg-black/65 py-0.5 text-center text-[10px] font-medium text-white">图片{index + 1}</span>
                       </Button>
                       <Button type="button" variant="ghost" size="iconSm" onClick={() => removeReference(image.id)} aria-label={`移除参考图 ${image.file.name}`} className="absolute right-0.5 top-0.5 h-5 w-5 bg-black/70 p-0 text-white opacity-0 hover:bg-black group-hover:opacity-100 group-focus-within:opacity-100"><X size={10} /></Button>
@@ -532,7 +661,7 @@ export const ImageGeneration = () => {
                       variant="ghost"
                       onClick={() => fileInputRef.current?.click()}
                       aria-label="添加参考图片"
-                      className="h-14 w-14 shrink-0 justify-center rounded-md border border-dashed border-muted-foreground/40 bg-transparent p-0 text-muted-foreground hover:bg-[var(--surface-hover)] hover:text-foreground"
+                      className="h-14 w-14 shrink-0 justify-center rounded-md border border-dashed border-muted-foreground/40 bg-transparent p-0 text-muted-foreground hover:bg-[var(--surface-hover)] hover:text-[var(--surface-hover-foreground)]"
                     >
                       <span className="flex flex-col items-center gap-0.5"><Plus size={18} className="shrink-0" /><span className="text-[10px]">添加</span></span>
                     </Button>
@@ -574,7 +703,7 @@ export const ImageGeneration = () => {
                 onClick={() => videoInputRef.current?.click()}
                 aria-label={referenceVideo ? `替换参考视频：${referenceVideo.name}` : '上传参考视频'}
                 title={referenceVideo?.name}
-                className="h-20 min-w-0 flex-col justify-center gap-2 rounded-lg border border-dashed border-muted-foreground/40 bg-transparent px-3 text-muted-foreground shadow-none hover:bg-[var(--surface-hover)] hover:text-foreground"
+                className="h-20 min-w-0 flex-col justify-center gap-2 rounded-lg border border-dashed border-muted-foreground/40 bg-transparent px-3 text-muted-foreground shadow-none hover:bg-[var(--surface-hover)] hover:text-[var(--surface-hover-foreground)]"
               >
                 <Video size={18} strokeWidth={1.5} />
                 <span className="max-w-full truncate text-xs">{referenceVideo?.name || '参考视频'}</span>
@@ -585,7 +714,7 @@ export const ImageGeneration = () => {
                 onClick={() => audioInputRef.current?.click()}
                 aria-label={referenceAudio ? `替换参考音频：${referenceAudio.name}` : '上传参考音频'}
                 title={referenceAudio?.name}
-                className="h-20 min-w-0 flex-col justify-center gap-2 rounded-lg border border-dashed border-muted-foreground/40 bg-transparent px-3 text-muted-foreground shadow-none hover:bg-[var(--surface-hover)] hover:text-foreground"
+                className="h-20 min-w-0 flex-col justify-center gap-2 rounded-lg border border-dashed border-muted-foreground/40 bg-transparent px-3 text-muted-foreground shadow-none hover:bg-[var(--surface-hover)] hover:text-[var(--surface-hover-foreground)]"
               >
                 <AudioLines size={18} strokeWidth={1.5} />
                 <span className="max-w-full truncate text-xs">{referenceAudio?.name || '参考音频'}</span>
@@ -608,7 +737,7 @@ export const ImageGeneration = () => {
                 }}
                 aria-haspopup="listbox"
                 aria-expanded={modelPanelOpen}
-                className="h-10 w-full justify-between rounded-lg border-0 bg-[var(--surface-control)] px-3 text-sm font-normal shadow-none hover:bg-[var(--surface-hover)]"
+                className="h-10 w-full justify-between rounded-lg border-0 bg-[var(--neutral-surface-subtle)] px-3 text-sm font-normal text-[var(--neutral-foreground)] shadow-none hover:bg-[var(--neutral-surface-hover)] hover:text-[var(--neutral-foreground)]"
               >
                 <span className="truncate">{selectedModel || `选择${generationMode === 'image' ? '图像' : '视频'}模型`}</span>
                 <ChevronDown size={15} className={cn('shrink-0 text-muted-foreground transition-transform', modelPanelOpen && 'rotate-180')} />
@@ -627,7 +756,7 @@ export const ImageGeneration = () => {
                         onClick={() => selectModel(model)}
                         className={cn(
                           'h-9 w-full min-w-0 justify-between rounded-md border-0 px-2.5 text-sm font-normal shadow-none',
-                          selected ? 'bg-[var(--surface-hover)] text-foreground' : 'hover:bg-[var(--surface-control)]',
+                          selected ? 'bg-[var(--neutral-surface-subtle)] text-[var(--neutral-foreground)]' : 'hover:bg-[var(--neutral-surface-subtle)] hover:text-[var(--neutral-foreground)]',
                         )}
                       >
                         <span className="truncate">{model}</span>
@@ -641,9 +770,9 @@ export const ImageGeneration = () => {
             {generationMode === 'image' && (
               <fieldset ref={generationCountPanelRef} className="relative min-w-0">
                 <legend className="mb-2 text-xs font-semibold">生成数量</legend>
-                <div className="grid h-10 grid-cols-5 rounded-lg bg-[var(--surface-control)] p-1">
+                <div className="grid h-10 grid-cols-5 rounded-lg bg-[var(--neutral-surface-subtle)] p-1 text-[var(--neutral-foreground)]">
                   {GENERATION_COUNT_OPTIONS.map((option) => (
-                    <Button key={option} type="button" variant="ghost" aria-pressed={generationCount === option} onClick={() => { setGenerationCount(option); setGenerationCountPanelOpen(false); }} className={cn('h-8 min-w-0 whitespace-nowrap px-0 text-xs', generationCount === option && 'bg-black/[0.07] text-foreground hover:bg-black/[0.07] dark:bg-white/[0.14] dark:hover:bg-white/[0.14]')}>
+                    <Button key={option} type="button" variant="ghost" aria-pressed={generationCount === option} onClick={() => { setGenerationCount(option); setGenerationCountPanelOpen(false); }} className={cn('h-8 min-w-0 whitespace-nowrap px-0 text-xs', generationCount === option && 'bg-[var(--neutral-surface)] text-[var(--neutral-foreground)] hover:bg-[var(--neutral-surface)]')}>
                       {option}张
                     </Button>
                   ))}
@@ -659,7 +788,7 @@ export const ImageGeneration = () => {
                       setParameterPanelOpen(false);
                       setGenerationCountPanelOpen((open) => !open);
                     }}
-                    className={cn('h-8 min-w-0 whitespace-nowrap px-0 text-xs', generationCount === 'custom' && 'bg-black/[0.07] text-foreground hover:bg-black/[0.07] dark:bg-white/[0.14] dark:hover:bg-white/[0.14]')}
+                    className={cn('h-8 min-w-0 whitespace-nowrap px-0 text-xs', generationCount === 'custom' && 'bg-[var(--neutral-surface)] text-[var(--neutral-foreground)] hover:bg-[var(--neutral-surface)]')}
                   >
                     {generationCount === 'custom' ? `${customGenerationCount}张 +` : '自定义'}
                   </Button>
@@ -681,7 +810,7 @@ export const ImageGeneration = () => {
                         }}
                         inputSize="sm"
                         aria-label="自定义生成张数"
-                        className="border-0 bg-[var(--surface-control)] pr-8 shadow-none"
+                        className="border-0 bg-[var(--neutral-surface)] pr-8 text-[var(--neutral-foreground)] shadow-none"
                       />
                       <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">张</span>
                     </div>
@@ -692,7 +821,7 @@ export const ImageGeneration = () => {
             {generationMode === 'video' && (
               <fieldset ref={videoDurationPanelRef} className="relative min-w-0">
                 <legend className="mb-2 text-xs font-semibold">秒数</legend>
-                <div className="grid h-10 grid-cols-4 rounded-lg bg-[var(--surface-control)] p-1">
+                <div className="grid h-10 grid-cols-4 rounded-lg bg-[var(--neutral-surface-subtle)] p-1 text-[var(--neutral-foreground)]">
                   {VIDEO_DURATION_OPTIONS.map((option) => (
                     <Button key={option} type="button" variant="ghost" aria-pressed={videoDuration === option} onClick={() => { setVideoDuration(option); setVideoDurationPanelOpen(false); }} className={segmentedOptionClass(videoDuration === option)}>
                       {option}s
@@ -733,7 +862,7 @@ export const ImageGeneration = () => {
                         }}
                         inputSize="sm"
                         aria-label="自定义视频秒数"
-                        className="border-0 bg-[var(--surface-control)] pr-8 shadow-none"
+                        className="border-0 bg-[var(--neutral-surface)] pr-8 text-[var(--neutral-foreground)] shadow-none"
                       />
                       <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">s</span>
                     </div>
@@ -756,7 +885,7 @@ export const ImageGeneration = () => {
               }}
               aria-haspopup="true"
               aria-expanded={parameterPanelOpen}
-              className="h-10 w-full justify-between rounded-lg border-0 bg-[var(--surface-control)] px-3 text-sm font-normal shadow-none hover:bg-[var(--surface-hover)]"
+              className="h-10 w-full justify-between rounded-lg border-0 bg-[var(--neutral-surface-subtle)] px-3 text-sm font-normal text-[var(--neutral-foreground)] shadow-none hover:bg-[var(--neutral-surface-hover)] hover:text-[var(--neutral-foreground)]"
             >
               <span className="truncate">{parameterSummary}</span>
               <ChevronDown size={15} className={cn('shrink-0 text-muted-foreground transition-transform', parameterPanelOpen && 'rotate-180')} />
@@ -767,7 +896,7 @@ export const ImageGeneration = () => {
                 <div className="space-y-4">
                   <fieldset>
                     <legend className="mb-2 text-xs font-semibold">画面比例</legend>
-                    <div className={cn('grid rounded-lg bg-[var(--surface-control)]', generationMode === 'video' ? 'grid-cols-3 gap-2 p-2' : 'grid-cols-6 gap-1 p-1.5')}>
+                    <div className={cn('grid rounded-lg bg-[var(--neutral-surface-subtle)] text-[var(--neutral-foreground)]', generationMode === 'video' ? 'grid-cols-3 gap-2 p-2' : 'grid-cols-6 gap-1 p-1.5')}>
                       {ratioOptions.map((option) => {
                         const selected = ratio === option.value;
                         return (
@@ -780,8 +909,8 @@ export const ImageGeneration = () => {
                             className={cn(
                               'w-full flex-col rounded-md border-0 px-1 text-xs shadow-none ring-0',
                               generationMode === 'video' ? 'h-20 gap-2 py-2' : 'h-14 gap-1 py-1',
-                              'hover:bg-black/[0.04] dark:hover:bg-white/[0.08]',
-                              selected && 'bg-black/[0.08] text-foreground shadow-sm hover:bg-black/[0.08] dark:bg-white/[0.14] dark:hover:bg-white/[0.14]',
+                              'hover:bg-[var(--neutral-surface)] hover:text-[var(--neutral-foreground)]',
+                              selected && 'bg-[var(--neutral-surface)] text-[var(--neutral-foreground)] shadow-sm hover:bg-[var(--neutral-surface)]',
                             )}
                           >
                             <span
@@ -804,7 +933,7 @@ export const ImageGeneration = () => {
                   {generationMode === 'video' ? (
                     <fieldset>
                       <legend className="mb-2 text-xs font-semibold">清晰度</legend>
-                      <div className="grid grid-cols-3 rounded-lg bg-[var(--surface-control)] p-1">
+                      <div className="grid grid-cols-3 rounded-lg bg-[var(--neutral-surface-subtle)] p-1 text-[var(--neutral-foreground)]">
                         {VIDEO_CLARITY_OPTIONS.map((option) => (
                           <Button key={option} type="button" variant="ghost" aria-pressed={videoClarity === option} onClick={() => setVideoClarity(option)} className={segmentedOptionClass(videoClarity === option)}>
                             {option}
@@ -816,7 +945,7 @@ export const ImageGeneration = () => {
                     <div className="grid grid-cols-2 gap-3">
                       <fieldset>
                         <legend className="mb-2 text-xs font-semibold">质量</legend>
-                        <div className="grid grid-cols-3 rounded-lg bg-[var(--surface-control)] p-1">
+                        <div className="grid grid-cols-3 rounded-lg bg-[var(--neutral-surface-subtle)] p-1 text-[var(--neutral-foreground)]">
                           {QUALITY_OPTIONS.map((option) => (
                             <Button key={option} type="button" variant="ghost" aria-pressed={quality === option} onClick={() => setQuality(option)} className={segmentedOptionClass(quality === option)}>
                               {option}
@@ -826,7 +955,7 @@ export const ImageGeneration = () => {
                       </fieldset>
                       <fieldset>
                         <legend className="mb-2 text-xs font-semibold">分辨率</legend>
-                        <div className="grid grid-cols-3 rounded-lg bg-[var(--surface-control)] p-1">
+                        <div className="grid grid-cols-3 rounded-lg bg-[var(--neutral-surface-subtle)] p-1 text-[var(--neutral-foreground)]">
                           {RESOLUTION_OPTIONS.map((option) => (
                             <Button key={option} type="button" variant="ghost" aria-pressed={resolution === option} onClick={() => setResolution(option)} className={segmentedOptionClass(resolution === option)}>
                               {option}
@@ -845,14 +974,14 @@ export const ImageGeneration = () => {
         <div className="shrink-0 pt-4">
           {error && <p role="alert" className="mb-3 text-xs text-red-600 dark:text-red-300">{error}</p>}
           {assetNotice && <p role="status" className="mb-3 text-xs font-medium text-foreground">{assetNotice}</p>}
-          <Button type="button" variant="primary" onClick={() => void handleGenerate()} disabled={isGenerating || !prompt.trim()} className="h-11 w-full border-0 text-sm font-semibold shadow-none">
+          <Button type="button" variant="primary" onClick={() => void handleGenerate()} disabled={isGenerating || !prompt.trim()} className="h-11 w-full border-0 bg-[var(--action-generate-bg)] text-[var(--action-generate-foreground)] text-sm font-semibold shadow-none hover:bg-[var(--action-generate-bg-hover)]">
             {isGenerating ? <><Loader2 size={16} className="animate-spin" /> 正在生成</> : <><Sparkles size={16} /> 生成{generationMode === 'image' ? '图片' : '视频'}</>}
           </Button>
         </div>
       </section>
 
-      <section className="flex min-h-0 overflow-hidden rounded-r-lg border border-[var(--surface-border)] bg-white dark:bg-[var(--surface-subtle)]" aria-label="生成结果列表">
-        <div className="min-w-0 flex-1 overflow-y-auto scroll-smooth">
+      <section className="flex min-h-0 min-w-0 overflow-hidden rounded-r-lg border !border-l-0 border-border bg-card text-card-foreground" aria-label="生成结果列表">
+        <div className="min-w-0 flex-1 overflow-x-hidden overflow-y-auto scroll-smooth">
           {isGenerating && (
             <div className="flex min-h-40 items-center justify-center gap-3 pb-4 text-sm text-muted-foreground">
               <Loader2 size={18} className="animate-spin text-foreground" /> 正在生成新的{generationMode === 'image' ? '图片' : '视频'}…
@@ -861,37 +990,73 @@ export const ImageGeneration = () => {
 
           {history.length > 0 ? history.map((record, index) => {
             const output = record.outputs[0] || '';
+            const selectedOutput = record.outputs.includes(previewUrl) ? previewUrl : output;
             const isVideoRecord = record.mode === 'video';
             return (
-              <article id={`generation-result-${index}`} key={record.id} className="scroll-mt-0 pb-4 last:pb-0">
-                <header className="px-4 pb-3 pt-4">
-                  <div className="flex items-center gap-3">
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-2">
-                        <h2 className="text-sm font-semibold">{isVideoRecord ? '视频生成' : '图片生成'}</h2>
-                        <span className="text-xs text-muted-foreground">{record.ratio} · {record.resolution}{isVideoRecord && record.duration ? ` · ${record.duration}s` : ` · ${record.quality}`}</span>
+              <article id={`generation-result-${index}`} key={record.id} className="scroll-mt-0 pb-2 last:pb-0">
+                <header className="px-2 pb-2 pt-2">
+                  <div className="flex min-h-9 flex-wrap items-center gap-2">
+                    <div className="min-w-[120px] flex-1">
+                      <div className="flex min-w-0 flex-wrap items-center gap-2">
+                        <h2 className="shrink-0 text-sm font-semibold">{isVideoRecord ? '视频生成' : '图片生成'}</h2>
                         <time dateTime={record.createdAt} className="flex items-center gap-1.5 whitespace-nowrap text-xs text-muted-foreground"><Clock3 size={12} /> {formatGenerationTime(record.createdAt)}</time>
                       </div>
                     </div>
-                    <Button variant="ghost" size="sm" type="button" onClick={() => editRecordPrompt(record)} aria-label={`编辑提示词：${record.prompt}`}><Pencil size={13} /> 编辑</Button>
-                    <Button variant="ghost" size="sm" type="button" onClick={() => { setPrompt(record.prompt); void handleGenerate(record.prompt); }}><RefreshCw size={13} /> 再次生成</Button>
-                    <Button variant="ghost" size="sm" type="button" onClick={() => downloadImage(output)}><Download size={13} /> 下载</Button>
-                    {!isVideoRecord && <Button variant="ghost" size="sm" type="button" onClick={() => void handleAddToAssets(output, record.prompt)}><BookmarkPlus size={13} /> 存入资产</Button>}
+                    <div className="flex shrink-0 items-center gap-2">
+                      <Button variant="ghost" size="iconSm" type="button" onClick={() => editRecordPrompt(record)} aria-label={`编辑提示词：${record.prompt}`} title="编辑提示词" className="h-6 w-6 p-0"><Pencil size={13} /></Button>
+                      <Button variant="ghost" size="iconSm" type="button" onClick={() => deleteRecord(record)} aria-label="删除生成记录" title="删除生成记录" className="h-6 w-6 p-0 text-muted-foreground hover:text-destructive"><Trash2 size={13} /></Button>
+                      {isVideoRecord && <Button variant="ghost" size="iconSm" type="button" onClick={() => downloadImage(selectedOutput)} aria-label="下载视频" title="下载视频" className="h-6 w-6 p-0"><Download size={13} /></Button>}
+                    </div>
                   </div>
 
                   <div className="group/prompt relative">
-                    <p tabIndex={0} title={record.prompt} className="truncate rounded-md bg-[var(--surface-control)] px-3 py-2 text-sm text-muted-foreground outline-none focus-visible:ring-1 focus-visible:ring-ring">{record.prompt}</p>
+                    <div className="flex min-w-0 items-center gap-2 rounded-md bg-[var(--neutral-surface-subtle)] px-3 py-2">
+                      <p tabIndex={0} title={record.prompt} className="min-w-0 flex-1 truncate text-sm text-muted-foreground outline-none focus-visible:ring-1 focus-visible:ring-ring">{record.prompt}</p>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="iconSm"
+                        onClick={() => void copyPrompt(record)}
+                        aria-label="复制提示词"
+                        title="复制提示词"
+                        className="h-6 w-6 shrink-0 p-0 text-muted-foreground hover:text-foreground"
+                      >
+                        {copiedPromptId === record.id ? <Check size={14} /> : <Copy size={14} />}
+                      </Button>
+                    </div>
                     <div role="tooltip" className="pointer-events-none absolute inset-x-0 top-full z-30 mt-1 hidden rounded-md border border-[var(--surface-border-strong)] bg-popover px-3 py-2 text-sm leading-6 text-popover-foreground shadow-lg group-hover/prompt:block group-focus-within/prompt:block">
                       {record.prompt}
                     </div>
                   </div>
                 </header>
 
-                <div className="mx-4 flex min-h-[360px] items-center justify-center overflow-hidden rounded-lg bg-[#0b0b0b]">
-                  {isVideoRecord
-                    ? <video src={output} controls preload="metadata" className="max-h-[680px] w-full object-contain" />
-                    : <img src={output} alt={record.prompt} className="max-h-[680px] w-full object-contain" />}
-                </div>
+                {isVideoRecord ? (
+                  <div className="mx-2 flex min-h-[360px] items-end justify-center overflow-hidden rounded-lg bg-[#0b0b0b]">
+                    <video src={output} controls preload="metadata" className="max-h-[680px] w-full object-contain" />
+                  </div>
+                ) : record.outputs.length > 1 ? (
+                  <div className="mx-2 grid grid-cols-2 gap-2 rounded-lg bg-[var(--surface-control)] p-2">
+                    {record.outputs.map((image, outputIndex) => (
+                      <div
+                        key={`${record.id}-${image}`}
+                        className={cn(
+                          'group relative flex min-w-0 items-center justify-center overflow-hidden rounded-md bg-[#0b0b0b] transition-shadow',
+                          selectedOutput === image && 'ring-2 ring-inset ring-foreground'
+                        )}
+                        style={{ aspectRatio: outputRatios[image] || 4 / 3 }}
+                      >
+                        <button type="button" onClick={() => setPreviewUrl(image)} aria-label={`选择第 ${outputIndex + 1} 张生成图片`} aria-pressed={selectedOutput === image} className="block min-w-0 max-w-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring">
+                          <GeneratedImageTile src={image} alt={`${record.prompt}，第 ${outputIndex + 1} 张`} onRatioChange={(nextRatio) => setOutputRatios((current) => current[image] === nextRatio ? current : { ...current, [image]: nextRatio })} />
+                        </button>
+                        <SavedAssetBadge saved={savedAssetUrls.has(image)} />
+                        <ImageActionOverlay onDownload={() => downloadImage(image)} onSave={() => void handleAddToAssets(image, record.prompt)} saved={savedAssetUrls.has(image)} onFullscreen={() => setFullscreenImage(image)} />
+                        <span className="absolute bottom-2 left-2 rounded bg-black/65 px-1.5 py-0.5 text-[10px] text-white opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100">{outputIndex + 1}/{record.outputs.length}</span>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <GeneratedImagePreview src={output} alt={record.prompt} onDownload={() => downloadImage(output)} onSave={() => void handleAddToAssets(output, record.prompt)} saved={savedAssetUrls.has(output)} onFullscreen={() => setFullscreenImage(output)} />
+                )}
 
               </article>
             );
@@ -903,7 +1068,7 @@ export const ImageGeneration = () => {
           )}
         </div>
 
-        <aside className="w-[84px] shrink-0 overflow-y-auto border-l border-[var(--surface-border)] bg-[#f4f4f2] p-2 dark:bg-[#0b0b0b]" aria-label="快速切换生成结果">
+        <aside className="w-[84px] shrink-0 overflow-y-auto p-2" aria-label="快速切换生成结果">
           <div className="space-y-2">
             {history.map((record, index) => {
               const output = record.outputs[0] || '';
@@ -917,14 +1082,61 @@ export const ImageGeneration = () => {
                   className={cn('block aspect-square w-full overflow-hidden rounded-md border-2 bg-[#111] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring', previewUrl === output ? 'border-foreground' : 'border-transparent hover:border-[var(--surface-border-strong)]')}
                 >
                   {record.mode === 'video'
-                    ? <video src={output} preload="metadata" className="h-full w-full object-cover" />
-                    : <img src={output} alt="" className="h-full w-full object-cover" />}
+                    ? <video src={output} preload="metadata" className="h-full w-full object-contain" />
+                    : <img src={output} alt="" className="h-full w-full object-contain" />}
                 </button>
               );
             })}
           </div>
         </aside>
       </section>
+
+      {fullscreenImage && (
+        <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/30 backdrop-blur-xl" role="dialog" aria-modal="true" aria-label="全屏图片详情" onClick={() => setFullscreenImage(null)}>
+          <aside className="flex h-screen w-screen flex-col overflow-hidden bg-black/25 text-white shadow-2xl backdrop-blur-xl" onClick={(event) => event.stopPropagation()}>
+            <header className="flex h-12 w-full shrink-0 items-center justify-between px-4">
+              <span className="min-w-0 truncate text-sm font-semibold" title={fullscreenRecord?.prompt || '图片详情'}>
+                {fullscreenRecord ? `图片生成 · ${formatGenerationTime(fullscreenRecord.createdAt)}` : '图片详情'}
+              </span>
+              <div className="flex h-8 items-center gap-1 rounded-lg bg-white/10 text-white/85 backdrop-blur-xl">
+                <Button type="button" variant="ghost" size="iconSm" onClick={() => downloadImage(fullscreenImage)} aria-label="下载图片" title="下载图片" className="h-8 w-8"><Download size={15} /></Button>
+                <Button type="button" variant="ghost" size="iconSm" onClick={() => setFullscreenImage(null)} aria-label="关闭详情" title="关闭详情" className="h-8 w-8"><X size={16} /></Button>
+              </div>
+            </header>
+            <div className="flex min-h-0 flex-1 flex-col items-stretch md:flex-row">
+              <div className="relative flex min-h-[280px] min-w-0 flex-1 items-center justify-center overflow-hidden px-4 pb-4">
+                {fullscreenRecord?.mode === 'video' ? (
+                  <video src={fullscreenImage} controls playsInline className="max-h-full max-w-full rounded-md object-contain" />
+                ) : (
+                  <img src={fullscreenImage} alt={fullscreenRecord?.prompt || '全屏预览'} className="block max-h-full max-w-full rounded-md object-contain" />
+                )}
+              </div>
+              {fullscreenRecord && (
+                <div className="flex min-h-0 w-full flex-col border-t border-white/10 bg-black/45 text-white backdrop-blur-xl md:mb-4 md:mr-2 md:max-w-[400px] md:rounded-xl md:border md:border-white/10 md:shadow-lg">
+                  <div className="min-h-0 flex-1 space-y-2 overflow-y-auto p-3">
+                    <section className="max-h-[560px] space-y-3 rounded-lg bg-white/10 p-3">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-xs font-medium text-white/75">提示词</span>
+                        <Button type="button" variant="ghost" size="iconSm" onClick={() => void navigator.clipboard?.writeText(fullscreenRecord.prompt)} aria-label="复制提示词" title="复制提示词" className="h-7 w-7 text-white/70 hover:bg-white/10 hover:text-white"><Copy size={13} /></Button>
+                      </div>
+                      <p className="whitespace-pre-wrap text-sm leading-6 text-white">{fullscreenRecord.prompt || '暂无提示词'}</p>
+                    </section>
+                    <section className="space-y-3 rounded-lg bg-white/10 p-3">
+                      <span className="text-xs font-medium text-white/75">模型参数</span>
+                      <dl className="grid grid-cols-2 gap-x-3 gap-y-2 text-xs">
+                        <div className="flex min-w-0 items-center gap-2"><dt className="shrink-0 text-white/55">模型</dt><dd className="truncate font-medium text-white" title={fullscreenRecord.model}>{fullscreenRecord.model || '未记录'}</dd></div>
+                        <div className="flex min-w-0 items-center gap-2"><dt className="shrink-0 text-white/55">比例</dt><dd className="truncate font-medium text-white">{fullscreenRecord.ratio}</dd></div>
+                        <div className="flex min-w-0 items-center gap-2"><dt className="shrink-0 text-white/55">分辨率</dt><dd className="truncate font-medium text-white">{fullscreenRecord.resolution}</dd></div>
+                        <div className="flex min-w-0 items-center gap-2"><dt className="shrink-0 text-white/55">质量</dt><dd className="truncate font-medium text-white">{fullscreenRecord.quality}</dd></div>
+                      </dl>
+                    </section>
+                  </div>
+                </div>
+              )}
+            </div>
+          </aside>
+        </div>
+      )}
 
     </main>
   );

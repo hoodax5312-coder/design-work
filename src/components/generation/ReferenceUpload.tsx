@@ -1,4 +1,4 @@
-import { Image as ImageIcon } from 'lucide-react';
+import { Image as ImageIcon } from '@/lib/remixIconShim';
 import { cn } from '../../lib/utils';
 import { Label } from '../ui';
 
@@ -40,7 +40,7 @@ export function ReferenceUpload({
         onDragOver={(e) => e.preventDefault()}
         className={cn(
           'flex h-32 cursor-pointer flex-col items-center justify-center rounded-md border border-dashed bg-muted/35',
-          'transition-colors hover:border-primary hover:bg-primary/5',
+          'transition-colors hover:border-foreground/30',
           className
         )}
       >

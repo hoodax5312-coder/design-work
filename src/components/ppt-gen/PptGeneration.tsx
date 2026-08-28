@@ -8,7 +8,7 @@ import {
   Presentation,
   Sparkles,
   Wand2,
-} from 'lucide-react';
+} from '@/lib/remixIconShim';
 import { cn } from '../../lib/utils';
 import { Button, Card, Input, Select, Skeleton, Textarea } from '../ui';
 
@@ -127,8 +127,8 @@ export const PptGeneration = () => {
       <main className="ui-module-panel flex min-w-0 flex-1 flex-col">
         <header className="ui-module-toolbar h-10 shrink-0 bg-card/90 px-3 backdrop-blur">
           <div className="flex items-center gap-5">
-            <div><div className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">Deck status</div><div className="mt-0.5 text-sm font-semibold">{progressLabel}</div></div>
-            <div className="hidden gap-5 lg:flex">{slideStats.map(([label, value]) => <div key={label} className="pl-1"><div className="text-xs uppercase tracking-wider text-slate-400">{label}</div><div className="mt-0.5 max-w-32 truncate text-xs font-medium">{value}</div></div>)}</div>
+            <div><div className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">Deck status</div><div className="mt-0.5 text-sm font-semibold">{progressLabel}</div></div>
+            <div className="hidden gap-5 lg:flex">{slideStats.map(([label, value]) => <div key={label} className="pl-1"><div className="text-xs uppercase tracking-wider text-muted-foreground">{label}</div><div className="mt-0.5 max-w-32 truncate text-xs font-medium">{value}</div></div>)}</div>
           </div>
           <Button variant="secondary" size="sm" onClick={exportOutline} disabled={!slides.length}><Download size={14} /> 导出方案</Button>
         </header>
@@ -139,7 +139,7 @@ export const PptGeneration = () => {
             <div className="space-y-2">
               {slides.map((slide) => (
                 <Button key={slide.id} variant="ghost" onClick={() => setSelectedId(slide.id)} className={cn('h-auto w-full flex-col items-stretch border p-2 text-left', selectedId === slide.id ? 'border-primary bg-primary/10' : 'border-transparent')}>
-                  <div className="mb-1 text-xs font-medium text-slate-400">{String(slide.id).padStart(2, '0')}</div>
+                  <div className="mb-1 text-xs font-medium text-muted-foreground">{String(slide.id).padStart(2, '0')}</div>
                   <div className="aspect-video overflow-hidden rounded-lg bg-[#151719] p-3 text-white">
                     <div className="text-xs tracking-widest text-[#c8ff00]">{slide.kicker}</div>
                     <div className="mt-2 line-clamp-2 text-xs font-semibold leading-tight">{slide.title}</div>
@@ -165,7 +165,7 @@ export const PptGeneration = () => {
                     )}>{selectedSlide.title}</h2>
                     <p className="mt-4 max-w-[56%] whitespace-pre-line text-[clamp(12px,1vw,14px)] leading-relaxed opacity-65">{selectedSlide.body}</p>
                   </div>
-                  <div className="absolute bottom-[8%] left-[7%] right-[7%] flex items-center justify-between border-t pt-3 text-xs uppercase tracking-[0.18em] opacity-40" style={{ borderColor: `${selectedTheme.swatches[1]}30` }}><span>Design Work studio</span><span>{String(selectedSlide.id).padStart(2, '0')} / {String(slides.length).padStart(2, '0')}</span></div>
+                  <div className="absolute bottom-[8%] left-[7%] right-[7%] flex items-center justify-between border-t pt-3 text-xs uppercase tracking-[0.18em] opacity-40" style={{ borderColor: `${selectedTheme.swatches[1]}30` }}><span>LIZUO studio</span><span>{String(selectedSlide.id).padStart(2, '0')} / {String(slides.length).padStart(2, '0')}</span></div>
                 </div>
 
                 <div className="mt-5 grid grid-cols-[1fr_1.4fr] gap-3">

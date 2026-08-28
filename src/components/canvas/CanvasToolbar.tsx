@@ -12,7 +12,7 @@ import {
   Clapperboard,
   Network,
   Boxes
-} from 'lucide-react';
+} from '@/lib/remixIconShim';
 import { cn } from '../../lib/utils';
 import { useCanvasStore } from '../../stores/useCanvasStore';
 import { nanoid } from 'nanoid';

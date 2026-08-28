@@ -7,7 +7,7 @@ import {
   Star,
   Download,
   Folder
-} from 'lucide-react';
+} from '@/lib/remixIconShim';
 import { cn } from '../../lib/utils';
 import { Badge, Button, Input, Textarea } from '../ui';
 
@@ -26,8 +26,8 @@ export const InspirationDetailPanel = ({ item }: InspirationDetailPanelProps) =>
         <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-muted">
           <Folder size={24} className="text-muted-foreground" />
         </div>
-        <h3 className="text-sm font-medium text-slate-800 dark:text-white mb-1">未选择创意</h3>
-        <p className="text-xs text-slate-500 dark:text-slate-400">点击左侧列表中的创意查看详情</p>
+        <h3 className="mb-1 text-sm font-medium text-foreground">未选择创意</h3>
+        <p className="text-xs text-muted-foreground">点击左侧列表中的创意查看详情</p>
       </div>
     );
   }
@@ -35,7 +35,7 @@ export const InspirationDetailPanel = ({ item }: InspirationDetailPanelProps) =>
   return (
     <div className="flex w-80 flex-shrink-0 flex-col overflow-hidden border-l border-border bg-card">
       {/* Top Preview */}
-      <div className="aspect-video bg-slate-100 dark:bg-zinc-800 relative group">
+      <div className="group relative aspect-video bg-muted">
         <img 
           src={item.image} 
           alt={item.title} 
@@ -43,7 +43,7 @@ export const InspirationDetailPanel = ({ item }: InspirationDetailPanelProps) =>
         />
         <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors flex items-center justify-center opacity-0 group-hover:opacity-100">
            <Button variant="secondary" size="iconSm" className="shadow-sm">
-             <Share size={16} className="text-slate-700 dark:text-slate-200" />
+             <Share size={16} className="text-foreground" />
            </Button>
         </div>
       </div>
@@ -55,7 +55,7 @@ export const InspirationDetailPanel = ({ item }: InspirationDetailPanelProps) =>
           {['#1d2531', '#64748b', '#94a3b8', '#cbd5e1', '#e2e8f0'].map((color) => (
             <div 
               key={color} 
-              className="w-6 h-6 rounded-full border border-slate-200 dark:border-zinc-700 shadow-sm"
+              className="h-6 w-6 rounded-full border border-border shadow-sm"
               style={{ backgroundColor: color }}
             />
           ))}
@@ -77,8 +77,8 @@ export const InspirationDetailPanel = ({ item }: InspirationDetailPanelProps) =>
 
         {/* Link */}
         <div className="space-y-2">
-          <div className="flex items-center gap-2 px-3 py-2 bg-slate-50 dark:bg-zinc-800/50 rounded-lg border border-slate-100 dark:border-zinc-800">
-            <LinkIcon size={14} className="text-slate-400 flex-shrink-0" />
+          <div className="flex items-center gap-2 rounded-lg border border-border bg-muted px-3 py-2">
+            <LinkIcon size={14} className="flex-shrink-0 text-muted-foreground" />
             <Input
               type="text"
               placeholder="https://..."
@@ -90,7 +90,7 @@ export const InspirationDetailPanel = ({ item }: InspirationDetailPanelProps) =>
 
         {/* Tags */}
         <div className="space-y-2">
-          <label className="text-xs font-medium text-slate-500 dark:text-slate-400">标签</label>
+          <label className="text-xs font-medium text-muted-foreground">标签</label>
           <div className="flex flex-wrap gap-2">
             {tags.map(tag => (
               <Badge key={tag} variant="secondary" className="gap-1 text-xs">
@@ -108,9 +108,9 @@ export const InspirationDetailPanel = ({ item }: InspirationDetailPanelProps) =>
 
         {/* Folder */}
         <div className="space-y-2">
-          <label className="text-xs font-medium text-slate-500 dark:text-slate-400">文件夹</label>
-          <div className="flex items-center gap-2 px-3 py-2 bg-slate-50 dark:bg-zinc-800/50 rounded-lg border border-slate-100 dark:border-zinc-800">
-             <span className="text-xs text-slate-400">未分类</span>
+          <label className="text-xs font-medium text-muted-foreground">文件夹</label>
+          <div className="flex items-center gap-2 rounded-lg border border-border bg-muted px-3 py-2">
+             <span className="text-xs text-muted-foreground">未分类</span>
              <Button variant="ghost" size="iconSm" className="ml-auto h-7 w-7">
                <Plus size={14} />
              </Button>
@@ -118,12 +118,12 @@ export const InspirationDetailPanel = ({ item }: InspirationDetailPanelProps) =>
         </div>
 
         {/* Basic Info */}
-        <div className="space-y-3 pt-4 border-t border-slate-100 dark:border-zinc-800">
-          <h4 className="text-xs font-medium text-slate-500 dark:text-slate-400">基本信息</h4>
+        <div className="space-y-3 border-t border-border pt-4">
+          <h4 className="text-xs font-medium text-muted-foreground">基本信息</h4>
           
           <div className="space-y-2">
             <div className="flex items-center justify-between text-xs">
-              <span className="text-slate-400">评分</span>
+              <span className="text-muted-foreground">评分</span>
               <div className="flex gap-0.5">
                 {[1, 2, 3, 4, 5].map((i) => (
                   <Star 
@@ -131,7 +131,7 @@ export const InspirationDetailPanel = ({ item }: InspirationDetailPanelProps) =>
                     size={12} 
                     className={cn(
                       "cursor-pointer transition-colors",
-                      i <= rating ? "fill-amber-400 text-amber-400" : "text-slate-300 dark:text-zinc-700"
+                      i <= rating ? "fill-amber-400 text-amber-400" : "text-muted-foreground/40"
                     )}
                     onClick={() => setRating(i)}
                   />
@@ -140,30 +140,30 @@ export const InspirationDetailPanel = ({ item }: InspirationDetailPanelProps) =>
             </div>
             
             <div className="flex items-center justify-between text-xs">
-              <span className="text-slate-400">尺寸</span>
-              <span className="text-slate-600 dark:text-slate-300">1728 × 897</span>
+              <span className="text-muted-foreground">尺寸</span>
+              <span className="text-foreground">1728 × 897</span>
             </div>
             
             <div className="flex items-center justify-between text-xs">
-              <span className="text-slate-400">文件大小</span>
-              <span className="text-slate-600 dark:text-slate-300">500.59 KB</span>
+              <span className="text-muted-foreground">文件大小</span>
+              <span className="text-foreground">500.59 KB</span>
             </div>
             
             <div className="flex items-center justify-between text-xs">
-              <span className="text-slate-400">格式</span>
-              <span className="text-slate-600 dark:text-slate-300">PNG</span>
+              <span className="text-muted-foreground">格式</span>
+              <span className="text-foreground">PNG</span>
             </div>
             
             <div className="flex items-center justify-between text-xs">
-              <span className="text-slate-400">添加日期</span>
-              <span className="text-slate-600 dark:text-slate-300">2026/02/03 17:13</span>
+              <span className="text-muted-foreground">添加日期</span>
+              <span className="text-foreground">2026/02/03 17:13</span>
             </div>
           </div>
         </div>
       </div>
 
       {/* Footer Actions */}
-      <div className="p-4 border-t border-slate-200 dark:border-zinc-800">
+      <div className="border-t border-border p-4">
         <Button variant="secondary" className="w-full">
           <Download size={16} />
           导出

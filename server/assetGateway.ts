@@ -4,6 +4,8 @@ import type { SmartCollectionRules } from './repositories/SmartCollectionReposit
 import { MacOsFilePickerProvider } from './import/MacOsFilePickerProvider';
 import { FilePickerCancelledError, type FilePickerProvider } from './import/FilePickerProvider';
 import { FingerprintService } from './import/FingerprintService';
+import { randomUUID } from 'node:crypto';
+import { removeStoredGeneratedImage, storeGeneratedImage } from './generatedAssetStorage';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 
@@ -43,6 +45,18 @@ const mapFileReference = (row: Record<string, unknown>) => ({
   lastAccessibleAt: row.last_accessible_at == null ? null : Number(row.last_accessible_at),
 });
 
+const mapAssetWithPreview = (runtime: LibraryRuntime, asset: ReturnType<LibraryRuntime['assets']['get']>) => {
+  if (!asset) return asset;
+  const latestPreviewStatus = runtime.previews.repository.latest(asset.id, 'thumbnail:512')?.status;
+  const generatedSourceStatus = asset.userMetadata?.generatedSourceStatus;
+  return {
+    ...asset,
+    previewUrl: `/api/assets/${asset.id}/preview?size=512&v=${asset.updatedAt}`,
+    previewStatus: latestPreviewStatus ||
+      (generatedSourceStatus === 'unrecoverable' ? 'unrecoverable' : 'missing'),
+  };
+};
+
 export const createAssetRouter = (
   getRuntime: () => Promise<LibraryRuntime>,
   picker: FilePickerProvider = new MacOsFilePickerProvider(),
@@ -72,12 +86,7 @@ export const createAssetRouter = (
       });
       response.json({
         ...page,
-        items: page.items.map((asset) => ({
-          ...asset,
-          previewUrl: `/api/assets/${asset.id}/preview?size=512&v=${asset.updatedAt}`,
-          previewStatus:
-            runtime.previews.repository.latest(asset.id, 'thumbnail:512')?.status || 'missing',
-        })),
+        items: page.items.map((asset) => mapAssetWithPreview(runtime, asset)),
       });
     } catch (error) {
       next(error);
@@ -90,19 +99,41 @@ export const createAssetRouter = (
       const title = typeof request.body?.title === 'string' ? request.body.title.trim() : '';
       if (!type || !title) throw new Error('资产类型和标题不能为空');
       const runtime = await getRuntime();
-      response.status(201).json(
-        runtime.assets.create({
+      const userMetadata =
+        request.body.userMetadata && typeof request.body.userMetadata === 'object'
+          ? request.body.userMetadata as Record<string, unknown>
+          : {};
+      const generatedSource =
+        type === 'image' && typeof request.body.sourceUrl === 'string'
+          ? request.body.sourceUrl
+          : type === 'image' && typeof userMetadata.generatedUrl === 'string'
+            ? userMetadata.generatedUrl
+            : '';
+      const assetId = randomUUID();
+      const stored = generatedSource
+        ? await storeGeneratedImage(runtime.paths, generatedSource, assetId)
+        : null;
+      try {
+        const asset = runtime.assets.create({
+          id: assetId,
           type,
           title,
           description: typeof request.body.description === 'string' ? request.body.description : '',
+          contentHash: stored?.reference.contentHash,
+          sourceUrl: stored?.sourceUrl,
           primaryFolderId:
             typeof request.body.primaryFolderId === 'string' ? request.body.primaryFolderId : null,
-          userMetadata:
-            request.body.userMetadata && typeof request.body.userMetadata === 'object'
-              ? request.body.userMetadata
-              : {},
-        }),
-      );
+          userMetadata,
+          fileReference: stored?.reference,
+        });
+        if (stored && runtime.tasks.supportedTypes().includes('preview.image')) {
+          runtime.tasks.start('preview.image', { assetId, size: 512 }, `${assetId}:512`);
+        }
+        response.status(201).json(mapAssetWithPreview(runtime, asset));
+      } catch (error) {
+        if (stored) await removeStoredGeneratedImage(stored);
+        throw error;
+      }
     } catch (error) {
       next(error);
     }
@@ -418,7 +449,7 @@ export const createAssetRouter = (
         return;
       }
       response.json({
-        ...asset,
+        ...mapAssetWithPreview(runtime, asset),
         tags: runtime.tags.listForAsset(asset.id),
         files: runtime.database
           .prepare(

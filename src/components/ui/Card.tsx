@@ -2,13 +2,13 @@ import { forwardRef, type HTMLAttributes } from 'react';
 import { cva, type VariantProps } from 'class-variance-authority';
 import { cn } from '../../lib/utils';
 
-const cardVariants = cva('rounded-lg text-card-foreground transition-colors', {
+const cardVariants = cva('theme-card text-[var(--surface-card-foreground)] transition-[background-color,border-color,box-shadow,transform]', {
   variants: {
     variant: {
-      default: 'border border-border bg-card shadow-sm',
-      solid: 'border border-border bg-card',
-      ghost: 'border border-border bg-transparent',
-      elevated: 'border border-border bg-card shadow-lg',
+      default: '',
+      solid: '',
+      ghost: 'theme-card-ghost',
+      elevated: 'theme-card-elevated',
     },
     padding: {
       none: 'p-0',
@@ -47,7 +47,7 @@ const CardHeader = forwardRef<HTMLDivElement, HTMLAttributes<HTMLDivElement>>(
   ({ className, ...props }, ref) => (
     <div
       ref={ref}
-      className={cn('flex items-center gap-2 border-b border-border pb-3', className)}
+    className={cn('flex items-center gap-2 border-b-[var(--surface-card-border-width)] border-[var(--surface-card-border)] pb-3', className)}
       {...props}
     />
   )
@@ -59,7 +59,7 @@ const CardTitle = forwardRef<HTMLHeadingElement, HTMLAttributes<HTMLHeadingEleme
   ({ className, ...props }, ref) => (
     <h3
       ref={ref}
-      className={cn('text-sm font-medium text-card-foreground', className)}
+    className={cn('text-sm font-medium text-[var(--surface-card-foreground)]', className)}
       {...props}
     />
   )
@@ -84,7 +84,7 @@ const CardFooter = forwardRef<HTMLDivElement, HTMLAttributes<HTMLDivElement>>(
   ({ className, ...props }, ref) => (
     <div
       ref={ref}
-      className={cn('flex items-center gap-2 border-t border-border pt-3', className)}
+      className={cn('flex items-center gap-2 border-t-[var(--surface-card-border-width)] border-[var(--surface-card-border)] pt-3', className)}
       {...props}
     />
   )

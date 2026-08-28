@@ -1,14 +1,13 @@
 import {
   ArrowRight,
-  Boxes,
   Film,
   Image as ImageIcon,
-  Infinity as InfinityIcon,
   Presentation,
-  Video,
-} from 'lucide-react';
+  Scissors,
+  Sparkles,
+} from '@/lib/remixIconShim';
 import { AppShell } from './components/layout/AppShell';
-import { Canvas } from './components/canvas/Canvas';
+import { CanvasProjectPage } from './components/canvas/CanvasProjectPage';
 import { ImageGeneration } from './components/image-gen/ImageGeneration';
 import { VideoGeneration } from './components/video-gen/VideoGeneration';
 import { PptGeneration } from './components/ppt-gen/PptGeneration';
@@ -19,7 +18,7 @@ import { WorkflowModal } from './components/modals/WorkflowModal';
 import { SettingsPage } from './components/settings/SettingsPage';
 import { useUIStore } from './stores/useUIStore';
 import { type ModuleType } from './stores/useUIStore';
-import { Badge, Button, Card } from './components/ui';
+import { Badge, Card } from './components/ui';
 
 const ModulePlaceholder = ({ title, description }: { title: string; description: string }) => (
   <div className="module-workspace flex h-full w-full items-center justify-center px-6 text-center">
@@ -38,18 +37,18 @@ const toolCards: Array<{
   tag: string;
 }> = [
   {
-    title: '无限画板',
-    description: '在无限空间中组织灵感、图像、分镜和生成节点，组装完整创作流。',
-    module: 'magic-canvas',
-    icon: InfinityIcon,
-    tag: '创作中枢',
+    title: '电商详情页',
+    description: '生成适配电商场景的商品详情内容与视觉素材。',
+    module: 'ecommerce',
+    icon: ImageIcon,
+    tag: '电商工具',
   },
   {
-    title: '图像生成',
-    description: '输入提示词、参考图和比例参数，快速生成静态视觉资产。',
-    module: 'image-gen',
-    icon: ImageIcon,
-    tag: '图片创作',
+    title: '抠图去背景',
+    description: '快速分离主体与背景，获得干净透明的商品素材。',
+    module: 'background-remove',
+    icon: Scissors,
+    tag: '图片处理',
   },
   {
     title: 'PPT 生成',
@@ -59,18 +58,11 @@ const toolCards: Array<{
     tag: '演示设计',
   },
   {
-    title: '视频生成',
-    description: '从主题脚本生成分镜、运镜、旁白和视频片段规划。',
-    module: 'video-gen',
-    icon: Video,
-    tag: '视频工作台',
-  },
-  {
-    title: '资产库',
-    description: '统一管理图片、视频、提示词、参考稿和项目产出，支持标签与收藏。',
-    module: 'assets',
-    icon: Boxes,
-    tag: '创意资产',
+    title: '产品图精修',
+    description: '优化产品图质感、光影和细节，统一视觉呈现。',
+    module: 'product-retouch',
+    icon: Sparkles,
+    tag: '图片处理',
   },
 ];
 
@@ -78,33 +70,19 @@ const ToolsHub = () => {
   const setActiveModule = useUIStore((state) => state.setActiveModule);
 
   return (
-    <div className="module-workspace h-full overflow-y-auto p-4 text-foreground sm:p-6 lg:p-8">
-      <div className="mx-auto max-w-7xl">
-        <div className="relative mb-6 border-b border-black/[0.06] px-1 pb-6 dark:border-white/[0.08]">
-          <h1 className="max-w-3xl text-3xl font-semibold leading-tight tracking-[-0.035em]">
-            让 AI 帮你整理、理解和再利用设计资产。
-          </h1>
-          <p className="mt-4 max-w-2xl text-sm leading-6 text-muted-foreground">
-            图片、视频、演示文稿和无限画板都是资产库的辅助能力，所有生成结果都会回到资产库继续归档与分享。
-          </p>
-          <div className="mt-5 flex flex-wrap gap-3">
-            <Button type="button" variant="primary" onClick={() => setActiveModule('assets')} className="h-8">
-              <Boxes size={16} /> 返回资产库
-            </Button>
-            <Button type="button" variant="secondary" onClick={() => setActiveModule('magic-canvas')} className="h-8">
-              <InfinityIcon size={16} /> 打开无限画板
-            </Button>
-          </div>
-        </div>
-
+    <div className="module-workspace h-full overflow-y-auto px-8 pb-4 pt-6 text-foreground sm:pb-6 lg:pb-8">
+      <div className="w-full">
         <div className="mb-4 flex items-end justify-between">
           <div>
-            <h2 className="text-xl font-semibold tracking-[-0.02em]">辅助创作能力</h2>
+            <h2 className="text-xl font-semibold tracking-[-0.02em]">工具</h2>
           </div>
           <div className="hidden items-center gap-2 text-xs text-muted-foreground md:flex"><Film size={14} /> 所有产出自动进入资产库</div>
         </div>
 
-        <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-5">
+        <div
+          className="grid w-full gap-3"
+          style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 320px), 1fr))' }}
+        >
           {toolCards.map((card) => {
             const Icon = card.icon;
 
@@ -113,7 +91,7 @@ const ToolsHub = () => {
                 key={card.title}
                 onClick={() => setActiveModule(card.module)}
                 onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') setActiveModule(card.module); }}
-                className="module-card group flex min-h-[200px] cursor-pointer flex-col rounded-lg p-4 text-left transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                className="module-card group flex min-h-[200px] w-full cursor-pointer flex-col p-4 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               >
                 <div className="mb-5 flex items-center justify-between">
                   <div className="grid h-10 w-10 place-items-center rounded-md bg-foreground text-background transition-colors group-hover:bg-muted group-hover:text-foreground">
@@ -144,19 +122,25 @@ function App() {
 
   return (
     <AppShell>
-        {activeModule === 'magic-canvas' && <Canvas />}
-        {activeModule === 'image-gen' && <ImageGeneration />}
+        {activeModule === 'magic-canvas' && <CanvasProjectPage />}
+        <div className={activeModule === 'image-gen' ? 'contents' : 'hidden'}>
+          <ImageGeneration />
+        </div>
         {activeModule === 'ppt-gen' && <PptGeneration />}
-        {activeModule === 'video-gen' && <VideoGeneration />}
+        <div className={activeModule === 'video-gen' ? 'contents' : 'hidden'}>
+          <VideoGeneration />
+        </div>
         {activeModule === 'projects' && <SourceCenter initialSection="documents" />}
         {activeModule === 'ecommerce' && <Ecommerce />}
+        {activeModule === 'background-remove' && <ModulePlaceholder title="抠图去背景" description="上传图片后即可进行主体分离与背景移除。" />}
+        {activeModule === 'product-retouch' && <ModulePlaceholder title="产品图精修" description="上传产品图后即可进行光影、质感与细节优化。" />}
         {activeModule === 'assets' && <AssetLibraryPage />}
         {activeModule === 'tools' && <ToolsHub />}
         {activeModule === 'sources' && <SourceCenter />}
         {activeModule === 'exports' && <ExportCenter />}
         {activeModule === 'settings' && <SettingsPage />}
         {/* Render Canvas as fallback or specific placeholders for other modules */}
-        {activeModule !== 'magic-canvas' && activeModule !== 'image-gen' && activeModule !== 'ppt-gen' && activeModule !== 'video-gen' && activeModule !== 'projects' && activeModule !== 'ecommerce' && activeModule !== 'assets' && activeModule !== 'tools' && activeModule !== 'sources' && activeModule !== 'exports' && activeModule !== 'settings' && (
+        {activeModule !== 'magic-canvas' && activeModule !== 'image-gen' && activeModule !== 'ppt-gen' && activeModule !== 'video-gen' && activeModule !== 'projects' && activeModule !== 'ecommerce' && activeModule !== 'background-remove' && activeModule !== 'product-retouch' && activeModule !== 'assets' && activeModule !== 'tools' && activeModule !== 'sources' && activeModule !== 'exports' && activeModule !== 'settings' && (
           <ModulePlaceholder title="模块建设中" description="这个入口还没有接入具体页面。" />
         )}
         <WorkflowModal />

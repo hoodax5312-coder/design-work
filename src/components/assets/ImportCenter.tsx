@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { AlertTriangle, Check, FilePlus2, X } from 'lucide-react';
+import { AlertTriangle, Check, FilePlus2, X } from '@/lib/remixIconShim';
 import { assetService } from '../../services/assetService';
 import type { ImportItem, ImportSession } from '../../types/asset.types';
 import { Alert, AlertDescription, Badge, Button, Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, Select } from '../ui';
@@ -92,7 +92,7 @@ export const ImportCenter = ({
                   >
                     <div className="min-w-0">
                       <div className="flex items-center gap-2">
-                        <span className={conflict ? 'text-amber-500' : 'text-[#c8ff00]'}>
+                        <span className={conflict ? 'text-amber-500' : 'text-primary'}>
                           {conflict ? <AlertTriangle size={14} /> : <Check size={14} />}
                         </span>
                         <span className="truncate text-xs font-semibold">{item.fileName}</span>

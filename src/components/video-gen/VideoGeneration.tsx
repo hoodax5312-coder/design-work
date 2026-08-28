@@ -25,9 +25,9 @@ import {
   UploadCloud,
   Wand2,
   X,
-} from 'lucide-react';
+} from '@/lib/remixIconShim';
 import { cn } from '../../lib/utils';
-import { getActiveProvider, getSelectedModel, useProviderStore } from '../../stores/useProviderStore';
+import { getSelectedModel, providerSupportsCategory, useProviderStore } from '../../stores/useProviderStore';
 import { useUIStore } from '../../stores/useUIStore';
 import { contentFeed, type GeneratedContentItem } from '../../services/contentFeed';
 import { assetService, waitForTask } from '../../services/assetService';
@@ -105,7 +105,9 @@ export const VideoGeneration = () => {
 };
 
 const VideoStudio = ({ onOpenLibrary }: { onOpenLibrary: () => void }) => {
-  const provider = useProviderStore(getActiveProvider);
+  const providers = useProviderStore((state) => state.providers);
+  const activeProviderId = useProviderStore((state) => state.activeProviderIds.video);
+  const provider = providers.find((item) => item.id === activeProviderId && providerSupportsCategory(item, 'video'));
   const videoModel = getSelectedModel(provider, 'video');
   const [prompt, setPrompt] = useState('');
   const [resolution, setResolution] = useState<(typeof RESOLUTION_OPTIONS)[number]>('1080P');
@@ -344,7 +346,7 @@ const VideoStudio = ({ onOpenLibrary }: { onOpenLibrary: () => void }) => {
 
             {shots.length === 0 ? (
               <div className="flex min-h-[320px] flex-col items-center justify-center rounded-lg border border-dashed border-border bg-muted/35 text-center">
-                <div className="mb-5 flex h-16 w-16 items-center justify-center rounded-lg bg-primary/15 text-foreground">
+                <div className="mb-5 flex h-16 w-16 items-center justify-center rounded-lg bg-muted text-muted-foreground">
                   <Film size={32} />
                 </div>
                 <h3 className="text-lg font-bold">从一个主题开始生成完整故事视频</h3>
@@ -390,7 +392,7 @@ const VideoStudio = ({ onOpenLibrary }: { onOpenLibrary: () => void }) => {
             )}
           </section>
 
-          <aside className="min-w-0 overflow-y-auto border-0 bg-white p-4 dark:bg-[#0b0b0b]">
+          <aside className="min-w-0 overflow-y-auto border-0 bg-card p-4 text-card-foreground">
             {selectedShot ? (
               <div className="space-y-4">
                 <Card padding="none" className="overflow-hidden">
@@ -481,7 +483,7 @@ const ProjectCover = ({
 
   if (!src || failed) {
     return (
-      <div className="absolute inset-0 grid place-items-center bg-[var(--surface-control)] text-muted-foreground">
+      <div className="absolute inset-0 grid place-items-center bg-[var(--surface-control)] text-[var(--surface-control-foreground)]">
         <Film aria-hidden="true" size={28} />
       </div>
     );
@@ -545,7 +547,7 @@ const VideoLibraryTabs = ({
   onProjects: () => void;
 }) => (
   <Tabs value={activeTab} onValueChange={(value) => value === 'assets' ? onAssets() : onProjects()}>
-    <TabsList aria-label="视频内容" className="h-8 gap-0 rounded-lg bg-[#f8f8f6] p-0.5 shadow-none dark:bg-[var(--surface-control)]">
+    <TabsList aria-label="视频内容" className="h-8 gap-0 rounded-lg bg-muted p-0.5 shadow-none">
       <TabsTrigger value="assets" className="h-7 border-0 px-3 text-xs font-semibold shadow-none data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm">素材</TabsTrigger>
       <TabsTrigger value="projects" className="h-7 border-0 px-3 text-xs font-semibold shadow-none data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm">工程</TabsTrigger>
     </TabsList>
@@ -557,7 +559,7 @@ const VideoAssetLibrary = ({ onCreate }: { onCreate: () => void }) => {
   const [query, setQuery] = useState('');
 
   return (
-    <div className="video-library-shell module-workspace flex h-full min-w-0 flex-col overflow-hidden !bg-white text-foreground dark:!bg-[var(--workspace-bg)]">
+    <div className="video-library-shell module-workspace flex h-full min-w-0 flex-col overflow-hidden bg-background text-foreground">
       <header className="mx-16 flex h-14 shrink-0 items-center justify-between gap-4">
         <VideoLibraryTabs
           activeTab={activeTab}
@@ -570,12 +572,12 @@ const VideoAssetLibrary = ({ onCreate }: { onCreate: () => void }) => {
             value={query}
             onChange={(event) => setQuery(event.target.value)}
             placeholder={activeTab === 'assets' ? '搜索视频标题和描述…' : '搜索视频工程…'}
-            className="h-8 border-0 bg-[#f3f3f1] py-0 pl-9 pr-9 shadow-none focus-visible:ring-1 focus-visible:ring-black/10 dark:bg-[var(--surface-control)] dark:focus-visible:ring-white/15"
+            className="h-8 border border-neutral-border bg-neutral-surface py-0 pl-9 pr-9 text-neutral-foreground placeholder:text-muted-foreground shadow-none focus-visible:ring-1 focus-visible:ring-neutral-border"
           />
           {query && <Button type="button" variant="ghost" size="iconSm" onClick={() => setQuery('')} aria-label="清空搜索" className="absolute right-0.5 top-1/2 h-6 w-6 -translate-y-1/2"><X size={13} /></Button>}
         </div>
       </header>
-      <div className="mx-16 mb-0 flex min-h-0 flex-1 overflow-hidden rounded-xl bg-[#f8f8f6] p-2 dark:bg-[var(--surface-bg)]">
+      <div className="mx-16 mb-0 flex min-h-0 flex-1 overflow-hidden rounded-xl bg-card p-2 text-card-foreground">
         {activeTab === 'assets'
           ? <VideoAssetCatalog query={query} />
           : <VideoProjectLibrary onCreate={onCreate} query={query} />}
@@ -655,7 +657,7 @@ export const VideoProjectLibrary = ({ onCreate, query }: { onCreate: () => void;
             aria-expanded={projectTypeOpen}
             aria-controls="project-type-menu"
             title="切换项目类型"
-            className="ml-0.5 h-7 w-7 text-muted-foreground hover:bg-black/[0.05] hover:text-foreground dark:hover:bg-white/[0.08]"
+            className="ml-0.5 h-7 w-7 text-muted-foreground hover:bg-accent hover:text-accent-foreground"
           >
             <ChevronDown size={14} className={cn('transition-transform', projectTypeOpen && 'rotate-180')} />
           </Button>
@@ -666,7 +668,7 @@ export const VideoProjectLibrary = ({ onCreate, query }: { onCreate: () => void;
             onClick={onCreate}
             aria-label="创建工程"
             title="创建工程"
-            className="ml-auto h-7 w-7 text-muted-foreground hover:bg-black/[0.05] hover:text-foreground dark:hover:bg-white/[0.08]"
+            className="ml-auto h-7 w-7 text-muted-foreground hover:bg-accent hover:text-accent-foreground"
           >
             <Plus size={15} />
           </Button>
@@ -674,7 +676,7 @@ export const VideoProjectLibrary = ({ onCreate, query }: { onCreate: () => void;
             <div
               id="project-type-menu"
               role="menu"
-              className="absolute left-4 top-10 z-30 w-36 rounded-lg border border-black/[0.05] bg-background p-1.5 shadow-lg dark:border-white/[0.07]"
+              className="absolute left-4 top-10 z-30 w-36 rounded-lg border border-border bg-popover p-1.5 text-popover-foreground shadow-lg"
             >
               {[
                 { id: 'visual' as const, label: '视觉设计' },
@@ -694,8 +696,8 @@ export const VideoProjectLibrary = ({ onCreate, query }: { onCreate: () => void;
                     setProjectTypeOpen(false);
                   }}
                   className={cn(
-                    'h-8 w-full justify-start px-2.5 text-xs font-medium hover:bg-black/[0.05] hover:text-foreground dark:hover:bg-white/[0.08]',
-                    projectType === option.id && 'bg-black/[0.06] text-foreground dark:bg-white/[0.1]',
+                    'h-8 w-full justify-start px-2.5 text-xs font-medium hover:bg-accent hover:text-accent-foreground',
+                    projectType === option.id && 'bg-accent text-accent-foreground',
                   )}
                 >
                   {option.label}
@@ -708,9 +710,9 @@ export const VideoProjectLibrary = ({ onCreate, query }: { onCreate: () => void;
           {visibleProjects.map((project) => {
             const isSelected = selectedProjectId === project.id;
             return (
-              <Button key={project.id} type="button" variant="ghost" onClick={() => { setSelectedProjectId(project.id); setIsPlaying(false); }} className={cn('group relative block h-auto w-full overflow-hidden rounded-lg border-0 bg-background/80 p-0 text-left shadow-none transition-[transform,box-shadow] hover:-translate-y-0.5 hover:bg-background hover:shadow-md focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-foreground/30', isSelected && 'ring-2 ring-inset ring-foreground/80')}>
+              <Button key={project.id} type="button" variant="ghost" onClick={() => { setSelectedProjectId(project.id); setIsPlaying(false); }} className={cn('group relative block h-auto w-full overflow-hidden rounded-lg border border-border bg-background p-0 text-left shadow-none transition-[border-color] hover:border-foreground/25 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-foreground/30', isSelected && 'ring-2 ring-inset ring-foreground/80')}>
                 <div className="relative aspect-video w-full overflow-hidden rounded-lg bg-[var(--surface-control)]">
-                  <ProjectCover src={project.thumbnail} alt={`${project.title} 视频封面`} className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105" />
+                  <ProjectCover src={project.thumbnail} alt={`${project.title} 视频封面`} className="h-full w-full object-cover" />
                   <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/10 to-transparent opacity-0 transition-opacity duration-200 group-hover:opacity-100 group-focus-visible:opacity-100" />
                   <h2 className="absolute inset-x-3 bottom-3 translate-y-1 truncate text-sm font-semibold text-white opacity-0 transition-[opacity,transform] duration-200 group-hover:translate-y-0 group-hover:opacity-100 group-focus-visible:translate-y-0 group-focus-visible:opacity-100">{project.title}</h2>
                 </div>
@@ -721,7 +723,7 @@ export const VideoProjectLibrary = ({ onCreate, query }: { onCreate: () => void;
         </div>
       </aside>}
       <section className="flex min-h-0 min-w-0 flex-col overflow-hidden rounded-lg bg-background">
-        <header className="flex h-11 min-w-0 shrink-0 items-center border-b border-black/[0.06] px-6 dark:border-white/[0.1]">
+        <header className="flex h-11 min-w-0 shrink-0 items-center border-b border-border px-6">
           <Button
             type="button"
             variant="ghost"
@@ -729,11 +731,11 @@ export const VideoProjectLibrary = ({ onCreate, query }: { onCreate: () => void;
             onClick={() => setProjectPanelOpen((open) => !open)}
             aria-label={projectPanelOpen ? '收起项目列表' : '展开项目列表'}
             title={projectPanelOpen ? '收起项目列表' : '展开项目列表'}
-            className="h-7 w-7 text-muted-foreground hover:bg-black/[0.05] dark:hover:bg-white/[0.08]"
+            className="h-7 w-7 text-muted-foreground hover:bg-accent hover:text-accent-foreground"
           >
             {projectPanelOpen ? <PanelLeftClose size={15} /> : <PanelLeftOpen size={15} />}
           </Button>
-          <span aria-hidden="true" className="mx-3 h-4 w-px bg-black/[0.06] dark:bg-white/[0.07]" />
+          <span aria-hidden="true" className="mx-3 h-4 w-px bg-border" />
           <h2 className="shrink-0 text-sm font-semibold tracking-[-0.01em]">{selectedProject.title}</h2>
           <div className="ml-4 flex min-w-0 items-center gap-4 overflow-hidden whitespace-nowrap text-xs text-muted-foreground">
             <span>时间 {selectedProjectMeta.updatedDate}</span>
@@ -809,7 +811,7 @@ const ProjectMaterials = ({
                     <article key={`${group.id}-${asset.id}`} className="overflow-hidden rounded-lg bg-muted/70">
                       <div className="relative aspect-video overflow-hidden bg-[#202020]">
                         {assetPreviewUrl(asset)
-                          ? <img src={assetPreviewUrl(asset)} alt={asset.title} className="h-full w-full object-cover transition-transform duration-300 hover:scale-[1.03]" />
+                          ? <img src={assetPreviewUrl(asset)} alt={asset.title} className="h-full w-full object-cover" />
                           : <Icon aria-hidden="true" className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 text-white/35" size={20} />}
                       </div>
                       <p className="truncate px-2.5 py-2 text-xs font-medium">{asset.title}</p>
@@ -981,15 +983,15 @@ export const VideoAssetCatalog = ({ query }: { query: string }) => {
   return (
     <>
       <div className="flex min-h-0 flex-1 gap-3 text-foreground">
-      {filterPanelOpen && <aside aria-label="视频筛选" className="asset-filter-panel flex h-full w-[200px] shrink-0 flex-col overflow-hidden bg-transparent text-card-foreground">
+      {filterPanelOpen && <aside aria-label="视频筛选" className="asset-filter-panel flex h-full w-[200px] shrink-0 flex-col overflow-hidden bg-sidebar text-sidebar-foreground">
         <header className="flex h-11 shrink-0 items-center px-4">
           <h2 className="text-sm font-semibold tracking-[-0.01em]">筛选</h2>
         </header>
         <nav className="min-h-0 flex-1 overflow-y-auto px-4 pb-3" aria-label="视频标签筛选">
           <section className="px-0 py-1">
             <div className="flex h-8 items-center justify-between">
-              <span className="text-[12px] font-semibold tracking-[0.04em] text-muted-foreground">标签</span>
-              <Button type="button" variant="ghost" size="iconSm" aria-label="新建视频标签" className="-mr-3 h-7 w-7 hover:bg-black/[0.05] hover:text-foreground dark:hover:bg-white/[0.08]"><Plus size={14} /></Button>
+              <span className="text-[12px] font-semibold tracking-[0.04em] text-sidebar-foreground/70">标签</span>
+              <Button type="button" variant="ghost" size="iconSm" aria-label="新建视频标签" className="-mr-3 h-7 w-7 text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"><Plus size={14} /></Button>
             </div>
             <div className="space-y-1">
               {tagOptions.map((tag) => (
@@ -1001,12 +1003,12 @@ export const VideoAssetCatalog = ({ query }: { query: string }) => {
                   onClick={() => setActiveTag(tag.id)}
                   aria-current={activeTag === tag.id ? 'page' : undefined}
                   className={cn(
-                    '-mx-3 h-8 w-[calc(100%+1.5rem)] justify-between px-3 text-sm font-semibold hover:bg-black/[0.08] hover:text-foreground dark:hover:bg-white/[0.12]',
-                    activeTag === tag.id && 'bg-foreground text-background hover:bg-foreground/90 hover:text-background',
+                    '-mx-3 h-8 w-[calc(100%+1.5rem)] justify-between px-3 text-sm font-semibold hover:bg-sidebar-accent hover:text-sidebar-accent-foreground',
+                    activeTag === tag.id && 'bg-sidebar-accent text-sidebar-accent-foreground',
                   )}
                 >
                   <span>{tag.label}</span>
-                  <span className={cn('w-6 text-right text-sm font-semibold tabular-nums text-muted-foreground', activeTag === tag.id && 'text-background/70')}>{tag.count}</span>
+                  <span className={cn('w-6 text-right text-sm font-semibold tabular-nums text-sidebar-foreground/70', activeTag === tag.id && 'text-sidebar-accent-foreground/70')}>{tag.count}</span>
                 </Button>
               ))}
             </div>
@@ -1015,12 +1017,12 @@ export const VideoAssetCatalog = ({ query }: { query: string }) => {
       </aside>}
 
       <main className="flex min-w-0 flex-1 flex-col overflow-hidden rounded-lg bg-background">
-        <header className="relative flex h-11 shrink-0 items-center justify-between border-b border-black/[0.06] px-6 dark:border-white/[0.1]">
+        <header className="relative flex h-11 shrink-0 items-center justify-between border-b border-border px-6">
           <div className="flex items-center gap-3">
-            <Button type="button" variant="ghost" size="iconSm" onClick={() => setFilterPanelOpen((open) => !open)} aria-label={filterPanelOpen ? '收起筛选' : '展开筛选'} className="h-7 w-7 text-muted-foreground hover:bg-black/[0.05] dark:hover:bg-white/[0.08]">
+            <Button type="button" variant="ghost" size="iconSm" onClick={() => setFilterPanelOpen((open) => !open)} aria-label={filterPanelOpen ? '收起筛选' : '展开筛选'} className="h-7 w-7 text-muted-foreground hover:bg-accent hover:text-accent-foreground">
               {filterPanelOpen ? <PanelLeftClose size={15} /> : <PanelLeftOpen size={15} />}
             </Button>
-            <span aria-hidden="true" className="h-4 w-px bg-black/[0.06] dark:bg-white/[0.07]" />
+            <span aria-hidden="true" className="h-4 w-px bg-border" />
             <h1 className="text-sm font-semibold tracking-[-0.01em]">{activeTagLabel}</h1>
           </div>
           <div className="relative flex items-center gap-1">
@@ -1035,7 +1037,7 @@ export const VideoAssetCatalog = ({ query }: { query: string }) => {
               aria-label="导入素材"
               title="导入素材"
               aria-expanded={dropZoneOpen}
-              className="h-8 w-8 text-muted-foreground hover:bg-black/[0.05] hover:text-foreground dark:hover:bg-white/[0.08]"
+              className="h-8 w-8 text-muted-foreground hover:bg-accent hover:text-accent-foreground"
             >
               <Plus size={16} className={cn('transition-transform', dropZoneOpen && 'rotate-45')} />
             </Button>
@@ -1046,13 +1048,13 @@ export const VideoAssetCatalog = ({ query }: { query: string }) => {
               onClick={() => setSortOpen((open) => !open)}
               aria-expanded={sortOpen}
               aria-controls="video-asset-sort-menu"
-              className="h-8 gap-1 px-2 text-xs font-medium text-muted-foreground hover:bg-black/[0.04] hover:text-foreground dark:hover:bg-white/[0.06]"
+              className="h-8 gap-1 px-2 text-xs font-medium text-muted-foreground hover:bg-accent hover:text-accent-foreground"
             >
               排序
               <ChevronDown size={13} className={cn('transition-transform', sortOpen && 'rotate-180')} />
             </Button>
             {sortOpen && (
-              <div id="video-asset-sort-menu" className="absolute right-0 top-10 z-30 w-48 rounded-lg border border-black/[0.04] bg-background p-1.5 shadow-lg dark:border-white/[0.06]">
+              <div id="video-asset-sort-menu" className="absolute right-0 top-10 z-30 w-48 rounded-lg border border-border bg-popover p-1.5 text-popover-foreground shadow-lg">
                 {sortOptions.map((option) => (
                   <Button
                     key={option.id}
@@ -1065,8 +1067,8 @@ export const VideoAssetCatalog = ({ query }: { query: string }) => {
                     }}
                     aria-pressed={sort === option.id}
                     className={cn(
-                      'h-9 w-full justify-between hover:bg-black/[0.05] hover:text-foreground dark:hover:bg-white/[0.08]',
-                      sort === option.id && 'bg-black/[0.06] text-foreground shadow-none dark:bg-white/[0.1]',
+                      'h-9 w-full justify-between hover:bg-accent hover:text-accent-foreground',
+                      sort === option.id && 'bg-accent text-accent-foreground shadow-none',
                     )}
                   >
                     <span className="text-xs font-semibold">{option.label}</span>
@@ -1081,8 +1083,8 @@ export const VideoAssetCatalog = ({ query }: { query: string }) => {
         {dropZoneOpen && (
           <section
             className={cn(
-              'mx-6 mt-6 flex min-h-[220px] shrink-0 cursor-pointer flex-col items-center justify-center rounded-lg border border-dashed border-black/[0.12] bg-black/[0.02] px-6 text-center transition-colors dark:border-[var(--surface-border-strong)] dark:bg-[var(--surface-subtle)]',
-              draggingFiles && 'border-foreground/40 bg-black/[0.06] dark:bg-white/[0.08]',
+              'mx-6 mt-6 flex min-h-[220px] shrink-0 cursor-pointer flex-col items-center justify-center rounded-lg border border-dashed border-border bg-muted/40 px-6 text-center transition-colors',
+              draggingFiles && 'border-ring bg-accent',
             )}
             onClick={() => fileInputRef.current?.click()}
             onDragEnter={(event) => {

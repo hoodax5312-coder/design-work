@@ -1,4 +1,4 @@
-import { LayoutGrid, PanelLeft, Sun, Moon, Settings } from 'lucide-react';
+import { LayoutGrid, PanelLeft, Sun, Moon, Settings } from '@/lib/remixIconShim';
 import { useUIStore } from '../../stores/useUIStore';
 import { Button, Separator } from '../ui';
 
@@ -10,10 +10,10 @@ export const Header = () => {
       {/* Left: Logo & Sidebar Toggle */}
       <div className="flex items-center gap-3">
         <div className="flex items-center gap-2">
-          <div className="flex h-5 w-5 items-center justify-center rounded bg-[#c8ff00] text-black">
+          <div className="flex h-5 w-5 items-center justify-center rounded bg-primary text-primary-foreground">
             <LayoutGrid size={12} />
           </div>
-          <span className="font-bold text-sm text-slate-800 dark:text-white">Design Work</span>
+          <span className="text-sm font-bold text-foreground">栗作 LIZUO</span>
         </div>
         
         <Separator orientation="vertical" className="h-3" />

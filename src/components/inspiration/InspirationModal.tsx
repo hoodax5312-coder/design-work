@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Upload, Save, User, MapPin, Box, Palette, Wrench, MoreHorizontal } from 'lucide-react';
+import { Upload, Save, User, MapPin, Box, Palette, Wrench, MoreHorizontal } from '@/lib/remixIconShim';
 import { Button, Dialog, DialogContent, DialogTitle, Input, Select, Tabs, TabsList, TabsTrigger, Textarea } from '../ui';
 
 interface InspirationModalProps {
@@ -35,7 +35,7 @@ export const InspirationModal = ({ isOpen, onClose, initialData, onSave }: Inspi
                 </DialogTitle>
                 
                 {/* Image Upload/Preview */}
-                <div className="group relative flex aspect-[4/3] cursor-pointer flex-col items-center justify-center overflow-hidden rounded-lg border border-dashed border-border bg-card transition-colors hover:border-primary">
+                <div className="group relative flex aspect-[4/3] cursor-pointer flex-col items-center justify-center overflow-hidden rounded-lg border border-dashed border-border bg-card transition-colors hover:border-foreground/30">
                   {initialData ? (
                     <img src={initialData.image} className="w-full h-full object-cover" />
                   ) : (
@@ -58,7 +58,7 @@ export const InspirationModal = ({ isOpen, onClose, initialData, onSave }: Inspi
                   />
 
                 <div className="space-y-2">
-                  <label className="text-xs font-medium text-slate-500">分类</label>
+                  <label className="text-xs font-medium text-muted-foreground">分类</label>
                   <div className="grid grid-cols-3 gap-2">
                     {[
                       { label: '人物', icon: User },
@@ -80,7 +80,7 @@ export const InspirationModal = ({ isOpen, onClose, initialData, onSave }: Inspi
                   />
 
                 <div className="space-y-1">
-                  <label className="text-xs font-medium text-slate-500">模式</label>
+                  <label className="text-xs font-medium text-muted-foreground">模式</label>
                   <Tabs defaultValue="standard"><TabsList className="w-full"><TabsTrigger value="standard" className="flex-1 text-xs">Standard</TabsTrigger><TabsTrigger value="bp" className="flex-1 text-xs">BP</TabsTrigger></TabsList></Tabs>
                 </div>
 

@@ -13,7 +13,7 @@ const defaultExecutor: ScriptExecutor = (arguments_) =>
   });
 
 const FILE_SCRIPT = `
-set selectedFiles to choose file with prompt "选择要导入 Design Work 的文件" with multiple selections allowed
+set selectedFiles to choose file with prompt "选择要导入栗作的文件" with multiple selections allowed
 set output to ""
 repeat with selectedFile in selectedFiles
   set output to output & POSIX path of selectedFile & linefeed
@@ -21,7 +21,7 @@ end repeat
 return output
 `;
 
-const DIRECTORY_SCRIPT = 'POSIX path of (choose folder with prompt "选择要导入 Design Work 的文件夹")';
+const DIRECTORY_SCRIPT = 'POSIX path of (choose folder with prompt "选择要导入栗作的文件夹")';
 
 const isCancelled = (error: unknown) => {
   const message = error instanceof Error ? error.message : String(error);

@@ -1,0 +1,43 @@
+import React, { forwardRef } from 'react';
+import * as Ri from '@remixicon/react';
+
+export type IconProps = React.SVGProps<SVGSVGElement> & { size?: number | string; strokeWidth?: number };
+export type LucideIcon = React.ComponentType<IconProps>;
+
+type RemixComponent = React.ComponentType<Record<string, unknown>>;
+const orderedSizes = [2, 4, 8, 12, 16, 20, 24, 28, 32, 40, 48, 64, 96];
+const normalizeSize = (size: number | string) => {
+  if (typeof size !== 'number') return size;
+  return orderedSizes.reduce((closest, value) => Math.abs(value - size) < Math.abs(closest - size) ? value : closest, orderedSizes[0]);
+};
+const icon = (Component: RemixComponent) => forwardRef<SVGSVGElement, IconProps>(({ size = 16, strokeWidth: _strokeWidth, ...props }, ref) => <Component ref={ref} size={normalizeSize(size)} {...props} />);
+
+const icons = {
+  add: Ri.RiAddLine, alert: Ri.RiAlertLine, arrowLeft: Ri.RiArrowLeftLine, arrowRight: Ri.RiArrowRightLine,
+  archive: Ri.RiArchiveLine, audio: Ri.RiVolumeUpLine, ban: Ri.RiForbidLine, bookmark: Ri.RiBookmarkLine,
+  box: Ri.RiBox3Line, bot: Ri.RiRobotLine, check: Ri.RiCheckLine, checkCircle: Ri.RiCheckboxCircleLine,
+  chevronDown: Ri.RiArrowDownSLine, chevronRight: Ri.RiArrowRightSLine, close: Ri.RiCloseLine, clock: Ri.RiTimeLine,
+  copy: Ri.RiFileCopyLine, database: Ri.RiDatabase2Line, download: Ri.RiDownloadLine, edit: Ri.RiPencilLine,
+  eye: Ri.RiEyeLine, eyeOff: Ri.RiEyeOffLine, file: Ri.RiFileLine, fileImage: Ri.RiFileImageLine, fileText: Ri.RiFileTextLine,
+  folder: Ri.RiFolderLine, folderOpen: Ri.RiFolderOpenLine, folderPlus: Ri.RiFolderAddLine, grid: Ri.RiGridLine,
+  hardDrive: Ri.RiHardDrive3Line, heart: Ri.RiHeartLine, image: Ri.RiImageLine, imageAdd: Ri.RiImageAddLine,
+  key: Ri.RiKey2Line, layers: Ri.RiStackLine, layout: Ri.RiLayoutLine, loader: Ri.RiLoader4Line,
+  map: Ri.RiMapLine, mapPin: Ri.RiMapPinLine, menu: Ri.RiMoreLine, mic: Ri.RiMicLine, moon: Ri.RiMoonLine,
+  monitor: Ri.RiMacLine, music: Ri.RiMusicLine, network: Ri.RiShareLine, pause: Ri.RiPauseLine, pencil: Ri.RiEditLine,
+  play: Ri.RiPlayLine, plus: Ri.RiAddLine, redo: Ri.RiArrowGoForwardLine, refresh: Ri.RiRefreshLine,
+  save: Ri.RiSaveLine, search: Ri.RiSearchLine, send: Ri.RiSendPlaneLine, settings: Ri.RiSettings3Line,
+  shield: Ri.RiShieldCheckLine, sparkles: Ri.RiSparklingLine, square: Ri.RiStopLine, sun: Ri.RiSunLine,
+  trash: Ri.RiDeleteBinLine, type: Ri.RiText, undo: Ri.RiArrowGoBackLine, upload: Ri.RiUploadLine,
+  user: Ri.RiUserLine, video: Ri.RiVideoLine, wand: Ri.RiMagicLine, wifi: Ri.RiWifiLine, wrench: Ri.RiToolsLine,
+} as const;
+
+export const ArrowLeft = icon(icons.arrowLeft); export const ArrowRight = icon(icons.arrowRight); export const AlertTriangle = icon(icons.alert); export const AlertCircle = icon(icons.alert);
+export const Archive = icon(icons.archive); export const AudioLines = icon(icons.audio); export const Ban = icon(icons.ban); export const BookmarkPlus = icon(icons.bookmark); export const Box = icon(icons.box); export const Bot = icon(icons.bot);
+export const Check = icon(icons.check); export const CheckCircle2 = icon(icons.checkCircle); export const CheckSquare2 = icon(icons.checkCircle); export const ChevronDown = icon(icons.chevronDown); export const ChevronRight = icon(icons.chevronRight); export const Circle = icon(Ri.RiCircleLine); export const CircleDot = icon(Ri.RiRadioButtonLine); export const Clock = icon(icons.clock); export const Clock3 = icon(icons.clock);
+export const Copy = icon(icons.copy); export const Database = icon(icons.database); export const Download = icon(icons.download); export const Eye = icon(icons.eye); export const EyeOff = icon(icons.eyeOff); export const File = icon(icons.file); export const FileImage = icon(icons.fileImage); export const FilePlus2 = icon(icons.file); export const FileText = icon(icons.fileText); export const FileUp = icon(icons.upload); export const Film = icon(icons.video);
+export const Folder = icon(icons.folder); export const FolderInput = icon(icons.folder); export const FolderKanban = icon(icons.folder); export const FolderOpen = icon(icons.folderOpen); export const FolderPlus = icon(icons.folderPlus); export const Globe2 = icon(Ri.RiGlobalLine); export const Grid = icon(icons.grid); export const Grid3X3 = icon(icons.grid); export const HardDrive = icon(icons.hardDrive); export const HardDriveDownload = icon(icons.download); export const Hash = icon(Ri.RiHashtag);
+export const Image = icon(icons.image); export const ImagePlus = icon(icons.imageAdd); export const Key = icon(icons.key); export const KeyRound = icon(icons.key); export const Layers = icon(icons.layers); export const Layers3 = icon(icons.layers); export const Layout = icon(icons.layout); export const LayoutGrid = icon(icons.grid); export const LayoutPanelTop = icon(icons.layout); export const LayoutTemplate = icon(icons.layout); export const Link = icon(Ri.RiLink); export const ListFilter = icon(Ri.RiListUnordered); export const Loader2 = icon(icons.loader); export const Map = icon(icons.map); export const MapPin = icon(icons.mapPin); export const Maximize = icon(Ri.RiFullscreenLine); export const Maximize2 = icon(Ri.RiFullscreenLine); export const MessageSquare = icon(Ri.RiChat1Line); export const MessageSquareText = icon(Ri.RiChat1Line); export const Mic = icon(icons.mic); export const Monitor = icon(icons.monitor); export const MonitorPlay = icon(icons.monitor); export const Moon = icon(icons.moon); export const MoreHorizontal = icon(icons.menu); export const MousePointer2 = icon(Ri.RiCursorLine); export const Mountain = icon(Ri.RiLandscapeLine); export const Music = icon(icons.music); export const Network = icon(icons.network);
+export const PackageCheck = icon(icons.checkCircle); export const Palette = icon(Ri.RiPaletteLine); export const PanelLeft = icon(Ri.RiLayoutLeftLine); export const PanelLeftClose = icon(Ri.RiLayoutLeftLine); export const PanelLeftOpen = icon(Ri.RiLayoutLeftLine); export const PanelRightClose = icon(Ri.RiLayoutRightLine); export const Pause = icon(icons.pause); export const Pencil = icon(icons.pencil); export const Phone = icon(Ri.RiSmartphoneLine); export const Pin = icon(Ri.RiPushpinLine); export const Play = icon(icons.play); export const Plus = icon(icons.plus); export const Power = icon(Ri.RiShutDownLine); export const Presentation = icon(Ri.RiSlideshowLine); export const RefreshCcw = icon(icons.refresh); export const RefreshCw = icon(icons.refresh); export const Redo = icon(icons.redo); export const RotateCcw = icon(icons.refresh); export const Save = icon(icons.save); export const ScanEye = icon(icons.eye); export const Scissors = icon(Ri.RiScissorsLine); export const Search = icon(icons.search); export const Send = icon(icons.send); export const Server = icon(Ri.RiServerLine); export const Settings = icon(icons.settings); export const Settings2 = icon(icons.settings); export const ShieldCheck = icon(icons.shield); export const Share = icon(Ri.RiShareLine); export const SlidersHorizontal = icon(Ri.RiEqualizerLine); export const Sparkles = icon(icons.sparkles); export const Square = icon(icons.square); export const Star = icon(Ri.RiStarLine); export const Sun = icon(icons.sun); export const Trash2 = icon(icons.trash); export const Type = icon(icons.type); export const Undo = icon(icons.undo); export const Upload = icon(icons.upload); export const UploadCloud = icon(icons.upload); export const User = icon(icons.user); export const UserRound = icon(icons.user); export const Video = icon(icons.video); export const Wand2 = icon(icons.wand); export const Wifi = icon(icons.wifi); export const Wrench = icon(icons.wrench); export const X = icon(icons.close); export const Zap = icon(Ri.RiFlashlightLine);
+// eslint-disable-next-line no-shadow-restricted-names
+export const Infinity = icon(Ri.RiInfinityLine); export const Command = icon(Ri.RiCommandLine); export const Boxes = icon(Ri.RiBox3Line); export const Code = icon(Ri.RiCodeLine); export const HelpCircle = icon(Ri.RiQuestionLine); export const Library = icon(Ri.RiBookShelfLine); export const MapIcon = icon(icons.map); export const ArrowUp = icon(Ri.RiArrowUpLine); export const CircleDotIcon = icon(Ri.RiRadioButtonLine);
+export const Hand = icon(Ri.RiHand); export const Clapperboard = icon(Ri.RiMovieLine); export const Smartphone = icon(Ri.RiSmartphoneLine); export const Camera = icon(Ri.RiCameraLine); export const Heart = icon(Ri.RiHeartLine); export const GitBranch = icon(Ri.RiGitBranchLine); export const ZoomIn = icon(Ri.RiZoomInLine); export const ZoomOut = icon(Ri.RiZoomOutLine);

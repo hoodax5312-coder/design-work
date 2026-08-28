@@ -1,5 +1,5 @@
 import { useRef } from 'react';
-import { ChevronDown, FolderInput, Save, Trash2, Undo, Redo } from 'lucide-react';
+import { ChevronDown, FolderInput, Save, Trash2, Undo, Redo } from '@/lib/remixIconShim';
 import { useCanvasStore } from '../../stores/useCanvasStore';
 import { Button, Card, Separator } from '../ui';
 
@@ -54,7 +54,7 @@ export const CanvasHeader = () => {
         className="hidden"
         onChange={(event) => {
           importWorkflow(event.target.files?.[0]).catch(() => {
-            window.alert('导入失败，请选择有效的 Design Work 工作流 JSON 文件。');
+            window.alert('导入失败，请选择有效的栗作工作流 JSON 文件。');
           });
           event.target.value = '';
         }}
@@ -62,7 +62,7 @@ export const CanvasHeader = () => {
        {/* Left: Toolbar */}
       <Card padding="sm" className="pointer-events-auto flex items-center gap-2 p-1">
          {/* Project Name */}
-         <Button variant="ghost" size="sm">
+         <Button variant="secondary" size="sm" className="h-8">
             <span className="font-medium text-sm">未命名项目</span>
             <ChevronDown size={14} className="opacity-50" />
          </Button>

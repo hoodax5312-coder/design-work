@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react';
-import { FolderInput, ImagePlus, Loader2, ShieldCheck, Upload, X } from 'lucide-react';
+import { FolderInput, ImagePlus, Loader2, ShieldCheck, Upload, X } from '@/lib/remixIconShim';
 import { Button, Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '../ui';
 
 const supportedImage = (file: File) =>
@@ -62,7 +62,7 @@ export const AssetImportDialog = ({
           <div>
             <SheetTitle id="asset-import-title" className="text-xl tracking-tight">导入图片素材</SheetTitle>
             <SheetDescription id="asset-import-description" className="mt-1.5 text-xs leading-5">
-              拖入图片即可自动存入 Design Work 管理目录，并完成去重与预览准备。
+              拖入图片即可自动存入栗作管理目录，并完成去重与预览准备。
             </SheetDescription>
           </div>
           <Button type="button" variant="ghost" size="iconSm" onClick={onClose} disabled={busy} aria-label="关闭导入素材面板">
@@ -87,7 +87,7 @@ export const AssetImportDialog = ({
             className={`relative flex min-h-[330px] flex-col items-center justify-center overflow-hidden rounded-lg border border-dashed px-6 text-center transition-all ${
               dragging
                 ? 'border-primary bg-primary/10 ring-2 ring-primary/15'
-                : 'border-border bg-muted/45 hover:bg-muted/65'
+                : 'border-border bg-muted/45 hover:border-foreground/25'
             }`}
           >
             <span className="relative grid h-16 w-16 place-items-center rounded-lg bg-foreground text-background shadow-sm">
@@ -126,7 +126,7 @@ export const AssetImportDialog = ({
           <div className="mt-3 flex items-center justify-between gap-4 rounded-lg border border-border bg-card px-4 py-3">
             <div className="flex min-w-0 items-center gap-2.5 text-xs leading-4 text-muted-foreground">
               <ShieldCheck size={15} className="shrink-0 text-foreground" aria-hidden="true" />
-              拖入图片会保存到 Design Work 本地管理目录；不会上传到第三方服务。
+              拖入图片会保存到栗作本地管理目录；不会上传到第三方服务。
             </div>
             <Button
               type="button"

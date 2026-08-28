@@ -5,11 +5,12 @@ import {
   Clock3,
   FilePlus2,
   FileText,
+  Folder,
   FolderOpen,
   FolderPlus,
   Search,
   X,
-} from 'lucide-react';
+} from '@/lib/remixIconShim';
 import { cn } from '../../lib/utils';
 import { Button, Card, Input } from '../ui';
 import { useProjectStore } from '../../stores/useProjectStore';
@@ -28,7 +29,7 @@ type SpaceEntry = {
 
 const DOCUMENTS: SpaceEntry[] = [
   { id: 'creative', name: '创作资料', kind: 'folder', description: '图像、视频和提示词的创作规范', updatedAt: '今天' },
-  { id: 'references', name: '视觉参考', kind: 'folder', parent: 'creative', description: '构图、光影和色彩参考', updatedAt: '昨天' },
+  { id: 'references', name: '视觉参考', kind: 'folder', description: '构图、光影和色彩参考', updatedAt: '昨天' },
   {
     id: 'workflow',
     name: '创作工作流.md',
@@ -85,7 +86,15 @@ const PROJECT_PARENT_STORAGE_KEY = 'design-work-project-document-parents';
 const readDocumentTree = (): SpaceEntry[] => {
   try {
     const saved = JSON.parse(localStorage.getItem(DOCUMENT_TREE_STORAGE_KEY) || 'null');
-    if (Array.isArray(saved)) return saved;
+    if (Array.isArray(saved)) {
+      // Folders are always top-level; documents may still belong to a root folder.
+      const rootFolderIds = new Set(
+        saved.filter((entry: SpaceEntry) => entry?.kind === 'folder' && !entry.parent).map((entry: SpaceEntry) => entry.id),
+      );
+      return saved.map((entry: SpaceEntry) => entry.kind === 'folder'
+        ? { ...entry, parent: undefined }
+        : { ...entry, parent: entry.parent && rootFolderIds.has(entry.parent) ? entry.parent : undefined });
+    }
   } catch {
     // Fall back to the built-in document tree.
   }
@@ -171,7 +180,7 @@ export const PersonalSpace = ({ embedded = false, query: externalQuery }: { embe
       id,
       kind,
       name: baseName,
-      parent: activeFolderId,
+      parent: kind === 'folder' ? undefined : activeFolderId,
       updatedAt: '刚刚',
       description: kind === 'document' ? '新建笔记' : undefined,
       content: kind === 'document' ? ['未命名笔记', ''] : undefined,
@@ -207,6 +216,7 @@ export const PersonalSpace = ({ embedded = false, query: externalQuery }: { embe
   const moveEntry = (entryId: string, targetFolderId?: string) => {
     const entry = allEntries.find((item) => item.id === entryId);
     if (!entry || entry.id === targetFolderId) return;
+    if (entry.kind === 'folder' && targetFolderId) return;
     if (entry.kind === 'folder' && targetFolderId && isDescendant(targetFolderId, entry.id)) return;
     if (entry.kind === 'project') {
       setProjectParents((current) => ({ ...current, [entry.id]: targetFolderId }));
@@ -238,17 +248,17 @@ export const PersonalSpace = ({ embedded = false, query: externalQuery }: { embe
             onDragOver={(event) => { if (!isContainer || draggedEntryId === entry.id) return; event.preventDefault(); event.stopPropagation(); event.dataTransfer.dropEffect = 'move'; setDragOverFolderId(entry.id); }}
             onDragLeave={(event) => { if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setDragOverFolderId((current) => current === entry.id ? null : current); }}
             onDrop={(event) => { if (!isContainer) return; event.preventDefault(); event.stopPropagation(); const draggedId = draggedEntryId || event.dataTransfer.getData('text/plain'); if (draggedId) moveEntry(draggedId, entry.id); }}
-            className={cn('rounded-md', isContainer && dragOverFolderId === entry.id && 'bg-black/[0.08] ring-1 ring-inset ring-black/15 dark:bg-white/[0.1] dark:ring-white/20')}
+            className={cn('rounded-md', isContainer && dragOverFolderId === entry.id && 'bg-sidebar-accent ring-1 ring-inset ring-ring/25')}
           >
             {editingEntryId === entry.id ? <div className="flex h-8 items-center gap-1 pr-2" style={{ paddingLeft: `${8 + depth * 16}px` }}>
-              {isContainer ? <span className="w-4 shrink-0"><ChevronRight size={13} /></span> : <FileText size={14} className="shrink-0 text-muted-foreground" />}
+              {isContainer ? <Folder size={24} className="shrink-0 text-sidebar-foreground/70" /> : <FileText size={16} className="shrink-0 text-sidebar-foreground/70" />}
               <Input autoFocus value={entryNameDraft} onChange={(event) => setEntryNameDraft(event.target.value)} onBlur={commitEntryName} onKeyDown={(event) => { if (event.key === 'Enter') commitEntryName(); if (event.key === 'Escape') { setEditingEntryId(null); setEntryNameDraft(''); } }} aria-label={isContainer ? '命名新文件夹' : '命名新笔记'} inputSize="sm" className="h-7 min-w-0 flex-1 px-2 text-xs" />
             </div> : <Button
               type="button"
               draggable
               onDragStart={(event) => { setDraggedEntryId(entry.id); event.dataTransfer.effectAllowed = 'move'; event.dataTransfer.setData('text/plain', entry.id); }}
               onDragEnd={() => { setDraggedEntryId(null); setDragOverFolderId(null); setRootDropActive(false); }}
-              variant={isActive ? 'secondary' : 'ghost'}
+              variant="ghost"
               size="sm"
               onClick={() => {
                 if (isContainer) {
@@ -259,10 +269,13 @@ export const PersonalSpace = ({ embedded = false, query: externalQuery }: { embe
                 openEntry(entry);
               }}
               aria-expanded={isContainer ? isOpen : undefined}
-              className={cn('h-8 w-full justify-start gap-1 pr-2 text-left text-xs font-normal', isActive && 'bg-black/[0.07] text-foreground hover:bg-black/[0.09] dark:bg-white/[0.09] dark:hover:bg-white/[0.11]')}
+              className={cn(
+                'mt-1 h-8 w-full justify-start gap-1 rounded-md pr-2 text-left text-sm font-normal text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground',
+                isActive && 'border border-[var(--action-secondary-border)] bg-[var(--action-secondary-bg)] text-[var(--action-secondary-foreground)] hover:bg-[var(--action-secondary-bg-hover)] hover:text-[var(--action-secondary-foreground)]',
+              )}
               style={{ paddingLeft: `${8 + depth * 16}px` }}
             >
-              {isContainer ? <span aria-hidden="true" className="grid h-4 w-4 shrink-0 place-items-center text-muted-foreground">{isOpen ? <ChevronDown size={13} /> : <ChevronRight size={13} />}</span> : <FileText aria-hidden="true" size={14} className="shrink-0 text-muted-foreground" />}
+              {isContainer ? <span aria-hidden="true" className={cn('flex h-6 w-8 shrink-0 items-center gap-1 text-sidebar-foreground/70', isActive && 'text-[var(--action-secondary-foreground)]')}>{isOpen ? <ChevronDown size={20} /> : <ChevronRight size={20} />}{isOpen ? <FolderOpen size={24} /> : <Folder size={24} />}</span> : <FileText aria-hidden="true" size={16} className={cn('shrink-0 text-sidebar-foreground/70', isActive && 'text-[var(--action-secondary-foreground)]')} />}
               <span className="min-w-0 flex-1 truncate">{entry.name}</span>
             </Button>}
           </div>
@@ -292,36 +305,36 @@ export const PersonalSpace = ({ embedded = false, query: externalQuery }: { embe
         </label>
       </header>}
 
-      <div className={cn('mb-0 flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl bg-[#f8f8f6] dark:bg-[var(--surface-bg)] md:flex-row', !embedded && 'mx-16 p-2')}>
-      <aside aria-label="知识文件树" className="flex max-h-[38vh] w-full shrink-0 flex-col overflow-hidden bg-transparent py-2 pr-2 shadow-none md:max-h-none md:w-[240px]">
-        <div className="mb-2 flex h-8 shrink-0 items-center justify-between px-1">
-          <button type="button" onClick={() => setActiveFolderId(undefined)} className="min-w-0 flex-1 truncate px-2 text-left text-xs font-semibold text-muted-foreground" title="在根目录新建">文件</button>
+      <div className={cn('mb-0 flex min-h-0 flex-1 flex-col overflow-hidden md:flex-row', embedded ? 'rounded-[10px] border border-border bg-transparent' : 'rounded-xl bg-card text-card-foreground', !embedded && 'mx-16 p-2')}>
+      <aside aria-label="知识文件树" className={cn('flex max-h-[38vh] w-full shrink-0 flex-col overflow-hidden bg-sidebar py-2 text-sidebar-foreground shadow-none md:max-h-none', embedded ? 'border-r border-sidebar-border px-2 md:w-[200px]' : 'pr-2 md:w-[240px]')}>
+        <div className="mb-2 flex h-12 shrink-0 items-center justify-center">
           <div className="flex shrink-0 gap-1">
-            <Button type="button" variant="ghost" size="iconSm" onClick={() => createEntry('document')} aria-label="新建笔记" title="新建笔记" className="h-8 w-8 text-muted-foreground"><FilePlus2 size={15} /></Button>
-            <Button type="button" variant="ghost" size="iconSm" onClick={() => createEntry('folder')} aria-label="新建文件夹" title="新建文件夹" className="h-8 w-8 text-muted-foreground"><FolderPlus size={15} /></Button>
+            <Button type="button" variant="ghost" size="iconSm" onClick={() => createEntry('document')} aria-label="新建笔记" title="新建笔记" className="h-8 w-8 text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"><FilePlus2 size={15} /></Button>
+            <Button type="button" variant="ghost" size="iconSm" onClick={() => createEntry('folder')} aria-label="新建文件夹" title="新建文件夹" className="h-8 w-8 text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"><FolderPlus size={15} /></Button>
           </div>
         </div>
         <div
-          className={cn('knowledge-file-tree-scroll min-h-0 flex-1 overflow-y-auto rounded-md transition-colors', rootDropActive && 'bg-black/[0.045] ring-1 ring-inset ring-black/10 dark:bg-white/[0.06] dark:ring-white/15')}
+          className={cn('knowledge-file-tree-scroll min-h-0 flex-1 overflow-y-auto rounded-md transition-colors', rootDropActive && 'bg-sidebar-accent ring-1 ring-inset ring-ring/25')}
           onDragOver={(event) => { if (!draggedEntryId) return; event.preventDefault(); event.dataTransfer.dropEffect = 'move'; if (event.target === event.currentTarget) setRootDropActive(true); }}
           onDragLeave={(event) => { if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setRootDropActive(false); }}
           onDrop={(event) => { if (event.target !== event.currentTarget) return; event.preventDefault(); const draggedId = draggedEntryId || event.dataTransfer.getData('text/plain'); if (draggedId) moveEntry(draggedId); }}
         >{renderTree(undefined)}</div>
-        {normalizedQuery && !allEntries.some((entry) => !entry.parent && entryMatchesQuery(entry)) && <div className="px-3 py-8 text-center text-xs text-muted-foreground">没有找到匹配文件</div>}
+        {normalizedQuery && !allEntries.some((entry) => !entry.parent && entryMatchesQuery(entry)) && <div className="px-3 py-8 text-center text-xs text-sidebar-foreground/70">没有找到匹配文件</div>}
       </aside>
 
-      <section className="flex min-w-0 flex-1 flex-col overflow-hidden rounded-lg bg-background shadow-sm">
-        <div role="tablist" aria-label="已打开的知识" className="flex h-10 shrink-0 items-end overflow-x-auto border-b border-black/[0.05] bg-background px-1 pt-1 dark:border-white/[0.06]">
+      <section className={cn('flex min-w-0 flex-1 flex-col overflow-hidden', embedded ? 'bg-transparent' : 'rounded-lg bg-background shadow-sm')}>
+      <div role="tablist" aria-label="已打开的知识" className="flex h-12 shrink-0 items-center gap-2 overflow-x-auto border-b border-border bg-transparent px-2">
           {openEntries.map((entry) => {
             const isActive = activeEntryId === entry.id;
-            return <div key={entry.id} className={cn('group flex h-9 min-w-[132px] max-w-[220px] items-center rounded-t-md border border-b-0 border-transparent', isActive && 'relative z-10 border-black/[0.05] bg-background after:absolute after:-bottom-px after:inset-x-0 after:h-px after:bg-background dark:border-white/[0.06]')}>
-              <button type="button" role="tab" aria-selected={isActive} onClick={() => { setActiveEntryId(entry.id); if (entry.kind === 'project') setActiveProject(entry.id); }} className="flex h-full min-w-0 flex-1 items-center gap-2 px-3 text-xs text-muted-foreground outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"><FileText size={13} className="shrink-0" /><span className={cn('truncate', isActive && 'text-foreground')}>{entry.name}</span></button>
-              <Button type="button" variant="ghost" size="iconSm" onClick={() => closeEntry(entry.id)} aria-label={`关闭 ${entry.name}`} title="关闭文件" className="mr-1 h-7 w-7 shrink-0 text-muted-foreground opacity-0 group-hover:opacity-100 group-focus-within:opacity-100"><X size={13} /></Button>
+            return <div key={entry.id} className={cn('group relative flex h-8 min-w-[132px] max-w-[220px] items-center rounded-md border-0 transition-colors hover:bg-accent hover:text-accent-foreground', isActive && 'border-[var(--surface-panel-border-width)] border-[var(--action-secondary-border)] bg-[var(--action-secondary-bg)] text-[var(--action-secondary-foreground)] hover:bg-[var(--action-secondary-bg-hover)] hover:text-[var(--action-secondary-foreground)]')}>
+              <button type="button" role="tab" aria-selected={isActive} onClick={() => { setActiveEntryId(entry.id); if (entry.kind === 'project') setActiveProject(entry.id); }} className={cn('flex h-full min-w-0 flex-1 items-center gap-2 px-3 text-xs text-muted-foreground outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring', isActive && 'text-[var(--action-secondary-foreground)]')}><FileText size={16} className="shrink-0" /><span className="truncate">{entry.name}</span></button>
+              <span aria-hidden="true" className={cn('pointer-events-none absolute inset-y-0 right-1 z-10 w-10 bg-accent opacity-0 transition-opacity', 'group-hover:opacity-100 group-focus-within:opacity-100', isActive && 'opacity-100')} />
+              <Button type="button" variant="ghost" size="iconSm" onClick={() => closeEntry(entry.id)} aria-label={`关闭 ${entry.name}`} title="关闭文件" className={cn('absolute right-1 top-1/2 z-20 h-7 w-7 -translate-y-1/2 text-muted-foreground opacity-0 group-hover:opacity-100 group-focus-within:opacity-100', isActive && 'opacity-100')}><X size={13} /></Button>
             </div>;
           })}
         </div>
         <div className="min-h-0 flex-1 overflow-y-auto">
-          {activeDocument || activeProject ? <article className="mx-auto max-w-3xl px-8 py-8 lg:px-12">
+          {activeDocument || activeProject ? <article className="w-full max-w-none px-4 py-6">
             <h1 className="text-3xl font-semibold tracking-[-0.04em]">{activeDocument?.content?.[0] || activeEntry?.name.replace(/\.md$/i, '')}</h1>
             <div className="mt-3 flex items-center gap-2 text-xs text-muted-foreground"><Clock3 size={13} /> 更新于 {activeEntry?.updatedAt || '刚刚'}</div>
             {activeEntry?.description && <p className="mt-6 text-sm leading-7 text-muted-foreground">{activeEntry.description}</p>}

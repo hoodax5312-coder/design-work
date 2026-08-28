@@ -2,16 +2,43 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
   normalizeOpenAiBaseUrl,
+  sanitizeProviderError,
   testOpenAi,
+  testProviderModels,
   type ProviderRequestConfig,
 } from './providerGateway';
 
 const config: ProviderRequestConfig = {
+  category: 'language',
   protocol: 'chat-completions',
   baseUrl: 'https://example.com',
   apiKey: 'test-key',
   model: 'test-model',
 };
+
+test('redacts a provider key echoed by the upstream error', () => {
+  const key = 'secret-provider-key-123456';
+  const message = `Incorrect API key provided: ${key}`;
+  const sanitized = sanitizeProviderError(message, key);
+  assert.equal(sanitized.includes(key), false);
+  assert.equal(sanitized.includes('secret-provider'), false);
+});
+
+test('model verification only calls the models endpoint', async () => {
+  const calls: string[] = [];
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async (input) => {
+    calls.push(String(input));
+    return Response.json({ data: [{ id: 'image-model' }] });
+  };
+  try {
+    const result = await testProviderModels({ ...config, model: 'image-model', category: 'image' });
+    assert.deepEqual(result, ['image-model']);
+    assert.deepEqual(calls, ['https://example.com/v1/models']);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
 
 test('normalizes an OpenAI-compatible origin to its v1 API root', () => {
   assert.equal(

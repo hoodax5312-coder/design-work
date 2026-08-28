@@ -11,7 +11,7 @@ import {
   Play,
   Presentation,
   Sparkles,
-} from 'lucide-react';
+} from '@/lib/remixIconShim';
 import { cn } from '../../lib/utils';
 import { useUIStore } from '../../stores/useUIStore';
 import { Badge, Button, Card, Separator, Tabs, TabsList, TabsTrigger, Textarea } from '../ui';
@@ -25,6 +25,8 @@ const moduleNames = {
   projects: '个人空间',
   tools: 'AI 应用',
   ecommerce: '电商设计',
+  'background-remove': '抠图去背景',
+  'product-retouch': '产品图精修',
   sources: '知识',
   exports: '导出中心',
   settings: '设置',
@@ -91,7 +93,7 @@ export const CreativeTaskPanel = () => {
               {steps.map((step, index) => {
                 const active = running && index === completed;
                 return (
-                  <div key={step.title} className="flex gap-3 rounded-md px-2 py-3 hover:bg-accent/50">
+                  <div key={step.title} className="flex gap-3 rounded-md border border-transparent px-2 py-3 transition-[border-color] hover:border-border">
                     <div className="mt-0.5 grid h-5 w-5 shrink-0 place-items-center">
                       {step.done ? <span className="grid h-4 w-4 place-items-center rounded-full bg-primary text-primary-foreground"><Check size={10} strokeWidth={3} /></span> : active ? <Loader2 size={15} className="animate-spin text-foreground" /> : <Circle size={14} className="text-muted-foreground/45" />}
                     </div>
@@ -129,9 +131,9 @@ export const CreativeTaskPanel = () => {
 
 const ArtifactList = () => {
   const artifacts = [
-    { icon: FileImage, title: '主视觉封面', meta: 'PNG · 2048×2048', color: 'bg-amber-100 text-amber-700' },
-    { icon: Presentation, title: '演示稿结构', meta: '8 页 · 16:9', color: 'bg-blue-100 text-blue-700' },
-    { icon: Film, title: '分镜预览', meta: '6 片段 · 24s', color: 'bg-rose-100 text-rose-700' },
+    { icon: FileImage, title: '主视觉封面', meta: 'PNG · 2048×2048', color: 'bg-muted text-muted-foreground' },
+    { icon: Presentation, title: '演示稿结构', meta: '8 页 · 16:9', color: 'bg-muted text-muted-foreground' },
+    { icon: Film, title: '分镜预览', meta: '6 片段 · 24s', color: 'bg-muted text-muted-foreground' },
   ];
   return (
     <div className="min-h-0 flex-1 overflow-y-auto p-4">

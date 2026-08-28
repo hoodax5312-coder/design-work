@@ -12,6 +12,7 @@ import {
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import {
+  ArrowLeft,
   Bot,
   ChevronDown,
   Hand,
@@ -29,12 +30,11 @@ import {
   Type,
   Upload,
   Video,
-} from 'lucide-react';
+} from '@/lib/remixIconShim';
 import { cn } from '../../lib/utils';
-import { getConfiguredModels, getSelectedModel, modelSupportsCategory, useProviderStore } from '../../stores/useProviderStore';
+import { getConfiguredModels, getSelectedModel, providerSupportsCategory, useProviderStore } from '../../stores/useProviderStore';
 import { useCanvasStore } from '../../stores/useCanvasStore';
 import { useProjectStore } from '../../stores/useProjectStore';
-import { useUIStore } from '../../stores/useUIStore';
 import { workspaceCacheService } from '../../services/workspaceCacheService';
 import { ImageGenNode } from '../nodes/ImageGenNode';
 import { TextNode } from '../nodes/TextNode';
@@ -76,7 +76,7 @@ const makeNode = (type: CanvasNodeType, position: { x: number; y: number }, data
   return { id, type, position, data: { prompt: '', model: '', style: '', resolution: '1k', aspectRatio: '1:1', isFocusMode: false, ...data } };
 };
 
-const CanvasInner = () => {
+const CanvasInner = ({ onBack }: { onBack?: () => void }) => {
   const flowRef = useRef<ReactFlowInstance | null>(null);
   const mediaInputRef = useRef<HTMLInputElement>(null);
   const toolbarRef = useRef<HTMLDivElement>(null);
@@ -110,25 +110,34 @@ const CanvasInner = () => {
   const redo = useCanvasStore((state) => state.redo);
   const restoreSnapshot = useCanvasStore((state) => state.restoreSnapshot);
   const activeProject = useProjectStore((state) => state.projects.find((project) => project.id === state.activeProjectId));
+  const saveProjectCanvas = useProjectStore((state) => state.saveProjectCanvas);
   const renameProject = useProjectStore((state) => state.renameProject);
   const setProjectEmoji = useProjectStore((state) => state.setProjectEmoji);
   const activeProjectName = activeProject?.name || '创作空间';
   const activeProjectEmoji = activeProject?.emoji || '😀';
-  const theme = useUIStore((state) => state.theme);
   const boardSnapshotsRef = useRef<Record<string, BoardSnapshot>>({});
   const boardMessagesRef = useRef<Record<string, ChatMessage[]>>({});
   const boardsInitializedRef = useRef(false);
   const canvasCacheLoadedRef = useRef(false);
 
+  useEffect(() => {
+    if (!activeProject) return undefined;
+    const timer = window.setTimeout(() => {
+      saveProjectCanvas(activeProject.id, { nodes, edges });
+    }, 240);
+    return () => window.clearTimeout(timer);
+  }, [activeProject, edges, nodes, saveProjectCanvas]);
+
   const providers = useProviderStore((state) => state.providers);
-  const activeProviderId = useProviderStore((state) => state.activeProviderId);
-  const languageModels = useMemo(() => providers.flatMap((provider) => getConfiguredModels(provider)
-    .filter((model) => modelSupportsCategory(model, 'language'))
+  const activeProviderId = useProviderStore((state) => state.activeProviderIds.language);
+  const languageModels = useMemo(() => providers.flatMap((provider) => getConfiguredModels(provider, 'language')
     .map((model) => ({ value: `${provider.id}::${model.id}`, label: model.id, provider }))), [providers]);
-  const fallbackProvider = providers.find((provider) => provider.id === activeProviderId) || languageModels[0]?.provider;
-  const resolvedAgentModel = agentModel || (fallbackProvider && getSelectedModel(fallbackProvider, 'language')
+  const fallbackProvider = providers.find((provider) => provider.id === activeProviderId && providerSupportsCategory(provider, 'language')) || languageModels[0]?.provider;
+  const resolvedAgentModel = languageModels.some((item) => item.value === agentModel)
+    ? agentModel
+    : fallbackProvider && getSelectedModel(fallbackProvider, 'language')
     ? `${fallbackProvider.id}::${getSelectedModel(fallbackProvider, 'language')}`
-    : languageModels[0]?.value || '');
+    : languageModels[0]?.value || '';
 
   useEffect(() => {
     let cancelled = false;
@@ -326,18 +335,22 @@ const CanvasInner = () => {
   };
 
   const minimapNodeColor = useMemo(() => (node: Node) => {
-    if (theme === 'dark') {
-      return node.type === 'imageGen' ? 'rgba(245,245,245,0.34)' : node.type === 'video' ? 'rgba(245,245,245,0.26)' : 'rgba(245,245,245,0.2)';
+    if (node.type === 'imageGen') {
+      return 'color-mix(in srgb, transparent, var(--foreground) 34%)';
     }
-    return node.type === 'imageGen' ? 'rgba(17,23,19,0.3)' : node.type === 'video' ? 'rgba(17,23,19,0.23)' : 'rgba(17,23,19,0.17)';
-  }, [theme]);
+    if (node.type === 'video') {
+      return 'color-mix(in srgb, transparent, var(--foreground) 26%)';
+    }
+    return 'color-mix(in srgb, transparent, var(--foreground) 20%)';
+  }, []);
   const visibleNodes = nodes;
 
   return (
-    <main className="absolute inset-0 min-h-0 overflow-hidden bg-white text-foreground dark:bg-[#0b0b0b]">
+    <main className="absolute inset-0 min-h-0 overflow-hidden bg-background text-foreground">
       {showExplorer && (
-        <aside className="absolute bottom-3 left-3 top-3 z-40 flex w-[252px] flex-col rounded-xl bg-white/95 shadow-[0_8px_28px_rgba(15,15,15,0.08)] backdrop-blur-xl dark:bg-[var(--surface-subtle)] dark:shadow-[0_8px_28px_rgba(0,0,0,0.2)]">
+        <aside className="absolute bottom-3 left-3 top-3 z-40 flex w-[252px] flex-col rounded-xl bg-card/95 text-card-foreground shadow-[0_8px_28px_rgba(15,15,15,0.08)] backdrop-blur-xl dark:shadow-[0_8px_28px_rgba(0,0,0,0.2)]">
           <div className="flex h-14 shrink-0 items-center gap-1 px-3">
+            {onBack && <Button type="button" variant="ghost" size="iconSm" onClick={onBack} aria-label="返回项目列表" title="返回项目列表" className="h-8 w-8 shrink-0"><ArrowLeft size={15} /></Button>}
             <div className="relative shrink-0">
               <Button type="button" variant="ghost" size="iconSm" onClick={() => setProjectEmojiOpen((open) => !open)} aria-label="选择项目表情" title="选择项目表情" className="h-8 w-8 rounded-lg bg-muted text-base">{activeProjectEmoji}</Button>
               {projectEmojiOpen && <Card padding="none" className="absolute left-0 top-10 z-50 grid w-[176px] grid-cols-6 gap-1 p-2 shadow-xl">{PROJECT_EMOJIS.map((emoji) => <Button key={emoji} type="button" variant="ghost" size="iconSm" onClick={() => selectProjectEmoji(emoji)} aria-label={`使用${emoji}表情`} className="h-7 w-7 text-base">{emoji}</Button>)}</Card>}
@@ -352,7 +365,7 @@ const CanvasInner = () => {
             <div className="mb-1 flex h-8 items-center justify-between px-2 text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground"><span>画布</span><Button type="button" variant="ghost" size="iconSm" onClick={createBoard} aria-label="新增画布" className="h-6 w-6"><Plus size={13} /></Button></div>
             <div className="space-y-1">
               {boards.map((board) => (
-                <Button key={board} type="button" variant="ghost" size="sm" onClick={() => switchBoard(board)} aria-pressed={activeBoard === board} className={cn('h-9 w-full justify-start gap-2 border-0 px-2 text-xs shadow-none hover:bg-black/[0.04] dark:hover:bg-white/[0.07]', activeBoard === board && 'bg-muted text-foreground hover:bg-muted')}>
+                <Button key={board} type="button" variant="ghost" size="sm" onClick={() => switchBoard(board)} aria-pressed={activeBoard === board} className={cn('h-9 w-full justify-start gap-2 border-0 px-2 text-xs shadow-none hover:bg-accent hover:text-accent-foreground', activeBoard === board && 'bg-accent text-accent-foreground')}>
                   <LayoutGrid size={14} /><span className="flex-1 truncate text-left">{board}</span>
                 </Button>
               ))}
@@ -367,7 +380,7 @@ const CanvasInner = () => {
                 const meta = NODE_META[type] || NODE_META.text;
                 const Icon = meta.icon;
                 const title = String(node.data?.prompt || node.data?.content || meta.label);
-                return <Button key={node.id} type="button" variant="ghost" size="sm" onClick={() => flowRef.current?.setCenter(node.position.x + 210, node.position.y + 130, { zoom: 1, duration: 240 })} className="group h-10 w-full justify-start gap-2 border-0 px-2 text-xs shadow-none hover:bg-black/[0.04] dark:hover:bg-white/[0.07]"><span className="grid h-6 w-6 shrink-0 place-items-center rounded-md bg-muted"><Icon size={12} /></span><span className="min-w-0 flex-1 truncate text-left">{title}</span><span className={cn('h-1.5 w-1.5 rounded-full', meta.dot)} /></Button>;
+                return <Button key={node.id} type="button" variant="ghost" size="sm" onClick={() => flowRef.current?.setCenter(node.position.x + 210, node.position.y + 130, { zoom: 1, duration: 240 })} className="group h-10 w-full justify-start gap-2 border-0 px-2 text-xs shadow-none hover:bg-accent hover:text-accent-foreground"><span className="grid h-6 w-6 shrink-0 place-items-center rounded-md bg-muted"><Icon size={12} /></span><span className="min-w-0 flex-1 truncate text-left">{title}</span><span className={cn('h-1.5 w-1.5 rounded-full', meta.dot)} /></Button>;
               }) : <div className="px-3 py-8 text-center text-xs text-muted-foreground">暂无内容</div>}
             </div>
           </div>
@@ -376,7 +389,8 @@ const CanvasInner = () => {
 
       <section className="absolute inset-0 z-0 overflow-hidden">
         {!showExplorer && (
-          <div className="absolute left-3 top-3 z-30 flex h-10 max-w-[240px] items-center gap-1 rounded-lg border border-black/[0.05] bg-white/90 py-1 pl-3 pr-1 shadow-sm backdrop-blur-xl dark:border-[var(--surface-border-strong)] dark:bg-[var(--surface-bg)]">
+          <div className="absolute left-3 top-3 z-30 flex h-10 max-w-[280px] items-center gap-1 rounded-lg border border-border bg-card/90 py-1 pl-1 pr-1 text-card-foreground shadow-sm backdrop-blur-xl">
+            {onBack && <Button type="button" variant="ghost" size="iconSm" onClick={onBack} aria-label="返回项目列表" title="返回项目列表" className="h-8 w-8 shrink-0"><ArrowLeft size={15} /></Button>}
             <div className="relative shrink-0">
               <Button type="button" variant="ghost" size="iconSm" onClick={() => setProjectEmojiOpen((open) => !open)} aria-label="选择项目表情" title="选择项目表情" className="h-8 w-8 rounded-md text-base">{activeProjectEmoji}</Button>
               {projectEmojiOpen && <Card padding="none" className="absolute left-0 top-10 z-50 grid w-[176px] grid-cols-6 gap-1 p-2 shadow-xl">{PROJECT_EMOJIS.map((emoji) => <Button key={emoji} type="button" variant="ghost" size="iconSm" onClick={() => selectProjectEmoji(emoji)} aria-label={`使用${emoji}表情`} className="h-7 w-7 text-base">{emoji}</Button>)}</Card>}
@@ -406,25 +420,25 @@ const CanvasInner = () => {
           zoomOnPinch
           minZoom={0.15}
           maxZoom={2.5}
-          defaultEdgeOptions={{ type: 'smoothstep', animated: true, style: { stroke: '#8a948d', strokeWidth: 1.4 } }}
+          defaultEdgeOptions={{ type: 'smoothstep', animated: true, style: { stroke: 'var(--muted-foreground)', strokeWidth: 1.4 } }}
           proOptions={{ hideAttribution: true }}
-          className="design-work-flow h-full w-full bg-white dark:bg-[#0b0b0b]"
+          className="design-work-flow h-full w-full bg-background"
         >
-          <Background gap={18} size={0.8} color="rgba(116,124,114,0.13)" />
+          <Background gap={18} size={0.8} color="color-mix(in srgb, transparent, var(--foreground) 13%)" />
           {showMinimap && (
             <MiniMap
               pannable
               zoomable
               nodeColor={minimapNodeColor}
-              nodeStrokeColor={theme === 'dark' ? 'rgba(255,255,255,0.1)' : 'rgba(17,23,19,0.08)'}
+              nodeStrokeColor="var(--border)"
               nodeStrokeWidth={1}
-              bgColor={theme === 'dark' ? 'rgba(18,18,18,0.58)' : 'rgba(255,255,255,0.58)'}
-              maskColor={theme === 'dark' ? 'rgba(5,5,5,0.3)' : 'rgba(255,255,255,0.3)'}
-              maskStrokeColor={theme === 'dark' ? 'rgba(255,255,255,0.12)' : 'rgba(17,23,19,0.1)'}
+              bgColor="var(--card)"
+              maskColor="color-mix(in srgb, transparent, var(--background) 45%)"
+              maskStrokeColor="var(--border)"
               maskStrokeWidth={1}
               style={{ width: 192, height: 108, backdropFilter: 'blur(18px) saturate(120%)' }}
               className={cn(
-                '!bottom-3 !left-auto !m-0 !overflow-hidden !rounded-lg !border-black/[0.06] !shadow-[0_8px_24px_rgba(0,0,0,0.08)] dark:!border-white/[0.08] dark:!shadow-[0_8px_24px_rgba(0,0,0,0.18)]',
+                '!bottom-3 !left-auto !m-0 !overflow-hidden !rounded-lg !border-border !shadow-[0_8px_24px_rgba(0,0,0,0.08)] dark:!shadow-[0_8px_24px_rgba(0,0,0,0.18)]',
                 showAgent ? '!right-[376px]' : '!right-3',
               )}
             />
@@ -433,7 +447,7 @@ const CanvasInner = () => {
 
         <input ref={mediaInputRef} type="file" accept="image/*,video/*,.txt,.md" className="sr-only" onChange={(event) => { importMedia(event.target.files?.[0]); event.target.value = ''; }} />
 
-        <Card ref={toolbarRef} padding="sm" className="absolute bottom-3 left-1/2 z-30 flex max-w-[calc(100%-24px)] -translate-x-1/2 items-center gap-2 overflow-visible border-black/[0.06] bg-white/94 p-1 shadow-[0_8px_28px_rgba(0,0,0,0.12)] backdrop-blur-xl dark:border-[var(--surface-border-strong)] dark:bg-[var(--surface-bg)]">
+        <Card ref={toolbarRef} padding="sm" className="absolute bottom-3 left-1/2 z-30 flex max-w-[calc(100%-24px)] -translate-x-1/2 items-center gap-2 overflow-visible border-border bg-card/95 p-1 text-card-foreground shadow-[0_8px_28px_rgba(0,0,0,0.12)] backdrop-blur-xl">
           <div className="relative">
             <div role="group" aria-label="画布操作工具" className="flex h-8 overflow-hidden rounded-md bg-muted">
               <Button
@@ -517,8 +531,8 @@ const CanvasInner = () => {
               </Button>
             </div>
           </div>
-          <span aria-hidden="true" className="h-6 w-px shrink-0 bg-black/[0.08] dark:bg-white/[0.1]" />
-          <div className="flex h-8 items-center gap-1 rounded-lg bg-black/[0.05] p-0.5 dark:bg-[var(--surface-control)]">
+          <span aria-hidden="true" className="h-6 w-px shrink-0 bg-border" />
+          <div className="flex h-8 items-center gap-1 rounded-lg bg-muted p-0.5">
             <CanvasToolButton icon={Map} label="小地图" active={showMinimap} onClick={() => setShowMinimap((visible) => !visible)} className="h-7 w-7" />
             <CanvasToolButton icon={Bot} label={showAgent ? '收起 Agent' : '展开 Agent'} active={showAgent} onClick={() => setShowAgent((visible) => !visible)} className="h-7 w-7" />
           </div>
@@ -534,7 +548,7 @@ const CanvasInner = () => {
       </section>
 
       {showAgent && (
-        <aside className="absolute bottom-3 right-3 top-3 z-40 flex w-[352px] flex-col rounded-xl bg-white/[0.96] shadow-[0_8px_28px_rgba(15,15,15,0.08)] backdrop-blur-xl dark:bg-[var(--surface-subtle)] dark:shadow-[0_8px_28px_rgba(0,0,0,0.22)]">
+        <aside className="absolute bottom-3 right-3 top-3 z-40 flex w-[352px] flex-col rounded-xl bg-card/[0.96] text-card-foreground shadow-[0_8px_28px_rgba(15,15,15,0.08)] backdrop-blur-xl dark:shadow-[0_8px_28px_rgba(0,0,0,0.22)]">
           <header className="flex h-14 shrink-0 items-center gap-2 px-3"><span className="grid h-8 w-8 place-items-center rounded-lg bg-muted text-foreground"><Bot size={16} /></span><div className="min-w-0 flex-1"><div className="text-xs font-semibold">Canvas Agent</div><div className="truncate text-xs text-muted-foreground">{agentWorking ? `正在操作 ${activeBoard}` : `当前画布：${activeBoard}`}</div></div><Button type="button" variant="ghost" size="iconSm" onClick={() => setAgentSettingsOpen((open) => !open)} aria-label="Agent 设置"><Settings2 size={15} /></Button></header>
 
           {agentSettingsOpen && <Card padding="sm" className="absolute right-3 top-12 z-40 w-[310px] p-3 shadow-xl"><div className="mb-2 text-xs font-semibold">Agent 模型</div><Select aria-label="Agent 模型" value={resolvedAgentModel} onChange={(event) => setAgentModel(event.target.value)} selectSize="sm" options={languageModels.length ? languageModels.map(({ value, label }) => ({ value, label })) : [{ value: '', label: '暂无语言模型' }]} disabled={!languageModels.length} /><div className="mb-2 mt-4 text-xs font-semibold">执行模式</div><div className="grid grid-cols-2 gap-1 rounded-lg bg-muted p-1"><Button type="button" variant={agentMode === 'auto' ? 'primary' : 'ghost'} size="sm" onClick={() => setAgentMode('auto')} className="text-xs">自动执行</Button><Button type="button" variant={agentMode === 'ask' ? 'primary' : 'ghost'} size="sm" onClick={() => setAgentMode('ask')} className="text-xs">询问执行</Button></div><p className="mt-2 text-xs leading-4 text-muted-foreground">自动执行会直接创建画布节点；询问执行会先确认任务。</p></Card>}
@@ -545,7 +559,7 @@ const CanvasInner = () => {
           </div>
 
           <div className="shrink-0 p-3">
-            <Card padding="none" className="overflow-hidden border-black/[0.08] shadow-sm focus-within:border-primary dark:border-white/10">
+            <Card padding="none" className="overflow-hidden border-border shadow-sm focus-within:border-ring">
               <Textarea value={agentPrompt} onChange={(event) => setAgentPrompt(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); void submitAgent(); } }} placeholder="输入消息，Enter 发送" variant="ghost" className="h-20 min-h-20 resize-none px-3 py-3 text-xs leading-5" />
               <div className="flex items-center gap-1 px-2 pb-2"><Button type="button" variant="ghost" size="iconSm" onClick={() => mediaInputRef.current?.click()} aria-label="添加参考素材" className="h-7 w-7"><Plus size={14} /></Button><Button type="button" variant="ghost" size="sm" onClick={() => setAgentSettingsOpen((open) => !open)} className="h-7 min-w-0 max-w-[170px] gap-1 px-2 text-xs text-muted-foreground"><span className="truncate">{languageModels.find((item) => item.value === resolvedAgentModel)?.label || '选择模型'}</span><ChevronDown size={10} /></Button><Badge variant="subtle" className="ml-auto text-xs">{agentMode === 'auto' ? '自动' : '询问'}</Badge><Button type="button" variant="primary" size="iconSm" onClick={() => void submitAgent()} disabled={!agentPrompt.trim() || agentWorking} aria-label="发送给 Agent" className="h-7 w-7 rounded-full"><Send size={12} /></Button></div>
             </Card>
@@ -560,4 +574,4 @@ const CanvasToolButton = ({ icon: Icon, label, active, disabled, onClick, classN
   <Button type="button" variant={active ? 'secondary' : 'ghost'} size="iconSm" aria-label={label} title={label} aria-pressed={active} disabled={disabled} onClick={onClick} className={cn('h-8 w-8 shrink-0', className)}><Icon size={14} strokeWidth={active ? 2.2 : 1.8} /></Button>
 );
 
-export const Canvas = () => <ReactFlowProvider><CanvasInner /></ReactFlowProvider>;
+export const Canvas = ({ onBack }: { onBack?: () => void }) => <ReactFlowProvider><CanvasInner onBack={onBack} /></ReactFlowProvider>;

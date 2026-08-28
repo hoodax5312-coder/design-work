@@ -15,7 +15,7 @@ import {
   RefreshCw,
   Search,
   ShieldCheck,
-} from 'lucide-react';
+} from '@/lib/remixIconShim';
 import { cn } from '../../lib/utils';
 import { assetService } from '../../services/assetService';
 import type { FileIssue } from '../../types/asset.types';
@@ -229,14 +229,14 @@ export const SourceCenter = ({ initialSection = 'notes' }: { initialSection?: 'n
   return (
     <div className="module-workspace flex h-full min-h-0 flex-col">
       <Tabs value={activeSection} onValueChange={(value) => setActiveSection(value as typeof activeSection)} className="ui-module-toolbar mx-3 h-14 shrink-0 border-0 px-0 shadow-none">
-        <TabsList aria-label="知识中心内容" className="h-8 gap-1 rounded-none border-0 bg-transparent p-0 shadow-none"><TabsTrigger value="notes" className="h-8 border-0 bg-transparent px-4 py-0 text-sm text-muted-foreground shadow-none focus-visible:ring-offset-0 data-[state=inactive]:hover:text-foreground data-[state=active]:!bg-[var(--surface-control)] data-[state=active]:!text-foreground data-[state=active]:!shadow-none">笔记</TabsTrigger><TabsTrigger value="documents" className="h-8 border-0 bg-transparent px-4 py-0 text-sm text-muted-foreground shadow-none focus-visible:ring-offset-0 data-[state=inactive]:hover:text-foreground data-[state=active]:!bg-[var(--surface-control)] data-[state=active]:!text-foreground data-[state=active]:!shadow-none">文件</TabsTrigger></TabsList>
+        <TabsList aria-label="知识中心内容" className="h-8 gap-1 rounded-none border-0 bg-transparent p-0 shadow-none"><TabsTrigger value="notes" className="h-8 border-0 bg-transparent px-4 py-0 text-sm text-muted-foreground shadow-none focus-visible:ring-offset-0 data-[state=inactive]:hover:text-foreground data-[state=active]:!bg-[var(--surface-control)] data-[state=active]:!text-[var(--surface-control-foreground)] data-[state=active]:!shadow-none">词库</TabsTrigger><TabsTrigger value="documents" className="h-8 border-0 bg-transparent px-4 py-0 text-sm text-muted-foreground shadow-none focus-visible:ring-offset-0 data-[state=inactive]:hover:text-foreground data-[state=active]:!bg-[var(--surface-control)] data-[state=active]:!text-[var(--surface-control-foreground)] data-[state=active]:!shadow-none">笔记</TabsTrigger></TabsList>
         <div className="relative ml-auto w-[240px] shrink-0">
-          <Search size={16} className="pointer-events-none absolute left-3 top-1/2 z-10 -translate-y-1/2 text-muted-foreground" />
-          <Input value={query} onChange={(event) => setQuery(event.target.value)} aria-label="搜索知识内容" placeholder={activeSection === 'documents' ? '搜索文件和文件夹…' : '搜索标题、描述和提取文字…'} className="h-9 border-0 bg-[#f3f3f1] py-0 pl-9 shadow-none focus-visible:ring-1 focus-visible:ring-black/10 dark:bg-[var(--surface-control)] dark:focus-visible:ring-white/15" />
+          <Search size={16} className="pointer-events-none absolute left-3 top-1/2 z-10 -translate-y-1/2 text-secondary-foreground/60" />
+          <Input value={query} onChange={(event) => setQuery(event.target.value)} aria-label="搜索知识内容" placeholder={activeSection === 'documents' ? '搜索笔记和文件夹…' : '搜索标题、描述和提取文字…'} className="h-8 border border-neutral-border bg-neutral-surface py-0 pl-9 text-neutral-foreground placeholder:text-muted-foreground shadow-none focus-visible:ring-1 focus-visible:ring-neutral-border" />
         </div>
       </Tabs>
-      <div className="mx-3 mb-0 min-h-0 flex-1 overflow-visible rounded-xl bg-[#f8f8f6] p-2 dark:bg-[var(--surface-bg)]">
-        {activeSection === 'notes' ? <QuickNotes /> : <PersonalSpace embedded query={query} />}
+      <div className="mx-3 mb-3 min-h-0 flex-1 overflow-visible bg-transparent p-0">
+        {activeSection === 'notes' ? <QuickNotes query={query} /> : <PersonalSpace embedded query={query} />}
       </div>
     </div>
   );
@@ -284,7 +284,7 @@ export const ExportCenter = () => {
           icon={PackageCheck}
         />
         <div className="mt-7 grid gap-5 lg:grid-cols-[1fr_340px]">
-          <section className="overflow-hidden rounded-lg border border-border bg-card shadow-sm">
+            <section className="overflow-hidden rounded-lg border border-border bg-card">
             <div className="flex gap-1 border-b border-border p-3">
               <ExportTab
                 active={kind === 'pptx'}
@@ -331,7 +331,7 @@ export const ExportCenter = () => {
                   label="输出规格"
                   value={kind === 'pptx' ? '16:9 · 可编辑' : '1080p · 高质量'}
                 />
-                <Setting label="文件位置" value="~/Design Work/Exports" />
+                <Setting label="文件位置" value="~/LIZUO/Exports" />
                 <Setting
                   label="资源策略"
                   value={kind === 'pptx' ? '嵌入图片与字体替代' : '复制所有依赖文件'}
@@ -426,14 +426,14 @@ export const ExportCenter = () => {
                   ['KV-preview.png', '昨天 19:06 · 4.1 MB'],
                 ].map(([name, meta]) => (
                   <Button key={name} variant="ghost" className="h-auto w-full justify-start gap-3 px-0 text-left">
-                    <span className="grid h-8 w-8 place-items-center rounded-md bg-primary/15">
+                    <span className="grid h-8 w-8 place-items-center rounded-md bg-muted text-muted-foreground">
                       <Download size={14} />
                     </span>
                     <span className="min-w-0 flex-1">
                       <span className="block truncate text-xs font-medium">{name}</span>
                       <span className="mt-0.5 block text-xs text-muted-foreground">{meta}</span>
                     </span>
-                    <ChevronRight size={12} className="text-slate-300" />
+                    <ChevronRight size={12} className="text-muted-foreground/50" />
                   </Button>
                 ))}
               </div>
@@ -514,6 +514,6 @@ const Setting = ({ label, value }: { label: string; value: string }) => (
       </span>
       <span className="mt-1 block truncate text-xs font-medium">{value}</span>
     </span>
-    <ChevronRight size={12} className="shrink-0 text-slate-300" />
+    <ChevronRight size={12} className="shrink-0 text-muted-foreground/50" />
   </Button>
 );

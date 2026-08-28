@@ -1,6 +1,6 @@
 import { memo, useMemo } from 'react';
 import { Node, NodeProps } from '@xyflow/react';
-import { Clapperboard, Loader2, Plus, Sparkles, Wand2 } from 'lucide-react';
+import { Clapperboard, Loader2, Plus, Sparkles, Wand2 } from '@/lib/remixIconShim';
 import { BaseNode } from './BaseNode';
 import { StoryboardNodeData, StoryboardShot } from '../../types/node.types';
 import { useCanvasStore } from '../../stores/useCanvasStore';

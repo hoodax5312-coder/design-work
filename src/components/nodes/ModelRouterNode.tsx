@@ -1,6 +1,6 @@
 import { memo } from 'react';
 import { Node, NodeProps } from '@xyflow/react';
-import { Ban, CheckCircle2, KeyRound, Network } from 'lucide-react';
+import { Ban, CheckCircle2, KeyRound, Network } from '@/lib/remixIconShim';
 import { BaseNode } from './BaseNode';
 import { ModelRouterNodeData } from '../../types/node.types';
 import { useCanvasStore } from '../../stores/useCanvasStore';
@@ -87,7 +87,7 @@ const Metric = ({
 }) => (
   <Card padding="sm" className={cn(
     active
-      ? 'border-blue-200 bg-blue-50 text-blue-700 dark:border-blue-500/30 dark:bg-blue-500/10 dark:text-blue-300'
+      ? 'border-primary/30 bg-primary/10 text-primary'
       : 'text-muted-foreground',
   )}>
     <Icon className="mb-1 h-3.5 w-3.5" />

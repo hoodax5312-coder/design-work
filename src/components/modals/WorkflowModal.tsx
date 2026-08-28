@@ -1,6 +1,6 @@
 import React from 'react';
 import { useUIStore } from '../../stores/useUIStore';
-import { Layout, Video, Music, Image as ImageIcon } from 'lucide-react';
+import { Layout, Video, Music, Image as ImageIcon } from '@/lib/remixIconShim';
 import { cn } from '../../lib/utils';
 import {
   Button,
@@ -20,12 +20,12 @@ const categories = [
 ];
 
 const templates = [
-  { id: 1, title: '文本转视频故事', category: 'video', image: 'bg-gradient-to-br from-[#c8ff00]/35 to-[#c8ff00]' },
-  { id: 2, title: '音乐视频生成', category: 'audio', image: 'bg-gradient-to-br from-cyan-500 to-blue-600' },
-  { id: 3, title: '角色设计', category: 'image', image: 'bg-gradient-to-br from-emerald-500 to-teal-600' },
-  { id: 4, title: '社交媒体帖子', category: 'video', image: 'bg-gradient-to-br from-pink-500 to-rose-600' },
-  { id: 5, title: '播客封面', category: 'image', image: 'bg-gradient-to-br from-orange-500 to-red-600' },
-  { id: 6, title: '环境音效', category: 'audio', image: 'bg-gradient-to-br from-[#c8ff00]/35 to-[#c8ff00]' },
+  { id: 1, title: '文本转视频故事', category: 'video', image: 'bg-muted' },
+  { id: 2, title: '音乐视频生成', category: 'audio', image: 'bg-muted' },
+  { id: 3, title: '角色设计', category: 'image', image: 'bg-muted' },
+  { id: 4, title: '社交媒体帖子', category: 'video', image: 'bg-muted' },
+  { id: 5, title: '播客封面', category: 'image', image: 'bg-muted' },
+  { id: 6, title: '环境音效', category: 'audio', image: 'bg-muted' },
 ];
 
 export const WorkflowModal = () => {
@@ -80,7 +80,7 @@ export const WorkflowModal = () => {
                   onClick={closeModal}
                   onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') closeModal(); }}
                   padding="none"
-                  className="group relative aspect-[4/3] overflow-hidden rounded-md border bg-card text-left transition-all hover:border-primary hover:shadow-md"
+                  className="group relative aspect-[4/3] overflow-hidden rounded-md border bg-card text-left transition-[border-color] hover:border-foreground/25"
                 >
                   <div className={cn("absolute inset-0 opacity-40 group-hover:opacity-60 transition-opacity", template.image)} />
                   <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/90 to-transparent p-4 pt-12">

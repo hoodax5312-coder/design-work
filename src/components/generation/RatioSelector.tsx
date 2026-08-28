@@ -1,4 +1,4 @@
-import { Square, Smartphone, Monitor, LayoutTemplate } from 'lucide-react';
+import { Square, Smartphone, Monitor, LayoutTemplate } from '@/lib/remixIconShim';
 import { cn } from '../../lib/utils';
 import { Button, Label } from '../ui';
 

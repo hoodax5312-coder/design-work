@@ -24,7 +24,7 @@ import {
   Sparkles,
   Star,
   X,
-} from 'lucide-react';
+} from '@/lib/remixIconShim';
 import {
   fallbackFolders,
   fallbackProjects,
@@ -513,12 +513,12 @@ export const ProjectGallery = () => {
                 onClick={() => openProject(project)}
                 onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') void openProject(project); }}
                 padding="none"
-                className="group cursor-pointer overflow-hidden text-left transition-[transform,box-shadow] hover:-translate-y-0.5 hover:shadow-md"
+                className="group cursor-pointer overflow-hidden text-left transition-[border-color] hover:border-foreground/20"
               >
                 <div className="relative aspect-video overflow-hidden bg-zinc-900">
                   <MediaView
                     media={project.cover}
-                    className="h-full w-full object-cover transition duration-500 group-hover:scale-[1.025] group-hover:brightness-110"
+                    className="h-full w-full object-cover"
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-transparent to-transparent opacity-60" />
                   <div className="absolute left-3 top-3 flex items-center gap-2">
@@ -606,7 +606,7 @@ export const ProjectGallery = () => {
       )}
 
       <div className="flex min-h-0 flex-1">
-        <aside className="w-[224px] shrink-0 overflow-y-auto border-0 bg-white dark:bg-[#0b0b0b]">
+        <aside className="w-[224px] shrink-0 overflow-y-auto border-0 bg-card text-card-foreground">
           <div className="border-0 p-4">
             <div className="mb-3 font-mono text-xs uppercase tracking-[0.22em] text-muted-foreground">Story structure</div>
             <div className="text-xs leading-5 text-muted-foreground">{selectedProject.description || '按情节组织生成片段与最终采用镜头。'}</div>
@@ -700,7 +700,7 @@ export const ProjectGallery = () => {
             )}
           </div>
 
-          <div className="h-[118px] shrink-0 border-0 bg-white dark:bg-[#0b0b0b]">
+          <div className="h-[118px] shrink-0 border-0 bg-card text-card-foreground">
             <div className="flex h-8 items-center justify-between border-0 px-3">
               <div className="flex items-center gap-2 text-xs uppercase tracking-[0.15em] text-muted-foreground"><Layers3 size={13} className="text-foreground" /> 片段组合 · V1</div>
               <div className="font-mono text-xs text-muted-foreground">{timelineClips.length} shots · {timelineClips.length * 8}s</div>
@@ -719,7 +719,7 @@ export const ProjectGallery = () => {
           </div>
         </section>
 
-        <aside className="hidden w-[340px] shrink-0 overflow-y-auto border-0 bg-white dark:bg-[#0b0b0b] xl:block">
+        <aside className="hidden w-[340px] shrink-0 overflow-y-auto border-0 bg-card text-card-foreground xl:block">
           {selectedClip ? (
             <>
               <div className="relative aspect-video bg-black">

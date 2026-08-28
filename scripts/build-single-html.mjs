@@ -42,7 +42,7 @@ if (/<script[^>]+src=|<link[^>]+href=/.test(standalone)) {
 }
 
 await mkdir(outputDir, { recursive: true });
-const outputPath = path.join(outputDir, 'Design Work-standalone.html');
+const outputPath = path.join(outputDir, 'LIZUO-standalone.html');
 await writeFile(outputPath, standalone, 'utf8');
 
 console.log(`单文件 HTML 已生成：${outputPath}`);

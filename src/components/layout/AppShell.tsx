@@ -7,7 +7,7 @@ import {
   Infinity as InfinityIcon,
   Presentation,
   Search,
-} from 'lucide-react';
+} from '@/lib/remixIconShim';
 import { useUIStore } from '../../stores/useUIStore';
 import { CreationModeSwitch } from './CreationModeSwitch';
 import { ProjectSidebar } from './ProjectSidebar';
@@ -21,8 +21,13 @@ export const AppShell = ({ children }: AppShellProps) => {
   const {
     activeModule,
     workspaceMode,
+    themeMode,
+    contentLayout,
+    topNavigationMode,
+    sidebarStyle,
     setWorkspaceMode,
     setActiveModule,
+    setThemeMode,
   } = useUIStore();
   const [commandOpen, setCommandOpen] = useState(false);
   const [commandQuery, setCommandQuery] = useState('');
@@ -81,6 +86,14 @@ export const AppShell = ({ children }: AppShellProps) => {
     return () => window.removeEventListener('keydown', handleShortcut);
   }, [setActiveModule, setWorkspaceMode, workspaceMode]);
 
+  useEffect(() => {
+    if (themeMode !== 'system') return;
+    const media = window.matchMedia('(prefers-color-scheme: dark)');
+    const syncSystemTheme = () => setThemeMode('system');
+    media.addEventListener('change', syncSystemTheme);
+    return () => media.removeEventListener('change', syncSystemTheme);
+  }, [setThemeMode, themeMode]);
+
   const runCommand = (run: () => void) => {
     setWorkspaceMode('editor');
     run();
@@ -89,14 +102,30 @@ export const AppShell = ({ children }: AppShellProps) => {
   };
 
   return (
-    <div className="flex h-[100dvh] w-screen overflow-hidden bg-[#f0f0ed] font-sans text-foreground dark:bg-[#151515]">
+    <div
+      className="flex h-[100dvh] w-screen overflow-hidden bg-sidebar font-sans text-foreground"
+      data-sidebar-style={sidebarStyle}
+      data-top-navigation={topNavigationMode}
+    >
       <ProjectSidebar />
 
-      <div className="app-workspace relative my-2 ml-0 mr-2 flex min-w-0 flex-1 flex-col overflow-hidden rounded-[16px] border border-[var(--surface-border)] bg-[var(--workspace-bg)] shadow-sm">
+      <div
+        className={
+          sidebarStyle === 'standard'
+            ? 'app-workspace relative flex min-w-0 flex-1 flex-col overflow-hidden bg-[var(--workspace-bg)]'
+            : sidebarStyle === 'floating'
+              ? 'app-workspace ui-app-shell relative my-2 ml-0 mr-2 flex min-w-0 flex-1 flex-col overflow-hidden bg-[var(--workspace-bg)]'
+              : 'app-workspace ui-app-shell ui-app-shell-embedded relative my-2 ml-0 mr-2 flex min-w-0 flex-1 flex-col overflow-hidden bg-[var(--workspace-bg)]'
+        }
+      >
         <div className="relative flex min-h-0 flex-1 overflow-hidden">
           <main className="relative min-w-0 flex-1 overflow-hidden">
             <div className="absolute inset-0 overflow-hidden">
-              <div className={activeModule === 'image-gen' ? 'app-content-container pt-14' : 'app-content-container'}>
+              <div className={[
+                'app-content-container',
+                activeModule === 'image-gen' ? 'pt-14' : '',
+                contentLayout === 'centered' ? 'mx-auto max-w-[1440px]' : '',
+              ].filter(Boolean).join(' ')}>
                 {children}
               </div>
             </div>

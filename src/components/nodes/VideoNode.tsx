@@ -1,6 +1,6 @@
 import { memo } from 'react';
 import { type Node, type NodeProps } from '@xyflow/react';
-import { Film, Video } from 'lucide-react';
+import { Film, Video } from '@/lib/remixIconShim';
 import { BaseNode } from './BaseNode';
 import { type VideoNodeData } from '../../types/node.types';
 import { useCanvasStore } from '../../stores/useCanvasStore';

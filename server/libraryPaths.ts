@@ -14,11 +14,27 @@ export interface LibraryPaths {
   managedAssets: string;
   taskTemp: string;
   backups: string;
+  modules: {
+    generation: string;
+    canvas: string;
+    assets: string;
+    knowledge: string;
+    tools: string;
+    settings: string;
+  };
 }
 
 export const createLibraryPaths = (dataDirectory: string, cacheDirectory = dataDirectory): LibraryPaths => {
   const dataRoot = path.resolve(dataDirectory);
   const cacheRoot = path.resolve(cacheDirectory);
+  const modules = {
+    generation: path.join(cacheRoot, 'workspace', 'generation-history.json'),
+    canvas: path.join(cacheRoot, 'workspace', 'canvas-workspace.json'),
+    assets: path.join(dataRoot, 'managed-assets'),
+    knowledge: dataRoot,
+    tools: cacheRoot,
+    settings: path.join(dataRoot, 'library.sqlite'),
+  };
   return {
     root: cacheRoot,
     dataRoot,
@@ -32,6 +48,7 @@ export const createLibraryPaths = (dataDirectory: string, cacheDirectory = dataD
     managedAssets: path.join(dataRoot, 'managed-assets'),
     taskTemp: path.join(cacheRoot, 'task-temp'),
     backups: path.join(dataRoot, 'backups'),
+    modules,
   };
 };
 

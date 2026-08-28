@@ -8,7 +8,7 @@ const buttonVariants = cva(
     variants: {
       variant: {
         primary: 'bg-primary text-primary-foreground hover:bg-primary/90',
-        secondary: 'border border-input bg-background hover:bg-accent hover:text-accent-foreground',
+        secondary: 'border-[var(--surface-panel-border-width)] border-[var(--action-secondary-border)] bg-[var(--action-secondary-bg)] text-[var(--action-secondary-foreground)] hover:bg-[var(--action-secondary-bg-hover)] hover:text-[var(--action-secondary-foreground)]',
         ghost: 'hover:bg-accent hover:text-accent-foreground',
         link: 'h-auto rounded-none p-0 text-foreground underline-offset-4 hover:underline',
         accent: 'bg-primary text-primary-foreground hover:bg-primary/90',

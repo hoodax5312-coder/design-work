@@ -8,7 +8,7 @@ import {
 import { VideoAnalyzeNodeData, VideoNodeData } from '../../types/node.types';
 import { detectScenesAndCapture } from '../../lib/videoUtils';
 import { useCanvasStore } from '../../stores/useCanvasStore';
-import { Loader2, FileText, Image as ImageIcon, Sparkles } from 'lucide-react';
+import { Loader2, FileText, Image as ImageIcon, Sparkles } from '@/lib/remixIconShim';
 import { BaseNode } from './BaseNode';
 import { Button } from '../ui';
 

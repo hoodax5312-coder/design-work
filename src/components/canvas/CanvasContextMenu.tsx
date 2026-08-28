@@ -2,7 +2,7 @@ import { useEffect, useRef } from 'react';
 import { useUIStore } from '../../stores/useUIStore';
 import { useCanvasStore } from '../../stores/useCanvasStore';
 import { useReactFlow } from '@xyflow/react';
-import { Type, Image as ImageIcon, Video, Music, Upload } from 'lucide-react';
+import { Type, Image as ImageIcon, Video, Music, Upload } from '@/lib/remixIconShim';
 import { Button, Card } from '../ui';
 
 export const CanvasContextMenu = () => {

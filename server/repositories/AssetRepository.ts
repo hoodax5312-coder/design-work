@@ -30,6 +30,7 @@ export interface CreateAssetInput {
   title: string;
   description?: string;
   contentHash?: string | null;
+  sourceUrl?: string | null;
   primaryFolderId?: string | null;
   favorite?: boolean;
   rating?: number;
@@ -38,7 +39,21 @@ export interface CreateAssetInput {
   normalizedMetadata?: Record<string, unknown>;
   userMetadata?: Record<string, unknown>;
   extractedText?: string;
+  fileReference?: AssetFileReferenceInput;
   now?: number;
+}
+
+export interface AssetFileReferenceInput {
+  absolutePath: string;
+  volumeId?: string | null;
+  fileName: string;
+  extension: string;
+  mimeType?: string | null;
+  fileSize: number;
+  fileCreatedAt?: number | null;
+  fileModifiedAt?: number | null;
+  contentHash?: string | null;
+  status?: string;
 }
 
 export interface UpdateAssetInput {
@@ -159,6 +174,38 @@ const buildSearch = (input: SearchAssetsInput) => {
 export class AssetRepository {
   constructor(private readonly database: DatabaseSync) {}
 
+  private insertFileReference(assetId: string, reference: AssetFileReferenceInput, now: number) {
+    const id = randomUUID();
+    this.database
+      .prepare(
+        `
+      INSERT INTO file_references(
+        id, asset_id, absolute_path, volume_id, file_name, extension, mime_type,
+        file_size, file_created_at, file_modified_at, content_hash, last_accessible_at,
+        status, created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `,
+      )
+      .run(
+        id,
+        assetId,
+        reference.absolutePath,
+        reference.volumeId ?? null,
+        reference.fileName,
+        reference.extension,
+        reference.mimeType ?? null,
+        reference.fileSize,
+        reference.fileCreatedAt ?? null,
+        reference.fileModifiedAt ?? null,
+        reference.contentHash ?? null,
+        now,
+        reference.status || 'online',
+        now,
+        now,
+      );
+    return id;
+  }
+
   create(input: CreateAssetInput): AssetRecord {
     const id = input.id || randomUUID();
     const now = input.now || Date.now();
@@ -168,9 +215,9 @@ export class AssetRepository {
           `
         INSERT INTO assets(
           id, type, title, description, content_hash, primary_folder_id,
-          favorite, rating, status, raw_metadata, normalized_metadata, user_metadata,
+          favorite, rating, source_url, status, raw_metadata, normalized_metadata, user_metadata,
           created_at, imported_at, updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `,
         )
         .run(
@@ -182,6 +229,7 @@ export class AssetRepository {
           input.primaryFolderId ?? null,
           input.favorite ? 1 : 0,
           input.rating || 0,
+          input.sourceUrl ?? null,
           input.status || 'active',
           JSON.stringify(input.rawMetadata || {}),
           JSON.stringify(input.normalizedMetadata || {}),
@@ -197,8 +245,15 @@ export class AssetRepository {
       `,
         )
         .run(id, input.title, input.description || '', input.extractedText || '');
+      if (input.fileReference) {
+        this.insertFileReference(id, input.fileReference, now);
+      }
     });
     return this.get(id) as AssetRecord;
+  }
+
+  addFileReference(assetId: string, reference: AssetFileReferenceInput, now = Date.now()) {
+    return withTransaction(this.database, () => this.insertFileReference(assetId, reference, now));
   }
 
   get(id: string): AssetRecord | null {

@@ -5,11 +5,12 @@ import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 import express from 'express';
+import sharp from 'sharp';
 import { createAssetRouter } from './assetGateway';
 import { openLibraryDatabase } from './database';
 import { ImportService } from './import/ImportService';
 import { FingerprintService } from './import/FingerprintService';
-import { createLibraryPaths } from './libraryPaths';
+import { createLibraryPaths, ensureLibraryDirectories } from './libraryPaths';
 import type { LibraryRuntime } from './libraryRuntime';
 import { PreviewService } from './previews/PreviewService';
 import { AssetRepository } from './repositories/AssetRepository';
@@ -141,6 +142,87 @@ test('asset API supports combined filters, durable updates, bulk operations, del
     await new Promise<void>((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));
     runtime.database.close();
     await fs.rm(filesDirectory, { recursive: true, force: true });
+  }
+});
+
+test('saving a generated image stores a local source, creates a preview, and cleans invalid input', async () => {
+  const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'design-work-generated-'));
+  const paths = createLibraryPaths(path.join(directory, 'library'));
+  await ensureLibraryDirectories(paths);
+  const database = openLibraryDatabase(paths.database);
+  const runtime: LibraryRuntime = {
+    database,
+    paths,
+    tasks: new TaskRunner(new TaskRepository(database)),
+    imports: new ImportService(database),
+    assets: new AssetRepository(database),
+    folders: new FolderRepository(database),
+    tags: new TagRepository(database),
+    smartCollections: new SmartCollectionRepository(database),
+    previews: new PreviewService(database, paths),
+  };
+  runtime.tasks.register('preview.image', async (input) => {
+    const result = await runtime.previews.generateImage(String(input.assetId), 512);
+    return { reused: result.reused };
+  });
+
+  const source = await sharp({
+    create: { width: 24, height: 16, channels: 3, background: '#6b7280' },
+  }).png().toBuffer();
+  const sourceUrl = `data:image/png;base64,${source.toString('base64')}`;
+  const app = express();
+  app.use(express.json({ limit: '5mb' }));
+  app.use('/api/assets', createAssetRouter(async () => runtime));
+  const server = app.listen(0, '127.0.0.1');
+  try {
+    await new Promise<void>((resolve, reject) => {
+      server.once('listening', resolve);
+      server.once('error', reject);
+    });
+    const origin = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
+    const createResponse = await fetch(`${origin}/api/assets`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        type: 'image',
+        title: '本地生成图',
+        sourceUrl,
+        userMetadata: { source: 'image-generation', generatedUrl: sourceUrl },
+      }),
+    });
+    assert.equal(createResponse.status, 201);
+    const created = await createResponse.json() as { id: string; previewStatus: string };
+    const reference = runtime.database
+      .prepare('SELECT * FROM file_references WHERE asset_id = ?')
+      .get(created.id) as Record<string, unknown>;
+    assert.equal(reference.status, 'online');
+    assert.equal(await fs.stat(String(reference.absolute_path)).then(() => true), true);
+
+    await runtime.tasks.waitForIdle();
+    assert.equal(runtime.previews.repository.latest(created.id, 'thumbnail:512')?.status, 'ready');
+    assert.equal(
+      (await fetch(`${origin}/api/assets/${created.id}/preview?size=512`)).status,
+      200,
+    );
+
+    const invalidResponse = await fetch(`${origin}/api/assets`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        type: 'image',
+        title: '损坏图片',
+        sourceUrl: 'data:image/png;base64,aW52YWxpZA==',
+      }),
+    });
+    assert.equal(invalidResponse.status, 400);
+    assert.equal(
+      (runtime.database.prepare('SELECT COUNT(*) AS count FROM assets').get()?.count),
+      1,
+    );
+  } finally {
+    await new Promise<void>((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));
+    database.close();
+    await fs.rm(directory, { recursive: true, force: true });
   }
 });
 

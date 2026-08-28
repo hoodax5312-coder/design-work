@@ -7,7 +7,7 @@ import {
   RotateCcw,
   Square,
   X,
-} from 'lucide-react';
+} from '@/lib/remixIconShim';
 import { cn } from '../../lib/utils';
 import { assetService } from '../../services/assetService';
 import type { DurableTask } from '../../types/asset.types';

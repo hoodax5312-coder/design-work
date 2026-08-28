@@ -1,4 +1,4 @@
-import { Search, Grid, Map, ChevronDown } from 'lucide-react';
+import { Search, Grid, Map, ChevronDown } from '@/lib/remixIconShim';
 import { useCanvasStore } from '../../stores/useCanvasStore';
 import { cn } from '../../lib/utils';
 import { Button, Card, Separator } from '../ui';

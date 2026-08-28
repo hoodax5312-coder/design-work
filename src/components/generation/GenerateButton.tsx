@@ -1,5 +1,5 @@
 import { type ButtonHTMLAttributes } from 'react';
-import { Sparkles } from 'lucide-react';
+import { Sparkles } from '@/lib/remixIconShim';
 import { cn } from '../../lib/utils';
 import { Button } from '../ui';
 

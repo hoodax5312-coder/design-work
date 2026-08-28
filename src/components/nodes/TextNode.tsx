@@ -1,9 +1,9 @@
 import { memo, useMemo } from 'react';
 import { type Node, type NodeProps } from '@xyflow/react';
-import { Loader2, Send, Type } from 'lucide-react';
+import { Loader2, Send, Type } from '@/lib/remixIconShim';
 import { BaseNode } from './BaseNode';
 import { type TextNodeData } from '../../types/node.types';
-import { getConfiguredModels, getSelectedModel, modelSupportsCategory, useProviderStore } from '../../stores/useProviderStore';
+import { getConfiguredModels, getSelectedModel, providerSupportsCategory, useProviderStore } from '../../stores/useProviderStore';
 import { useCanvasStore } from '../../stores/useCanvasStore';
 import { generateProviderText } from '../../services/providerService';
 import { Button, Select, Textarea } from '../ui';
@@ -14,11 +14,12 @@ export const TextNode = memo(({ id, data, selected }: NodeProps<CanvasTextNode>)
   const updateNode = useCanvasStore((state) => state.updateNode);
   const deleteNode = useCanvasStore((state) => state.deleteNode);
   const providers = useProviderStore((state) => state.providers);
-  const activeProviderId = useProviderStore((state) => state.activeProviderId);
-  const options = useMemo(() => providers.flatMap((provider) => getConfiguredModels(provider)
-    .filter((model) => modelSupportsCategory(model, 'language'))
+  const activeProviderId = useProviderStore((state) => state.activeProviderIds.language);
+  const options = useMemo(() => providers.flatMap((provider) => getConfiguredModels(provider, 'language')
     .map((model) => ({ provider, model: model.id }))), [providers]);
-  const provider = providers.find((item) => item.id === data.providerId) || providers.find((item) => item.id === activeProviderId) || options[0]?.provider;
+  const provider = providers.find((item) => item.id === data.providerId && providerSupportsCategory(item, 'language'))
+    || providers.find((item) => item.id === activeProviderId && providerSupportsCategory(item, 'language'))
+    || options[0]?.provider;
   const model = data.model || getSelectedModel(provider, 'language') || options[0]?.model || '';
   const active = options.find((option) => option.provider.id === provider?.id && option.model === model);
 
@@ -28,7 +29,7 @@ export const TextNode = memo(({ id, data, selected }: NodeProps<CanvasTextNode>)
     if (!data.prompt?.trim()) return;
     updateNode(id, { isGenerating: true, error: undefined, providerId: target.id, model });
     try {
-      const result = await generateProviderText({ ...target, model }, data.prompt);
+      const result = await generateProviderText(target, data.prompt, model);
       updateNode(id, { content: result.content, isGenerating: false });
     } catch (error) {
       updateNode(id, { isGenerating: false, error: error instanceof Error ? error.message : '生成失败' });

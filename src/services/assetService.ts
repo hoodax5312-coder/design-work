@@ -60,6 +60,7 @@ export const assetService = {
     title: string;
     description?: string;
     primaryFolderId?: string | null;
+    sourceUrl?: string;
     userMetadata?: Record<string, unknown>;
   }) => request<AssetSummary>('/api/assets', json(input)),
   list: async (query: AssetQuery = {}) => {

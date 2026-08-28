@@ -18,7 +18,7 @@ import {
   User,
   ZoomIn,
   ZoomOut,
-} from 'lucide-react';
+} from '@/lib/remixIconShim';
 import { useReactFlow } from '@xyflow/react';
 import { useUIStore, type PanelType } from '../../stores/useUIStore';
 import { useCanvasStore } from '../../stores/useCanvasStore';

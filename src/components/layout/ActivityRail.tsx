@@ -41,20 +41,20 @@ export const ActivityRail = () => {
   };
 
   return (
-    <nav className="flex h-full w-16 shrink-0 flex-col items-center border-r border-black/[0.08] bg-[#f8f8f7] py-2 dark:border-white/10 dark:bg-[#0d0d0d]">
+    <nav className="flex h-full w-16 shrink-0 flex-col items-center border-r border-border bg-background py-2 text-foreground">
       <Button type="button" variant="primary" size="iconSm"
         onClick={() => openEditor('assets')}
-        aria-label="Design Work 资产库"
+        aria-label="栗作 LIZUO 资产库"
         className="relative mb-4 h-8 w-8 shadow-sm"
       >
         <RiCommandFill size={17} />
-        <span className="absolute -bottom-0.5 h-[3px] w-4 rounded-full bg-[#c8ff00]" />
+        <span className="absolute -bottom-0.5 h-[3px] w-4 rounded-full bg-primary" />
       </Button>
 
       <div className="flex flex-1 flex-col items-center gap-1">
         {editorTools.map((tool, index) => (
           <div key={tool.module} className="flex flex-col items-center gap-1">
-            {index === 1 && <div className="my-1 h-px w-5 bg-black/10 dark:bg-white/10" />}
+            {index === 1 && <div className="my-1 h-px w-5 bg-border" />}
             <RailButton
               lineIcon={tool.lineIcon}
               fillIcon={tool.fillIcon}
@@ -64,7 +64,7 @@ export const ActivityRail = () => {
             />
           </div>
         ))}
-        <div className="mt-1 text-xs font-semibold text-slate-300 dark:text-zinc-700">⌘K</div>
+        <div className="mt-1 text-xs font-semibold text-muted-foreground/50">⌘K</div>
       </div>
 
       <div className="flex w-full flex-col items-center gap-1 pb-1">
@@ -99,8 +99,8 @@ const RailButton = ({
       'group relative',
       utility ? 'h-10 w-10' : 'h-9 w-9',
       active
-        ? 'bg-black/[0.08] text-black dark:bg-white/10 dark:text-white'
-        : 'text-slate-400 hover:bg-black/[0.045] hover:text-slate-800 dark:text-zinc-600 dark:hover:bg-white/[0.06] dark:hover:text-zinc-200',
+        ? 'bg-accent text-accent-foreground'
+        : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground',
     )}
   >
       <Icon size={utility ? 20 : 18} />

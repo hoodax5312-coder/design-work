@@ -1,4 +1,4 @@
-name: Deploy Design Work preview
+name: Deploy LIZUO preview
 
 on:
   push:

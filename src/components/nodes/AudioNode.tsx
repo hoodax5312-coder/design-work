@@ -1,7 +1,7 @@
 import { memo } from 'react';
 import { NodeProps, Node } from '@xyflow/react';
 import { AudioNodeData } from '../../types/node.types';
-import { Music, Play, Pause } from 'lucide-react';
+import { Music, Play, Pause } from '@/lib/remixIconShim';
 import { BaseNode } from './BaseNode';
 import { Button } from '../ui';
 

@@ -1,5 +1,5 @@
 import { type ReactNode } from 'react';
-import { RefreshCw, Download, Sparkles, BookmarkPlus } from 'lucide-react';
+import { RefreshCw, Download, Sparkles, BookmarkPlus } from '@/lib/remixIconShim';
 import { Button } from '../ui';
 
 interface PreviewPanelProps {

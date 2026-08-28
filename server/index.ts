@@ -15,5 +15,5 @@ app.use((_request, response) => {
 });
 
 app.listen(port, () => {
-  console.log(`Design Work is running at http://localhost:${port}`);
+  console.log(`栗作 LIZUO is running at http://localhost:${port}`);
 });

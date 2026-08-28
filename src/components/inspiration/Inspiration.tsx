@@ -11,7 +11,7 @@ import {
   Sparkles,
   Sun,
   type LucideIcon,
-} from 'lucide-react';
+} from '@/lib/remixIconShim';
 import { cn } from '../../lib/utils';
 import { Button } from '../ui';
 
@@ -191,10 +191,10 @@ export const Inspiration = () => {
   };
 
   return (
-    <main className="h-full overflow-hidden bg-transparent text-slate-950 dark:text-white">
+    <main className="h-full overflow-hidden bg-transparent text-foreground">
       <div className="flex h-full min-w-0 flex-col gap-3 md:flex-row">
-        <aside className="flex w-full shrink-0 flex-col bg-transparent px-3 py-3 md:w-[232px] md:px-4 md:py-4">
-          <div className="mb-3 pl-1 text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">分类</div>
+        <aside className="flex w-full shrink-0 flex-col bg-sidebar px-3 py-3 text-sidebar-foreground md:w-[232px] md:px-4 md:py-4">
+          <div className="mb-3 pl-1 text-xs font-semibold uppercase tracking-[0.18em] text-sidebar-foreground/70">分类</div>
           <nav aria-label="提示词分类" className="flex gap-1 overflow-x-auto pb-1 md:block md:space-y-1 md:overflow-visible md:pb-0">
             {CATEGORIES.map((category) => {
               const Icon = category.icon;
@@ -208,13 +208,13 @@ export const Inspiration = () => {
                   className={cn(
                     'group relative h-8 shrink-0 justify-start gap-2 px-3 text-left text-[13px] md:w-full md:gap-3 md:text-sm',
                     isActive
-                      ? 'bg-foreground text-background'
-                      : 'text-muted-foreground hover:bg-black/[0.06] hover:text-foreground dark:hover:bg-white/[0.08]',
+                      ? 'bg-sidebar-accent text-sidebar-accent-foreground'
+                      : 'text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground',
                   )}
                 >
                   <Icon aria-hidden="true" size={19} strokeWidth={1.7} />
                   <span className="flex-1">{category.label}</span>
-                  <span className={cn('hidden h-5 min-w-5 place-items-center rounded-md px-1 text-xs tabular-nums md:grid', isActive ? 'bg-background/15 text-background' : 'bg-black/[0.05] text-muted-foreground dark:bg-white/[0.06]')}>
+                  <span className={cn('hidden h-5 min-w-5 place-items-center rounded-md px-1 text-xs tabular-nums md:grid', isActive ? 'bg-sidebar-foreground/15 text-sidebar-accent-foreground' : 'bg-sidebar-foreground/10 text-sidebar-foreground/70')}>
                     {count}
                   </span>
                 </Button>
@@ -234,7 +234,7 @@ export const Inspiration = () => {
             {visiblePrompts.map((prompt) => {
               const isCopied = copiedId === prompt.id;
               return (
-                <article key={prompt.id} className="group relative flex min-h-[176px] min-w-0 flex-col rounded-lg border border-black/[0.045] bg-white p-4 transition-[background-color,box-shadow] hover:bg-[#fcfcfb] hover:shadow-[0_4px_14px_rgba(15,15,15,0.05)] focus-within:bg-[#fcfcfb] dark:border-[var(--surface-border)] dark:bg-[var(--surface-bg)] dark:hover:bg-[var(--surface-hover)]">
+                <article key={prompt.id} className="group relative flex min-h-[176px] min-w-0 flex-col rounded-lg border border-border bg-card p-4 text-card-foreground transition-[border-color] hover:border-foreground/20 focus-within:border-ring">
                   <Button type="button" variant="ghost" size="iconSm"
                       onClick={() => copyPrompt(prompt)}
                       aria-label={`复制「${prompt.title}」提示词`}

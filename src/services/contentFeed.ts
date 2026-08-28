@@ -54,4 +54,16 @@ export const contentFeed = {
     }
     window.dispatchEvent(new Event('design-work:content-feed-updated'));
   },
+  removeByPreviewUrls(urls: string[]) {
+    const targets = new Set(urls.filter(Boolean));
+    if (!targets.size) return;
+    volatileItems = volatileItems.filter((item) => !targets.has(item.previewUrl));
+    const next = persistedItems().filter((item) => !targets.has(item.previewUrl));
+    try {
+      localStorage.setItem(KEY, JSON.stringify(next));
+    } catch {
+      // Volatile entries have already been removed for this session.
+    }
+    window.dispatchEvent(new Event('design-work:content-feed-updated'));
+  },
 };

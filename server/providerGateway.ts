@@ -1,10 +1,12 @@
 import type { NextFunction, Request, Response } from 'express';
 import { Router } from 'express';
 import { Agent, fetch as undiciFetch } from 'undici';
+import type { ModelCategory, ProviderProtocol } from '../src/types/provider';
 
-export type ProviderProtocol = 'responses' | 'chat-completions' | 'anthropic-messages';
+export type { ProviderProtocol } from '../src/types/provider';
 
 export interface ProviderRequestConfig {
+  category: ModelCategory;
   protocol: ProviderProtocol;
   baseUrl: string;
   apiKey: string;
@@ -46,6 +48,7 @@ const defaultBaseUrl = (protocol: ProviderProtocol) => {
 };
 
 const normalizeConfig = (input: ProviderRequestConfig): ProviderRequestConfig => ({
+  category: input.category,
   protocol: input.protocol,
   baseUrl:
     input.protocol !== 'anthropic-messages'
@@ -54,6 +57,17 @@ const normalizeConfig = (input: ProviderRequestConfig): ProviderRequestConfig =>
   apiKey: input.apiKey?.trim(),
   model: input.model?.trim(),
 });
+
+export const sanitizeProviderError = (message: unknown, apiKey = '') => {
+  let sanitized = String(message || '请求失败');
+  const trimmedKey = apiKey.trim();
+  if (trimmedKey) sanitized = sanitized.split(trimmedKey).join('[REDACTED]');
+  return sanitized
+    .replace(/\bBearer\s+[^\s,;]+/gi, 'Bearer [REDACTED]')
+    .replace(/\b(?:api[-_ ]?key|token)\s*[:=]\s*[^\s,;]+/gi, '$1: [REDACTED]')
+    .replace(/\b(?:sk|key)-[A-Za-z0-9._*-]{8,}\b/gi, '[REDACTED]')
+    .replace(/\b[A-Za-z0-9][A-Za-z0-9._*-]{23,}\b/g, '[REDACTED]');
+};
 
 const readJson = async (response: globalThis.Response) => {
   const text = await response.text();
@@ -125,22 +139,28 @@ export const testOpenAi = async (config: ProviderRequestConfig) => {
 };
 
 const testAnthropic = async (config: ProviderRequestConfig) => {
-  const response = await fetch(`${config.baseUrl}/messages`, {
-    method: 'POST',
+  const response = await fetch(`${config.baseUrl}/models`, {
     headers: {
       'x-api-key': config.apiKey,
       'anthropic-version': '2023-06-01',
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({
-      model: config.model,
-      max_tokens: 1,
-      messages: [{ role: 'user', content: 'ping' }],
-    }),
   });
   const payload = await readJson(response);
   if (!response.ok) throw providerError(response.status, payload);
-  return [config.model];
+  assertJsonPayload(response, payload);
+  if (!Array.isArray(payload?.data)) {
+    throw new Error('模型列表响应格式不兼容，请检查 Base URL 和协议');
+  }
+  return payload.data.map((item: { id?: string }) => item.id).filter(Boolean).sort();
+};
+
+export const testProviderModels = async (input: ProviderRequestConfig) => {
+  const config = normalizeConfig(input);
+  assertConfig(config);
+  return config.protocol === 'anthropic-messages'
+    ? testAnthropic(config)
+    : testOpenAi(config);
 };
 
 const chatOpenAi = async (
@@ -242,32 +262,12 @@ export const createProviderRouter = () => {
       const config = normalizeConfig(request.body?.config || {});
       assertConfig(config);
       const startedAt = Date.now();
-      const models =
-        config.protocol === 'anthropic-messages'
-            ? await testAnthropic(config)
-            : await testOpenAi(config);
-      let chatVerified = config.protocol === 'anthropic-messages';
-
-      if (config.protocol !== 'anthropic-messages') {
-        if (!models.includes(config.model)) {
-          throw new Error(`模型 ${config.model} 不在供应商返回的可用模型列表中`);
-        }
-        const verification = await (config.protocol === 'responses' ? chatResponses : chatOpenAi)(
-          config,
-          [{ role: 'user', content: 'Reply with OK only.' }],
-          { maxTokens: 8, temperature: 0 },
-        );
-        if (!verification.content.trim()) {
-          throw new Error('聊天接口验证失败：模型返回了空内容');
-        }
-        chatVerified = true;
-      }
+      const models = await testProviderModels(config);
 
       response.json({
         ok: true,
         latency: Date.now() - startedAt,
         models,
-        chatVerified,
         normalizedBaseUrl: config.baseUrl,
       });
     }),
@@ -357,12 +357,28 @@ export const createProviderRouter = () => {
   router.use(
     (
       error: Error & { status?: number },
-      _request: Request,
+      request: Request,
       response: Response,
       _next: NextFunction,
     ) => {
+      const config = request.body?.config as Partial<ProviderRequestConfig> | undefined;
+      const categoryLabels: Record<ModelCategory, string> = {
+        language: '文本',
+        image: '生图',
+        video: '视频',
+      };
+      let context = '';
+      if (config?.category && categoryLabels[config.category]) {
+        let host = '未知 Host';
+        try {
+          host = new URL(String(config.baseUrl || '')).host || host;
+        } catch {
+          // Keep a safe generic host label for malformed URLs.
+        }
+        context = `${categoryLabels[config.category]}连接 · ${host} · ${error.status || 500}：`;
+      }
       response.status(error.status || 500).json({
-        error: error.message || '请求失败',
+        error: `${context}${sanitizeProviderError(error.message, String(config?.apiKey || ''))}`,
       });
     },
   );

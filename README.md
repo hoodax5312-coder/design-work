@@ -1,8 +1,8 @@
-# Design Work
+# 栗作 LIZUO
 
 [在线预览](https://hoodax5312-coder.github.io/design-work/) · [版本规划](./ROADMAP.md) · [更新日志](./CHANGELOG.md) · [历史版本](https://github.com/hoodax5312-coder/design-work/releases)
 
-Design Work 是一个本地优先的 AI 创作工作台，包含真实模型对话、Agent 广场、图像生成、魔法画布、素材库和电商视觉工作流。
+栗作 LIZUO 是一个面向设计与内容创作者的本地优先 AI 创作工作台，集图片生成、视频生成、资产管理、专业知识与常用工具于一体。
 
 ## 视频工程素材库
 
@@ -31,7 +31,7 @@ Higgsfield 公开项目的授权条款不一定等同于开源软件许可证。
 
 ## 本地运行
 
-要求 Node.js 22.22 以上版本。Design Work 的本地资产数据库将使用该版本提供的 `node:sqlite`，启动脚本会在版本过低时直接给出升级提示。
+要求 Node.js 22.22 以上版本。栗作的本地资产数据库将使用该版本提供的 `node:sqlite`，启动脚本会在版本过低时直接给出升级提示。
 
 ```bash
 npm install
@@ -54,7 +54,7 @@ npm start
 
 ### 关于单文件 HTML
 
-`npm run build:html` 生成的 `output/Design Work-standalone.html` 仅用于界面预览。浏览器直接打开单文件时没有 Node.js、SQLite、文件扫描或媒体处理能力；完整的本地资产管理功能必须通过 `npm run dev` 或 `npm start` 运行本地服务。
+`npm run build:html` 生成的 `output/LIZUO-standalone.html` 仅用于界面预览。浏览器直接打开单文件时没有 Node.js、SQLite、文件扫描或媒体处理能力；完整的本地资产管理功能必须通过 `npm run dev` 或 `npm start` 运行本地服务。
 
 ## 配置模型
 

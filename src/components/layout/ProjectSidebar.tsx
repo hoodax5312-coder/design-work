@@ -14,23 +14,18 @@ import {
   Pin,
   Presentation,
   Trash2,
-} from 'lucide-react';
+} from '@/lib/remixIconShim';
 import {
   RiArchiveStackFill,
   RiArchiveStackLine,
-  RiCommandFill,
   RiFileTextFill,
   RiFileTextLine,
   RiImageAiFill,
   RiImageAiLine,
   RiInfinityFill,
   RiInfinityLine,
-  RiMoonFill,
   RiSettings3Fill,
   RiSettings3Line,
-  RiSidebarFoldLine,
-  RiSidebarUnfoldLine,
-  RiSunFill,
   RiToolsFill,
   RiToolsLine,
   type RemixiconComponentType,
@@ -55,7 +50,6 @@ const navigationGroups: Array<{
     title: '创作',
     items: [
       { module: 'image-gen', label: '生成', lineIcon: RiImageAiLine, fillIcon: RiImageAiFill },
-      { module: 'magic-canvas', label: '画布', lineIcon: RiInfinityLine, fillIcon: RiInfinityFill },
     ],
   },
   {
@@ -63,6 +57,7 @@ const navigationGroups: Array<{
     items: [
       { module: 'assets', label: '资产', lineIcon: RiArchiveStackLine, fillIcon: RiArchiveStackFill },
       { module: 'sources', label: '知识', lineIcon: RiFileTextLine, fillIcon: RiFileTextFill },
+      { module: 'magic-canvas', label: '画布', lineIcon: RiInfinityLine, fillIcon: RiInfinityFill },
       { module: 'tools', label: '工具', lineIcon: RiToolsLine, fillIcon: RiToolsFill },
       { module: 'settings', label: '设置', lineIcon: RiSettings3Line, fillIcon: RiSettings3Fill },
     ],
@@ -153,6 +148,8 @@ const explorerContent: Record<ModuleType, { title: string; section: string; entr
       { label: '发布版本', meta: '2', icon: PackageCheck },
     ],
   },
+  'background-remove': { title: '抠图去背景', section: '图片处理', entries: [] },
+  'product-retouch': { title: '产品图精修', section: '图片处理', entries: [] },
   settings: { title: '设置', section: '工作台设置', entries: [] },
 };
 void explorerContent;
@@ -162,11 +159,11 @@ export const ProjectSidebar = () => {
     activeModule,
     workspaceMode,
     projectSidebarOpen,
-    theme,
+    sidebarStyle,
+    sidebarCollapseMode,
     setActiveModule,
     setWorkspaceMode,
     toggleProjectSidebar,
-    toggleTheme,
   } = useUIStore();
   const {
     projects,
@@ -183,6 +180,7 @@ export const ProjectSidebar = () => {
     y: number;
   } | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const sidebarHidden = !projectSidebarOpen && sidebarCollapseMode === 'hidden';
   const contextMenuRef = useRef<HTMLDivElement>(null);
   const initializedProjectRef = useRef<string | null>(null);
   const contextProject = projects.find((project) => project.id === contextMenu?.projectId);
@@ -261,42 +259,53 @@ export const ProjectSidebar = () => {
   return (
     <aside
       className={cn(
-        'flex h-full shrink-0 flex-col overflow-hidden bg-transparent text-foreground transition-[width] duration-200 ease-out',
-        projectSidebarOpen ? 'w-[184px]' : 'w-16',
+        'group relative flex h-full shrink-0 flex-col overflow-visible bg-transparent text-sidebar-foreground transition-[width] duration-200 ease-out',
+        projectSidebarOpen ? 'w-[200px]' : sidebarHidden ? 'w-0' : 'w-16',
+        sidebarStyle === 'standard' && 'border-r border-sidebar-border bg-sidebar',
+        sidebarStyle === 'floating' && 'my-2 ml-2 h-[calc(100%-16px)] rounded-xl border border-sidebar-border bg-sidebar shadow-sm',
       )}
     >
-      <div className={cn('relative flex h-16 shrink-0 items-center', projectSidebarOpen ? 'gap-2 px-3' : 'justify-center')}>
-        {projectSidebarOpen && (
-          <>
-            <Button type="button" variant="secondary" size="iconSm"
-              onClick={() => openModule('assets')}
-              aria-label="打开资产库"
-              title="Design Work"
-              className="relative h-9 w-9 shadow-sm"
-            >
-              <RiCommandFill size={18} />
-            </Button>
-            <span className="min-w-0 flex-1 truncate text-sm font-semibold tracking-[-0.01em]">Design Work</span>
-          </>
-        )}
-        <Button
-          type="button"
-          variant="ghost"
-          size="iconSm"
-          onClick={toggleProjectSidebar}
-          aria-label={projectSidebarOpen ? '收起侧栏' : '展开侧栏'}
-          title={projectSidebarOpen ? '收起侧栏' : '展开侧栏'}
-          className="h-8 w-8 shrink-0 text-muted-foreground"
+      <div className={cn('relative flex h-16 shrink-0 items-center', projectSidebarOpen ? 'gap-2 px-3' : 'justify-center', sidebarHidden && 'invisible')}>
+        <Button type="button" variant="ghost" size="iconSm"
+          onClick={() => openModule('assets')}
+          aria-label="打开资产库"
+          title="栗作 LIZUO"
+          className="relative h-9 w-9 shrink-0 overflow-hidden bg-transparent p-0 text-sidebar-foreground shadow-none hover:bg-transparent hover:text-sidebar-foreground"
         >
-          {projectSidebarOpen ? <RiSidebarFoldLine size={17} /> : <RiSidebarUnfoldLine size={17} />}
+          <img src="/brand/lizuo-avatar.png" alt="" draggable={false} className="size-8 rounded-[4px] object-cover" />
         </Button>
+        {projectSidebarOpen && (
+            <span className="min-w-0 flex-1 truncate text-sm font-semibold tracking-[-0.01em]">栗作 LIZUO</span>
+        )}
       </div>
+
+      <Button
+        type="button"
+        variant="ghost"
+        size="iconSm"
+        onClick={toggleProjectSidebar}
+        aria-label={projectSidebarOpen ? '收起侧栏' : '展开侧栏'}
+        title={projectSidebarOpen ? '收起侧栏' : '展开侧栏'}
+        className={cn(
+          'absolute top-1/2 z-20 h-12 w-3 -translate-y-1/2 rounded-md border border-border bg-card p-0 text-muted-foreground opacity-0 shadow-[0_1px_3px_rgba(0,0,0,0.12)] transition-opacity hover:bg-card hover:text-foreground hover:opacity-100 group-hover:opacity-100',
+          sidebarHidden ? 'right-[-12px]' : 'right-[-6px]',
+        )}
+      >
+        <span
+          aria-hidden="true"
+          className={cn(
+            'block h-0 w-0 border-y-[4px] border-y-transparent',
+            projectSidebarOpen ? 'border-r-[5px] border-r-current' : 'border-l-[5px] border-l-current',
+          )}
+        />
+      </Button>
 
       <nav
         aria-label="主要功能"
         className={cn(
           'flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto py-2',
           projectSidebarOpen ? 'px-2' : 'px-1',
+          sidebarHidden && 'invisible pointer-events-none',
         )}
       >
         {navigationGroups.map((group) => (
@@ -317,8 +326,8 @@ export const ProjectSidebar = () => {
                     ? 'h-10 w-full justify-start gap-3 px-3 text-sm'
                     : 'h-12 w-14 flex-col justify-center gap-1 px-0 text-[10px] leading-none',
                   active
-                    ? 'bg-foreground text-background shadow-sm hover:bg-foreground hover:text-background'
-                    : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground',
+                    ? 'bg-sidebar-accent text-sidebar-accent-foreground shadow-none hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
+                    : 'text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground',
                 )}
               >
                 <Icon
@@ -332,30 +341,6 @@ export const ProjectSidebar = () => {
           </section>
         ))}
       </nav>
-
-      <div className="mt-auto flex shrink-0 flex-col items-stretch gap-1 px-2 py-2">
-        {[
-          {
-            label: theme === 'dark' ? '浅色模式' : '深色模式',
-            icon: theme === 'dark' ? RiSunFill : RiMoonFill,
-            action: toggleTheme,
-          },
-        ].map(({ label, icon: Icon, action }) => (
-          <Button type="button" variant="ghost"
-            key={label}
-            onClick={action}
-            aria-label={label}
-            title={label}
-            className={cn(
-              'h-10 w-full text-muted-foreground',
-              projectSidebarOpen ? 'justify-start gap-3 px-3' : 'justify-center px-0',
-            )}
-          >
-            <Icon size={18} className="shrink-0" />
-            {projectSidebarOpen && <span className="truncate text-sm">{label}</span>}
-          </Button>
-        ))}
-      </div>
 
       {contextMenu && contextProject && (
         <Card
