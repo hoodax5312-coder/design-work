@@ -161,6 +161,7 @@ export const ProjectSidebar = () => {
     projectSidebarOpen,
     sidebarStyle,
     sidebarCollapseMode,
+    navigationPosition,
     setActiveModule,
     setWorkspaceMode,
     toggleProjectSidebar,
@@ -180,8 +181,17 @@ export const ProjectSidebar = () => {
     y: number;
   } | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [edgePreviewOpen, setEdgePreviewOpen] = useState(false);
+  const horizontal = navigationPosition === 'top';
+  const onRight = navigationPosition === 'right';
+  const sidebarExpanded = projectSidebarOpen;
   const sidebarHidden = !projectSidebarOpen && sidebarCollapseMode === 'hidden';
+  const temporarilyRevealed = sidebarHidden && edgePreviewOpen;
+  const visuallyExpanded = sidebarExpanded || temporarilyRevealed;
+  const showBrandLabel = horizontal || visuallyExpanded;
+  const showNavigationLabels = !sidebarHidden || temporarilyRevealed;
   const contextMenuRef = useRef<HTMLDivElement>(null);
+  const edgePreviewTimerRef = useRef<number | null>(null);
   const initializedProjectRef = useRef<string | null>(null);
   const contextProject = projects.find((project) => project.id === contextMenu?.projectId);
   // 资产资料库是固定导航，不随上方生成/画板模块切换。
@@ -232,6 +242,34 @@ export const ProjectSidebar = () => {
     return () => window.clearTimeout(timer);
   }, [notice]);
 
+  useEffect(() => {
+    setEdgePreviewOpen(false);
+  }, [navigationPosition, projectSidebarOpen, sidebarCollapseMode]);
+
+  useEffect(() => () => {
+    if (edgePreviewTimerRef.current !== null) {
+      window.clearTimeout(edgePreviewTimerRef.current);
+    }
+  }, []);
+
+  const showEdgePreview = () => {
+    if (edgePreviewTimerRef.current !== null) {
+      window.clearTimeout(edgePreviewTimerRef.current);
+      edgePreviewTimerRef.current = null;
+    }
+    setEdgePreviewOpen(true);
+  };
+
+  const hideEdgePreview = () => {
+    if (edgePreviewTimerRef.current !== null) {
+      window.clearTimeout(edgePreviewTimerRef.current);
+    }
+    edgePreviewTimerRef.current = window.setTimeout(() => {
+      setEdgePreviewOpen(false);
+      edgePreviewTimerRef.current = null;
+    }, 160);
+  };
+
 
   const runWorkspaceAction = async (
     path: '/api/workspace/reveal' | '/api/workspace/worktree',
@@ -256,16 +294,59 @@ export const ProjectSidebar = () => {
     }
   };
 
-  return (
+  return <>
+    {sidebarHidden && (
+      <div
+        aria-hidden="true"
+        data-navigation-edge-trigger={navigationPosition}
+        className={cn(
+          'fixed z-40',
+          horizontal
+            ? 'inset-x-0 top-0 h-2'
+            : cn('inset-y-0 w-2', onRight ? 'right-0' : 'left-0'),
+        )}
+        onMouseEnter={showEdgePreview}
+      />
+    )}
     <aside
+      data-navigation-edge-preview={temporarilyRevealed ? 'open' : 'closed'}
+      onMouseEnter={temporarilyRevealed ? showEdgePreview : undefined}
+      onMouseLeave={temporarilyRevealed ? hideEdgePreview : undefined}
       className={cn(
-        'group relative flex h-full shrink-0 flex-col overflow-visible bg-transparent text-sidebar-foreground transition-[width] duration-200 ease-out',
-        projectSidebarOpen ? 'w-[200px]' : sidebarHidden ? 'w-0' : 'w-16',
-        sidebarStyle === 'standard' && 'border-r border-sidebar-border bg-sidebar',
-        sidebarStyle === 'floating' && 'my-2 ml-2 h-[calc(100%-16px)] rounded-xl border border-sidebar-border bg-sidebar shadow-sm',
+        'group relative shrink-0 overflow-visible bg-transparent text-sidebar-foreground transition-[width,height] duration-200 ease-out',
+        horizontal
+          ? cn('order-0 flex w-full flex-row', sidebarHidden ? 'h-0' : 'h-16')
+          : cn('flex h-full flex-col', onRight ? 'order-2' : 'order-0', projectSidebarOpen ? 'w-[200px]' : sidebarHidden ? 'w-0' : 'w-16'),
+        !sidebarHidden && sidebarStyle === 'standard' && cn('bg-sidebar', horizontal ? 'border-b border-sidebar-border' : onRight ? 'border-l border-sidebar-border' : 'border-r border-sidebar-border'),
+        !sidebarHidden && sidebarStyle === 'floating' && cn(
+          'rounded-xl border border-sidebar-border bg-sidebar shadow-sm',
+          horizontal ? 'mx-2 mt-2 w-[calc(100%-16px)]' : onRight ? 'my-2 mr-2 h-[calc(100%-16px)]' : 'my-2 ml-2 h-[calc(100%-16px)]',
+        ),
+        temporarilyRevealed && cn(
+          'fixed z-[80] m-0 rounded-xl border border-sidebar-border bg-sidebar shadow-lg',
+          horizontal
+            ? 'inset-x-2 top-2 h-16 w-auto'
+            : cn('inset-y-2 h-auto w-[200px]', onRight ? 'right-2' : 'left-2'),
+        ),
       )}
     >
-      <div className={cn('relative flex h-16 shrink-0 items-center', projectSidebarOpen ? 'gap-2 px-3' : 'justify-center', sidebarHidden && 'invisible')}>
+      {temporarilyRevealed && (
+        <div
+          aria-hidden="true"
+          className={cn(
+            'absolute',
+            horizontal
+              ? 'inset-x-0 -top-2 h-2'
+              : cn('inset-y-0 w-2', onRight ? '-right-2' : '-left-2'),
+          )}
+        />
+      )}
+      <div className={cn(
+        'relative flex shrink-0 items-center',
+        horizontal ? 'h-full w-[200px] gap-2 px-3' : 'h-16',
+        !horizontal && (visuallyExpanded ? 'gap-2 px-3' : 'justify-center'),
+        sidebarHidden && !temporarilyRevealed && 'invisible',
+      )}>
         <Button type="button" variant="ghost" size="iconSm"
           onClick={() => openModule('assets')}
           aria-label="打开资产库"
@@ -274,42 +355,51 @@ export const ProjectSidebar = () => {
         >
           <img src="/brand/lizuo-avatar.png" alt="" draggable={false} className="size-8 rounded-[4px] object-cover" />
         </Button>
-        {projectSidebarOpen && (
+        {showBrandLabel && (
             <span className="min-w-0 flex-1 truncate text-sm font-semibold tracking-[-0.01em]">栗作 LIZUO</span>
         )}
       </div>
 
-      <Button
+      {!horizontal && <Button
         type="button"
         variant="ghost"
         size="iconSm"
         onClick={toggleProjectSidebar}
-        aria-label={projectSidebarOpen ? '收起侧栏' : '展开侧栏'}
-        title={projectSidebarOpen ? '收起侧栏' : '展开侧栏'}
+        aria-label={projectSidebarOpen ? '收起导航栏' : '展开导航栏'}
+        title={projectSidebarOpen ? '收起导航栏' : '展开导航栏'}
         className={cn(
-          'absolute top-1/2 z-20 h-12 w-3 -translate-y-1/2 rounded-md border border-border bg-card p-0 text-muted-foreground opacity-0 shadow-[0_1px_3px_rgba(0,0,0,0.12)] transition-opacity hover:bg-card hover:text-foreground hover:opacity-100 group-hover:opacity-100',
-          sidebarHidden ? 'right-[-12px]' : 'right-[-6px]',
+          'absolute z-20 rounded-md border border-border bg-card p-0 text-muted-foreground opacity-0 shadow-[0_1px_3px_rgba(0,0,0,0.12)] transition-opacity hover:bg-card hover:text-foreground hover:opacity-100 group-hover:opacity-100',
+          cn('top-1/2 h-12 w-3 -translate-y-1/2', onRight ? (sidebarHidden && !temporarilyRevealed ? 'left-[-12px]' : 'left-[-6px]') : (sidebarHidden && !temporarilyRevealed ? 'right-[-12px]' : 'right-[-6px]')),
         )}
       >
         <span
           aria-hidden="true"
           className={cn(
-            'block h-0 w-0 border-y-[4px] border-y-transparent',
-            projectSidebarOpen ? 'border-r-[5px] border-r-current' : 'border-l-[5px] border-l-current',
+            'block h-0 w-0',
+            'border-y-[4px] border-y-transparent',
+            onRight
+              ? (projectSidebarOpen ? 'border-l-[5px] border-l-current' : 'border-r-[5px] border-r-current')
+              : (projectSidebarOpen ? 'border-r-[5px] border-r-current' : 'border-l-[5px] border-l-current'),
           )}
         />
       </Button>
+      }
 
       <nav
         aria-label="主要功能"
         className={cn(
-          'flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto py-2',
-          projectSidebarOpen ? 'px-2' : 'px-1',
-          sidebarHidden && 'invisible pointer-events-none',
+          'flex min-h-0 min-w-0 flex-1 gap-1',
+          horizontal ? 'flex-row justify-end overflow-x-auto px-2 py-1' : 'flex-col overflow-y-auto py-2',
+          !horizontal && (visuallyExpanded ? 'px-2' : 'px-1'),
+          sidebarHidden && !temporarilyRevealed && 'invisible pointer-events-none',
         )}
       >
         {navigationGroups.map((group) => (
-          <section key={group.title} className={cn('flex flex-col gap-1', !projectSidebarOpen && 'items-center')}>
+          <section key={group.title} className={cn(
+            'flex gap-1',
+            horizontal ? 'flex-row items-center' : 'flex-col',
+            !horizontal && !visuallyExpanded && 'items-center',
+          )}>
             {group.items.map((item) => {
               const itemWorkspaceMode = item.workspaceMode || 'editor';
               const active = workspaceMode === itemWorkspaceMode
@@ -322,9 +412,11 @@ export const ProjectSidebar = () => {
                 aria-label={item.label}
                 title={item.label}
                 className={cn(
-                  projectSidebarOpen
-                    ? 'h-10 w-full justify-start gap-3 px-3 text-sm'
-                    : 'h-12 w-14 flex-col justify-center gap-1 px-0 text-[10px] leading-none',
+                  horizontal
+                    ? 'h-8 min-w-[84px] justify-center gap-2 px-3 text-xs'
+                    : visuallyExpanded
+                      ? 'h-10 w-full justify-start gap-3 px-3 text-sm'
+                      : 'h-12 w-14 flex-col justify-center gap-1 px-0 text-[10px] leading-none',
                   active
                     ? 'bg-sidebar-accent text-sidebar-accent-foreground shadow-none hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
                     : 'text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground',
@@ -334,7 +426,9 @@ export const ProjectSidebar = () => {
                   size={18}
                   className="shrink-0"
                 />
-                <span className={cn('truncate', !projectSidebarOpen && 'max-w-full')}>{item.label}</span>
+                {showNavigationLabels && (
+                  <span className="truncate">{item.label}</span>
+                )}
               </Button>
               );
             })}
@@ -416,5 +510,5 @@ export const ProjectSidebar = () => {
         </div>
       )}
     </aside>
-  );
+  </>;
 };

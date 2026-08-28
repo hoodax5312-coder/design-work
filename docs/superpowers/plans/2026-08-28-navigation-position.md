@@ -11,7 +11,7 @@
 ## Global Constraints
 
 - Default navigation position is `left`.
-- Top navigation expands to icon + text, collapses to icons only, and reaches zero height when completely hidden.
+- Top navigation always shows icon + text and has no expand/collapse handle; the collapse preference remains available for left and right navigation.
 - Left, top, and right positions continue to support embedded, standard, and floating styles.
 - Do not duplicate the navigation information architecture or create a second top-navigation component.
 - Theme-card overlays fade from fully transparent at the top to 50% black at the bottom.
@@ -65,11 +65,11 @@ Use `flex-col` for top and `flex-row` otherwise. Render the same sidebar before 
 
 - [ ] **Step 2: Adapt sidebar dimensions and navigation flow**
 
-For top, use `h-16 w-full` when expanded or icon-only, `h-0` when hidden, horizontal navigation, and compact horizontal items. For left/right, keep the existing 200px/64px/0 width behavior and vertical navigation.
+For top, always use `h-16 w-full`, horizontal navigation, and compact icon-plus-label items. For left/right, keep the existing 200px/64px/0 width behavior and vertical navigation.
 
 - [ ] **Step 3: Adapt borders, floating margins, and collapse handle**
 
-Use bottom border for top standard navigation, left border for right standard navigation, and place the collapse handle on the bottom, left, or right edge according to position.
+Use bottom border for top standard navigation and left border for right standard navigation. Place the collapse handle only on the outer edge of left and right navigation; top navigation has no handle.
 
 ### Task 3: Add the setting and overlay gradient
 

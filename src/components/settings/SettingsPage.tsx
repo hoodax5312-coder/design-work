@@ -31,7 +31,7 @@ export const SettingsPage = () => {
         <h1 className="text-xl font-semibold tracking-[-0.02em]">设置</h1>
       </header>
       <div className="ui-module-panel flex min-h-0 min-w-0 w-full flex-1 overflow-hidden">
-        <aside className="flex w-[200px] shrink-0 flex-col border-r-[var(--surface-panel-border-width)] border-[var(--surface-panel-border)] bg-sidebar p-3 text-sidebar-foreground">
+        <aside className="ui-module-divider-r flex w-[200px] shrink-0 flex-col bg-sidebar p-3 text-sidebar-foreground">
         <nav aria-label="设置分类" className="space-y-2">
           {SETTINGS_TABS.map(({ id, label, icon: Icon }) => {
             const active = activeTab === id;

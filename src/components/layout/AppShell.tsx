@@ -25,6 +25,7 @@ export const AppShell = ({ children }: AppShellProps) => {
     contentLayout,
     topNavigationMode,
     sidebarStyle,
+    navigationPosition,
     setWorkspaceMode,
     setActiveModule,
     setThemeMode,
@@ -103,19 +104,28 @@ export const AppShell = ({ children }: AppShellProps) => {
 
   return (
     <div
-      className="flex h-[100dvh] w-screen overflow-hidden bg-sidebar font-sans text-foreground"
+      className={navigationPosition === 'top'
+        ? 'flex h-[100dvh] w-screen flex-col overflow-hidden bg-sidebar font-sans text-foreground'
+        : 'flex h-[100dvh] w-screen flex-row overflow-hidden bg-sidebar font-sans text-foreground'}
       data-sidebar-style={sidebarStyle}
       data-top-navigation={topNavigationMode}
+      data-navigation-position={navigationPosition}
     >
       <ProjectSidebar />
 
       <div
         className={
           sidebarStyle === 'standard'
-            ? 'app-workspace relative flex min-w-0 flex-1 flex-col overflow-hidden bg-[var(--workspace-bg)]'
+            ? 'app-workspace order-1 relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-[var(--workspace-bg)]'
             : sidebarStyle === 'floating'
-              ? 'app-workspace ui-app-shell relative my-2 ml-0 mr-2 flex min-w-0 flex-1 flex-col overflow-hidden bg-[var(--workspace-bg)]'
-              : 'app-workspace ui-app-shell ui-app-shell-embedded relative my-2 ml-0 mr-2 flex min-w-0 flex-1 flex-col overflow-hidden bg-[var(--workspace-bg)]'
+              ? [
+                  'app-workspace ui-app-shell order-1 relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-[var(--workspace-bg)]',
+                  'm-2',
+                ].join(' ')
+              : [
+                  'app-workspace ui-app-shell ui-app-shell-embedded order-1 relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-[var(--workspace-bg)]',
+                  navigationPosition === 'top' ? 'mx-2 mb-2' : navigationPosition === 'right' ? 'my-2 ml-2' : 'my-2 mr-2',
+                ].join(' ')
         }
       >
         <div className="relative flex min-h-0 flex-1 overflow-hidden">

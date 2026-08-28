@@ -36,6 +36,7 @@
     /* Keep the workspace shell visibly distinct from its page surface. The
        foreground mix stays neutral enough to work across all theme palettes. */
     --workspace-bg: color-mix(in srgb, var(--background) 94%, var(--foreground) 6%);
+    --module-workspace-bg: var(--background);
     --surface-bg: var(--card);
     --surface-bg-foreground: var(--card-foreground);
     --surface-subtle: var(--muted);
@@ -82,11 +83,11 @@
     --surface-panel-border-width: 1px;
     --surface-panel-radius: var(--radius);
     --surface-panel-shadow: none;
-    --action-generate-bg: #facc15;
-    --action-generate-bg-hover: #eab308;
-    --action-generate-foreground: #1a1a1a;
-    --action-generate-bg-soft: #fef3c7;
-    --action-generate-foreground-soft: #854d0e;
+    --action-generate-bg: var(--primary);
+    --action-generate-bg-hover: color-mix(in srgb, var(--primary) 82%, var(--primary-foreground));
+    --action-generate-foreground: var(--primary-foreground);
+    --action-generate-bg-soft: var(--accent);
+    --action-generate-foreground-soft: var(--accent-foreground);
     --action-secondary-bg: color-mix(in srgb, var(--primary) 12%, var(--background));
     --action-secondary-bg-hover: color-mix(in srgb, var(--primary) 18%, var(--background));
     --action-secondary-foreground: var(--primary);
@@ -212,34 +213,36 @@
   }
 
   :root[data-theme='nature'] {
-    --background: #f5f9ff; --foreground: #142b48;
-    --card: #ffffff; --card-foreground: #142b48;
-    --popover: #ffffff; --popover-foreground: #142b48;
-    --primary: #006bff; --primary-foreground: #ffffff;
-    --secondary: #edf5ff; --secondary-foreground: #174a8b;
-    --muted: #f1f6ff; --muted-foreground: #46658c;
-    --accent: #e6f0ff; --accent-foreground: #174a8b;
-    --border: lab(86.1674% 1.92863 7.74415); --input: lab(86.1674% 1.92863 7.74415); --ring: #006bff;
-    --sidebar: #f1f6ff; --sidebar-foreground: #18324f;
-    --sidebar-primary: #006bff; --sidebar-primary-foreground: #ffffff;
-    --sidebar-accent: #e6f0ff; --sidebar-accent-foreground: #174a8b;
-    --sidebar-border: oklch(0.8805 0.0208 74.6428); --sidebar-ring: oklch(0.5234 0.1347 144.1672);
-    --radius: .5rem; --theme-font: Montserrat, "PingFang SC", system-ui, sans-serif;
+    --background: lab(98.84% .0000298023 -.0000119209); --foreground: lab(0% 0 0); --card: lab(100% 0 0); --card-foreground: lab(0% 0 0);
+    --popover: lab(98.84% .0000298023 -.0000119209); --popover-foreground: lab(0% 0 0);
+    --primary: lab(0% 0 0); --primary-foreground: lab(100% 0 0);
+    --secondary: lab(93.04% .0000298023 -.0000119209); --secondary-foreground: lab(0% 0 0);
+    --muted: lab(96.52% -.0000298023 .0000119209); --muted-foreground: lab(35.04% -.0000149012 0);
+    --accent: lab(93.04% .0000298023 -.0000119209); --accent-foreground: lab(0% 0 0);
+    --border: lab(90.72% .0000298023 -.0000119209); --input: lab(93.04% .0000298023 -.0000119209); --ring: lab(0% 0 0);
+    --sidebar: oklch(0.99 0 0); --sidebar-foreground: oklch(0 0 0);
+    --sidebar-primary: oklch(0 0 0); --sidebar-primary-foreground: oklch(1 0 0);
+    --sidebar-accent: oklch(0.94 0 0); --sidebar-accent-foreground: oklch(0 0 0);
+    --sidebar-border: oklch(0.94 0 0); --sidebar-ring: oklch(0 0 0);
+    --workspace-bg: lab(93.04% .0000298023 -.0000119209);
+    --module-workspace-bg: lab(98.84% .0000298023 -.0000119209);
+    --radius: .5rem; --theme-font: Geist, "PingFang SC", system-ui, sans-serif;
   }
 
   :root.dark[data-theme='nature'] {
-    --background: lab(15.4887% -8.37591 5.21905); --foreground: lab(93.318% .971526 3.55097);
-    --card: lab(22.9455% -7.77106 5.65313); --card-foreground: lab(93.318% .971526 3.55097);
-    --popover: lab(22.9455% -7.77106 5.65313); --popover-foreground: lab(93.318% .971526 3.55097);
-    --primary: #006bff; --primary-foreground: #ffffff;
-    --secondary: #18345f; --secondary-foreground: #eaf3ff;
-    --muted: #13294b; --muted-foreground: #b8d2f5;
-    --accent: #214f96; --accent-foreground: #f3f8ff;
-    --border: lab(30.0663% -7.20507 6.10945); --input: lab(30.0663% -7.20507 6.10945); --ring: #006bff;
-    --sidebar: oklch(0.2683 0.0279 150.7681); --sidebar-foreground: oklch(0.9423 0.0097 72.6595);
-    --sidebar-primary: #006bff; --sidebar-primary-foreground: #ffffff;
-    --sidebar-accent: #214f96; --sidebar-accent-foreground: #f3f8ff;
-    --sidebar-border: oklch(0.3942 0.0265 142.9926); --sidebar-ring: oklch(0.6731 0.1624 144.2083);
+    --background: lab(0% 0 0); --foreground: lab(100% 0 0); --card: lab(2.47865% 0 0); --card-foreground: lab(100% 0 0);
+    --popover: lab(5.26802% 0 0); --popover-foreground: lab(100% 0 0);
+    --primary: lab(100% 0 0); --primary-foreground: lab(0% 0 0);
+    --secondary: lab(13% 0 0); --secondary-foreground: lab(100% 0 0);
+    --muted: lab(10.68% .00000745058 -.00000298023); --muted-foreground: lab(67.52% -.0000298023 0);
+    --accent: lab(21.12% 0 0); --accent-foreground: lab(100% 0 0);
+    --border: lab(14.16% 0 0); --input: lab(21.12% 0 0); --ring: lab(67.52% -.0000298023 0);
+    --sidebar: oklch(0.18 0 0); --sidebar-foreground: oklch(1 0 0);
+    --sidebar-primary: oklch(1 0 0); --sidebar-primary-foreground: oklch(0 0 0);
+    --sidebar-accent: oklch(0.32 0 0); --sidebar-accent-foreground: oklch(1 0 0);
+    --sidebar-border: oklch(0.32 0 0); --sidebar-ring: oklch(0.72 0 0);
+    --workspace-bg: lab(0% 0 0);
+    --module-workspace-bg: lab(5.26802% 0 0);
   }
 
   :root[data-theme='soft-pop'] {
@@ -483,18 +486,18 @@
   :root[data-theme='nature'] {
     --surface-card-bg: var(--card);
     --surface-card-foreground: var(--card-foreground);
-    --surface-card-border: color-mix(in srgb, var(--primary) 24%, var(--border));
+    --surface-card-border: var(--border);
     --surface-card-border-width: 1px;
-    --surface-card-radius: .5rem;
-    --surface-card-shadow: 0 2px 6px color-mix(in srgb, var(--primary) 10%, transparent);
-    --surface-card-hover-shadow: 0 6px 14px color-mix(in srgb, var(--primary) 16%, transparent);
+    --surface-card-radius: var(--radius);
+    --surface-card-shadow: 0 1px 2px color-mix(in srgb, var(--foreground) 6%, transparent);
+    --surface-card-hover-shadow: 0 4px 12px color-mix(in srgb, var(--foreground) 10%, transparent);
     --surface-card-hover-transform: translateY(-1px);
-    --surface-panel-bg: color-mix(in srgb, var(--card) 92%, var(--primary));
+    --surface-panel-bg: var(--card);
     --surface-panel-foreground: var(--card-foreground);
-    --surface-panel-border: color-mix(in srgb, var(--primary) 20%, var(--border));
+    --surface-panel-border: var(--border);
     --surface-panel-border-width: 1px;
-    --surface-panel-radius: .5rem;
-    --surface-panel-shadow: 0 1px 5px color-mix(in srgb, var(--primary) 8%, transparent);
+    --surface-panel-radius: var(--radius);
+    --surface-panel-shadow: none;
   }
 
   :root[data-theme='soft-pop'] {
@@ -710,7 +713,7 @@
   .module-workspace {
     gap: 0;
     padding: 0;
-    background: var(--workspace-bg);
+    background: var(--module-workspace-bg, var(--workspace-bg));
     color: var(--text-primary);
   }
 
