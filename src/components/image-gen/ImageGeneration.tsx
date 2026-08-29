@@ -4,7 +4,6 @@ import {
   BookmarkPlus,
   Check,
   ChevronDown,
-  Clock3,
   Copy,
   Download,
   Loader2,
@@ -64,8 +63,8 @@ const VIDEO_RATIO_OPTIONS = [
 
 const segmentedOptionClass = (selected: boolean) => cn(
   'h-8 w-full border-0 px-1 text-xs shadow-none ring-0',
-  'hover:bg-[var(--neutral-surface-subtle)] hover:text-[var(--neutral-foreground)]',
-  selected && 'bg-[var(--neutral-surface-subtle)] text-[var(--neutral-foreground)] hover:bg-[var(--neutral-surface-subtle)]'
+  'hover:bg-[var(--neutral-control-selected)] hover:text-[var(--neutral-foreground)]',
+  selected && 'bg-[var(--neutral-control-selected)] text-[var(--neutral-foreground)] hover:bg-[var(--neutral-control-selected)]'
 );
 
 interface ReferenceImage {
@@ -136,6 +135,22 @@ const formatGenerationTime = (value: string) => new Intl.DateTimeFormat('zh-CN',
   minute: '2-digit',
   hour12: false,
 }).format(new Date(value));
+
+const formatGenerationDate = (value: string) => {
+  const parts = new Intl.DateTimeFormat('zh-CN', {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(new Date(value));
+  const part = (type: Intl.DateTimeFormatPartTypes) => parts.find((item) => item.type === type)?.value || '';
+  return `${part('year')}.${part('month')}.${part('day')}`;
+};
+
+const formatGenerationParameters = (record: GenerationRecord) => (
+  record.mode === 'video'
+    ? [record.ratio, record.duration ? `${record.duration}秒` : null, record.resolution].filter(Boolean).join('·')
+    : [record.ratio, record.quality, record.resolution].join('·')
+);
 
 const ActionIcon = ({ kind }: { kind: 'download' | 'save' | 'fullscreen' }) => {
   const Icon = kind === 'download' ? Download : kind === 'save' ? BookmarkPlus : Maximize2;
@@ -629,7 +644,7 @@ export const ImageGeneration = () => {
               onDragOver={(event) => { event.preventDefault(); setDraggingReference(true); }}
               onDragLeave={(event) => { if (!event.currentTarget.contains(event.relatedTarget as Node)) setDraggingReference(false); }}
               onDrop={(event) => { event.preventDefault(); setDraggingReference(false); addReferences(event.dataTransfer.files); }}
-              className={cn('relative overflow-hidden rounded-lg bg-[var(--neutral-surface-subtle)] text-[var(--neutral-foreground)] transition-colors focus-within:ring-1 focus-within:ring-inset focus-within:ring-[var(--neutral-border)]', draggingReference && 'bg-[var(--neutral-surface)] text-[var(--neutral-foreground)] ring-2 ring-inset ring-[var(--neutral-border)]')}
+              className={cn('relative overflow-hidden rounded-lg border-solid [border-color:var(--generation-control-border)] [border-width:var(--generation-control-border-width)] bg-[var(--neutral-surface-subtle)] text-[var(--neutral-foreground)] transition-colors focus-within:ring-1 focus-within:ring-inset focus-within:ring-[var(--neutral-border)]', draggingReference && 'bg-[var(--neutral-surface)] text-[var(--neutral-foreground)] ring-2 ring-inset ring-[var(--neutral-border)]')}
             >
               <input ref={fileInputRef} type="file" accept="image/*" multiple className="sr-only" onChange={(event) => { if (event.target.files) addReferences(event.target.files); event.target.value = ''; }} />
               <Textarea
@@ -737,7 +752,7 @@ export const ImageGeneration = () => {
                 }}
                 aria-haspopup="listbox"
                 aria-expanded={modelPanelOpen}
-                className="h-10 w-full justify-between rounded-lg border-0 bg-[var(--neutral-surface-subtle)] px-3 text-sm font-normal text-[var(--neutral-foreground)] shadow-none hover:bg-[var(--neutral-surface-hover)] hover:text-[var(--neutral-foreground)]"
+                className="h-10 w-full justify-between rounded-lg border-solid [border-color:var(--generation-control-border)] [border-width:var(--generation-control-border-width)] bg-[var(--neutral-surface-subtle)] px-3 text-sm font-normal text-[var(--neutral-foreground)] shadow-none hover:bg-[var(--neutral-surface-hover)] hover:text-[var(--neutral-foreground)]"
               >
                 <span className="truncate">{selectedModel || `选择${generationMode === 'image' ? '图像' : '视频'}模型`}</span>
                 <ChevronDown size={15} className={cn('shrink-0 text-muted-foreground transition-transform', modelPanelOpen && 'rotate-180')} />
@@ -756,7 +771,7 @@ export const ImageGeneration = () => {
                         onClick={() => selectModel(model)}
                         className={cn(
                           'h-9 w-full min-w-0 justify-between rounded-md border-0 px-2.5 text-sm font-normal shadow-none',
-                          selected ? 'bg-[var(--neutral-surface-subtle)] text-[var(--neutral-foreground)]' : 'hover:bg-[var(--neutral-surface-subtle)] hover:text-[var(--neutral-foreground)]',
+                          selected ? 'bg-[var(--neutral-control-selected)] text-[var(--neutral-foreground)]' : 'hover:bg-[var(--neutral-surface-subtle)] hover:text-[var(--neutral-foreground)]',
                         )}
                       >
                         <span className="truncate">{model}</span>
@@ -770,9 +785,9 @@ export const ImageGeneration = () => {
             {generationMode === 'image' && (
               <fieldset ref={generationCountPanelRef} className="relative min-w-0">
                 <legend className="mb-2 text-xs font-semibold">生成数量</legend>
-                <div className="grid h-10 grid-cols-5 rounded-lg bg-[var(--neutral-surface-subtle)] p-1 text-[var(--neutral-foreground)]">
+                <div className="grid h-10 grid-cols-5 rounded-lg border-solid [border-color:var(--generation-control-border)] [border-width:var(--generation-control-border-width)] bg-[var(--neutral-surface-subtle)] p-1 text-[var(--neutral-foreground)]">
                   {GENERATION_COUNT_OPTIONS.map((option) => (
-                    <Button key={option} type="button" variant="ghost" aria-pressed={generationCount === option} onClick={() => { setGenerationCount(option); setGenerationCountPanelOpen(false); }} className={cn('h-8 min-w-0 whitespace-nowrap px-0 text-xs', generationCount === option && 'bg-[var(--neutral-surface)] text-[var(--neutral-foreground)] hover:bg-[var(--neutral-surface)]')}>
+                    <Button key={option} type="button" variant="ghost" aria-pressed={generationCount === option} onClick={() => { setGenerationCount(option); setGenerationCountPanelOpen(false); }} className={cn('h-8 min-w-0 whitespace-nowrap px-0 text-xs', generationCount === option && 'bg-[var(--neutral-control-selected)] text-[var(--neutral-foreground)] hover:bg-[var(--neutral-control-selected)]')}>
                       {option}张
                     </Button>
                   ))}
@@ -788,7 +803,7 @@ export const ImageGeneration = () => {
                       setParameterPanelOpen(false);
                       setGenerationCountPanelOpen((open) => !open);
                     }}
-                    className={cn('h-8 min-w-0 whitespace-nowrap px-0 text-xs', generationCount === 'custom' && 'bg-[var(--neutral-surface)] text-[var(--neutral-foreground)] hover:bg-[var(--neutral-surface)]')}
+                    className={cn('h-8 min-w-0 whitespace-nowrap px-0 text-xs', generationCount === 'custom' && 'bg-[var(--neutral-control-selected)] text-[var(--neutral-foreground)] hover:bg-[var(--neutral-control-selected)]')}
                   >
                     {generationCount === 'custom' ? `${customGenerationCount}张 +` : '自定义'}
                   </Button>
@@ -885,7 +900,7 @@ export const ImageGeneration = () => {
               }}
               aria-haspopup="true"
               aria-expanded={parameterPanelOpen}
-              className="h-10 w-full justify-between rounded-lg border-0 bg-[var(--neutral-surface-subtle)] px-3 text-sm font-normal text-[var(--neutral-foreground)] shadow-none hover:bg-[var(--neutral-surface-hover)] hover:text-[var(--neutral-foreground)]"
+              className="h-10 w-full justify-between rounded-lg border-solid [border-color:var(--generation-control-border)] [border-width:var(--generation-control-border-width)] bg-[var(--neutral-surface-subtle)] px-3 text-sm font-normal text-[var(--neutral-foreground)] shadow-none hover:bg-[var(--neutral-surface-hover)] hover:text-[var(--neutral-foreground)]"
             >
               <span className="truncate">{parameterSummary}</span>
               <ChevronDown size={15} className={cn('shrink-0 text-muted-foreground transition-transform', parameterPanelOpen && 'rotate-180')} />
@@ -909,8 +924,8 @@ export const ImageGeneration = () => {
                             className={cn(
                               'w-full flex-col rounded-md border-0 px-1 text-xs shadow-none ring-0',
                               generationMode === 'video' ? 'h-20 gap-2 py-2' : 'h-14 gap-1 py-1',
-                              'hover:bg-[var(--neutral-surface)] hover:text-[var(--neutral-foreground)]',
-                              selected && 'bg-[var(--neutral-surface)] text-[var(--neutral-foreground)] shadow-sm hover:bg-[var(--neutral-surface)]',
+                              'hover:bg-[var(--neutral-control-selected)] hover:text-[var(--neutral-foreground)]',
+                              selected && 'bg-[var(--neutral-control-selected)] text-[var(--neutral-foreground)] shadow-sm hover:bg-[var(--neutral-control-selected)]',
                             )}
                           >
                             <span
@@ -980,7 +995,7 @@ export const ImageGeneration = () => {
         </div>
       </section>
 
-      <section className="flex min-h-0 min-w-0 overflow-hidden rounded-r-lg border !border-l-0 border-border bg-card text-card-foreground" aria-label="生成结果列表">
+      <section className="flex min-h-0 min-w-0 overflow-hidden rounded-r-lg border !border-l-0 border-border bg-card pl-3 text-card-foreground" aria-label="生成结果列表">
         <div className="min-w-0 flex-1 overflow-x-hidden overflow-y-auto scroll-smooth">
           {isGenerating && (
             <div className="flex min-h-40 items-center justify-center gap-3 pb-4 text-sm text-muted-foreground">
@@ -994,12 +1009,14 @@ export const ImageGeneration = () => {
             const isVideoRecord = record.mode === 'video';
             return (
               <article id={`generation-result-${index}`} key={record.id} className="scroll-mt-0 pb-2 last:pb-0">
-                <header className="px-2 pb-2 pt-2">
+                <header className="bg-[var(--module-workspace-bg,var(--background))] px-2 pb-2 pt-2">
                   <div className="flex min-h-9 flex-wrap items-center gap-2">
                     <div className="min-w-[120px] flex-1">
                       <div className="flex min-w-0 flex-wrap items-center gap-2">
-                        <h2 className="shrink-0 text-sm font-semibold">{isVideoRecord ? '视频生成' : '图片生成'}</h2>
-                        <time dateTime={record.createdAt} className="flex items-center gap-1.5 whitespace-nowrap text-xs text-muted-foreground"><Clock3 size={12} /> {formatGenerationTime(record.createdAt)}</time>
+                        <h2 className="shrink-0 text-sm font-semibold">
+                          {isVideoRecord ? '视频生成' : '图片生成'}-{formatGenerationDate(record.createdAt)}
+                        </h2>
+                        <span className="whitespace-nowrap text-xs text-muted-foreground">{formatGenerationParameters(record)}</span>
                       </div>
                     </div>
                     <div className="flex shrink-0 items-center gap-2">
@@ -1010,7 +1027,7 @@ export const ImageGeneration = () => {
                   </div>
 
                   <div className="group/prompt relative">
-                    <div className="flex min-w-0 items-center gap-2 rounded-md bg-[var(--neutral-surface-subtle)] px-3 py-2">
+                    <div className="flex min-w-0 items-center gap-2 rounded-md border-solid [border-color:var(--generation-control-border)] [border-width:var(--generation-control-border-width)] bg-[var(--neutral-surface-subtle)] px-3 py-2">
                       <p tabIndex={0} title={record.prompt} className="min-w-0 flex-1 truncate text-sm text-muted-foreground outline-none focus-visible:ring-1 focus-visible:ring-ring">{record.prompt}</p>
                       <Button
                         type="button"

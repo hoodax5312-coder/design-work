@@ -246,6 +246,24 @@ export function ApiSettings({ onEditingChange }: ApiSettingsProps) {
     setMessage({ type: 'success', text: `${provider.name} 已设为当前${categories.find((item) => item.id === category)?.label}厂商` });
   };
 
+  const activateProviderForAllCategories = (provider: ProviderConfig) => {
+    const configuredCategories = categories.filter(({ id }) => getConfiguredModels(provider, id).length > 0);
+    const unverifiedCategories = configuredCategories.filter(({ id }) => {
+      const selected = provider.models.find((model) => model.id === getSelectedModel(provider, id));
+      return (selected?.verification?.status || 'pending') !== 'healthy';
+    });
+
+    if (unverifiedCategories.length) {
+      const confirmed = window.confirm(
+        `${provider.name} 的${unverifiedCategories.map(({ label }) => label).join('、')}默认模型尚未全部验证。\nHost：${providerHost(provider.baseUrl)}\n\n仍要启用并允许实际请求继续吗？`,
+      );
+      if (!confirmed) return;
+    }
+
+    configuredCategories.forEach(({ id }) => setActiveProvider(id, provider.id));
+    setMessage({ type: 'success', text: `${provider.name} 已启用` });
+  };
+
   const exportProviders = () => {
     const payload = {
       format: 'design-work-provider-config',
@@ -322,6 +340,11 @@ export function ApiSettings({ onEditingChange }: ApiSettingsProps) {
         <div className="flex flex-col gap-4">
           {savedProviders.map((provider) => {
             const expanded = expandedProviderIds.has(provider.id);
+            const configuredCategoryIds = categories
+              .filter(({ id }) => getConfiguredModels(provider, id).length > 0)
+              .map(({ id }) => id);
+            const providerEnabled = configuredCategoryIds.length > 0
+              && configuredCategoryIds.every((id) => activeProviderIds[id] === provider.id);
             return (
               <Card key={provider.id} padding="none" className="overflow-hidden border-border">
                 <div className="flex items-center gap-3 px-4 py-4 sm:px-5">
@@ -330,6 +353,19 @@ export function ApiSettings({ onEditingChange }: ApiSettingsProps) {
                     <h5 className="truncate text-sm font-semibold">{provider.name}</h5>
                     <p className="mt-1 truncate text-xs text-muted-foreground">{providerHost(provider.baseUrl)} · {provider.models.length} 个模型</p>
                   </div>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    disabled={providerEnabled}
+                    onClick={() => activateProviderForAllCategories(provider)}
+                    className="h-8 min-w-[72px] gap-1.5 px-2 text-xs disabled:bg-muted disabled:text-muted-foreground disabled:opacity-100"
+                  >
+                    {providerEnabled
+                      ? <Check aria-hidden="true" size={13} />
+                      : <Power aria-hidden="true" size={13} />}
+                    {providerEnabled ? '已启用' : '启用'}
+                  </Button>
                   <Button type="button" variant="ghost" size="iconSm" onClick={() => beginEdit(provider)} aria-label={`编辑 ${provider.name}`} title={`编辑 ${provider.name}`} className="h-8 w-8"><Pencil aria-hidden="true" size={13} /></Button>
                   <Button type="button" variant="ghost" size="iconSm" onClick={() => { if (window.confirm(`确定删除 API 厂商“${provider.name}”吗？`)) removeProvider(provider.id); }} aria-label={`删除 ${provider.name}`} title={`删除 ${provider.name}`} className="h-8 w-8 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"><Trash2 aria-hidden="true" size={14} /></Button>
                   <Button type="button" variant="ghost" size="iconSm" onClick={() => toggleProvider(provider.id)} aria-label={expanded ? '收起模型类型' : '展开模型类型'} aria-expanded={expanded} className="h-8 w-8"><ChevronDown aria-hidden="true" size={15} className={cn('transition-transform', expanded && 'rotate-180')} /></Button>

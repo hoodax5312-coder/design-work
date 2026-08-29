@@ -371,7 +371,7 @@ export const AssetLibraryPage = () => {
     ? '案例资源'
     : activeTagLabel || activeFolderLabel || (favoritesOnly ? '收藏' : activeTypeLabel);
   return (
-    <div className="module-workspace ui-workspace-surface relative flex h-full min-w-0 flex-col bg-neutral-surface text-foreground">
+    <div className="module-workspace ui-workspace-surface relative flex h-full min-w-0 flex-col bg-[var(--module-workspace-bg,var(--background))] text-foreground">
       <header className="mx-3 shrink-0 p-0">
         <div className="flex min-h-14 w-full items-center justify-between gap-4">
           <div
@@ -419,7 +419,7 @@ export const AssetLibraryPage = () => {
               value={query}
               onChange={(event) => setQuery(event.target.value)}
               placeholder="搜索标题、描述和提取文字…"
-              className="h-8 border border-neutral-border bg-neutral-surface py-0 pl-9 pr-9 text-neutral-foreground placeholder:text-muted-foreground shadow-none focus-visible:ring-1 focus-visible:ring-neutral-border"
+              className="module-search-input h-8 border border-neutral-border bg-neutral-surface py-0 pl-9 pr-9 text-neutral-foreground placeholder:text-muted-foreground shadow-none focus-visible:ring-1 focus-visible:ring-neutral-border"
             />
             {query && (
               <Button variant="ghost" size="iconSm" onClick={() => setQuery('')} aria-label="清空搜索" className="absolute right-0.5 top-1/2 h-6 w-6 -translate-y-1/2"><X size={13} /></Button>
@@ -429,15 +429,15 @@ export const AssetLibraryPage = () => {
         </div>
       </header>
 
-      <div className="ui-module-panel mx-3 mb-3 mt-0 flex min-h-0 flex-1">
+      <div className="ui-module-panel mx-3 mb-3 mt-0 flex min-h-0 flex-1 bg-[var(--module-workspace-bg,var(--background))]">
         <div className="flex min-h-0 flex-1 gap-0">
         {(source === 'uploaded' || source === 'online') && filterPanelOpen && <aside
           id="asset-filter-panel"
           aria-label="资产筛选"
-          className="asset-filter-panel ui-module-divider-r flex h-full w-[200px] shrink-0 flex-col overflow-hidden bg-sidebar text-sidebar-foreground"
+          className="asset-filter-panel ui-module-divider-r flex h-full w-[200px] shrink-0 flex-col overflow-hidden bg-[var(--module-workspace-bg,var(--background))] text-foreground"
         >
           <nav className="min-h-0 flex-1 overflow-y-auto px-3 py-3" aria-label="素材标签筛选">
-            <section className="px-0 py-1" data-filter-section="type">
+            <section className="px-0 pb-1" data-filter-section="type">
               <div className="flex flex-col gap-0.5">
                 {assetTypeOptions
                   .filter((option) => option.id !== 'project')
@@ -457,8 +457,8 @@ export const AssetLibraryPage = () => {
                         }}
                         aria-pressed={active}
                         className={cn(
-                          'h-8 w-full justify-start gap-2 rounded-md px-2.5 text-sm font-medium text-sidebar-foreground hover:bg-[var(--action-generate-bg-soft)] hover:text-[var(--action-generate-foreground-soft)]',
-                          active && 'bg-[var(--action-generate-bg-soft)] text-[var(--action-generate-foreground-soft)]',
+                          'h-8 w-full justify-start gap-2 rounded-md px-2.5 text-sm font-medium text-foreground hover:bg-[var(--surface-hover)] hover:text-[var(--surface-hover-foreground)]',
+                          active && 'bg-[var(--surface-control)] text-[var(--surface-control-foreground)] hover:bg-[var(--surface-control)] hover:text-[var(--surface-control-foreground)]',
                         )}
                       >
                         <Icon size={16} className="shrink-0" />
@@ -490,8 +490,8 @@ export const AssetLibraryPage = () => {
                   onClick={() => { setTagIds([]); setOffset(0); }}
                   aria-pressed={!tagIds.length}
                   className={cn(
-                    'flex h-7 w-full items-center rounded-md px-2.5 text-left text-xs font-medium text-sidebar-foreground transition-colors hover:bg-[var(--action-generate-bg-soft)] hover:text-[var(--action-generate-foreground-soft)]',
-                    !tagIds.length && 'bg-[var(--action-generate-bg-soft)] text-[var(--action-generate-foreground-soft)]',
+                    'flex h-7 w-full items-center rounded-md px-2.5 text-left text-xs font-medium text-foreground transition-colors hover:bg-[var(--surface-hover)] hover:text-[var(--surface-hover-foreground)]',
+                    !tagIds.length && 'bg-[var(--surface-control)] text-[var(--surface-control-foreground)] hover:bg-[var(--surface-control)] hover:text-[var(--surface-control-foreground)]',
                   )}
                 >
                   All
@@ -502,8 +502,8 @@ export const AssetLibraryPage = () => {
                     <div
                       key={tag.id}
                       className={cn(
-                        'group/tag mt-0.5 flex h-7 w-full items-center rounded-md transition-colors hover:bg-[var(--action-generate-bg-soft)] hover:text-[var(--action-generate-foreground-soft)] focus-within:bg-[var(--action-generate-bg-soft)] focus-within:text-[var(--action-generate-foreground-soft)]',
-                        selected && 'bg-[var(--action-generate-bg-soft)] text-[var(--action-generate-foreground-soft)]',
+                        'group/tag mt-0.5 flex h-7 w-full items-center rounded-md transition-colors hover:bg-[var(--surface-hover)] hover:text-[var(--surface-hover-foreground)] focus-within:bg-[var(--surface-hover)] focus-within:text-[var(--surface-hover-foreground)]',
+                        selected && 'bg-[var(--surface-control)] text-[var(--surface-control-foreground)] hover:bg-[var(--surface-control)] hover:text-[var(--surface-control-foreground)] focus-within:bg-[var(--surface-control)] focus-within:text-[var(--surface-control-foreground)]',
                       )}
                     >
                       <button

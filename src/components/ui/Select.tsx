@@ -35,7 +35,7 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(
           <select
             ref={ref}
             className={cn(
-              'flex w-full appearance-none rounded-md border border-input bg-background px-3 pr-10 text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50',
+              'flex w-full appearance-none rounded-md border border-input bg-[var(--neutral-field-surface)] px-3 pr-10 text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50',
               sizeClasses[selectSize],
               error && 'border-red-500 focus:border-red-500 focus:ring-red-500',
               className

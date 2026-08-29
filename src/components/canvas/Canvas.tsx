@@ -352,7 +352,7 @@ const CanvasInner = ({ onBack }: { onBack?: () => void }) => {
           <div className="flex h-14 shrink-0 items-center gap-1 px-3">
             {onBack && <Button type="button" variant="ghost" size="iconSm" onClick={onBack} aria-label="返回项目列表" title="返回项目列表" className="h-8 w-8 shrink-0"><ArrowLeft size={15} /></Button>}
             <div className="relative shrink-0">
-              <Button type="button" variant="ghost" size="iconSm" onClick={() => setProjectEmojiOpen((open) => !open)} aria-label="选择项目表情" title="选择项目表情" className="h-8 w-8 rounded-lg bg-muted text-base">{activeProjectEmoji}</Button>
+              <Button type="button" variant="ghost" size="iconSm" onClick={() => setProjectEmojiOpen((open) => !open)} aria-label="选择项目表情" title="选择项目表情" className="h-8 w-8 rounded-full bg-muted text-[20px] leading-none">{activeProjectEmoji}</Button>
               {projectEmojiOpen && <Card padding="none" className="absolute left-0 top-10 z-50 grid w-[176px] grid-cols-6 gap-1 p-2 shadow-xl">{PROJECT_EMOJIS.map((emoji) => <Button key={emoji} type="button" variant="ghost" size="iconSm" onClick={() => selectProjectEmoji(emoji)} aria-label={`使用${emoji}表情`} className="h-7 w-7 text-base">{emoji}</Button>)}</Card>}
             </div>
             <div className="min-w-0 flex-1 text-xs font-semibold">
@@ -392,7 +392,7 @@ const CanvasInner = ({ onBack }: { onBack?: () => void }) => {
           <div className="absolute left-3 top-3 z-30 flex h-10 max-w-[280px] items-center gap-1 rounded-lg border border-border bg-card/90 py-1 pl-1 pr-1 text-card-foreground shadow-sm backdrop-blur-xl">
             {onBack && <Button type="button" variant="ghost" size="iconSm" onClick={onBack} aria-label="返回项目列表" title="返回项目列表" className="h-8 w-8 shrink-0"><ArrowLeft size={15} /></Button>}
             <div className="relative shrink-0">
-              <Button type="button" variant="ghost" size="iconSm" onClick={() => setProjectEmojiOpen((open) => !open)} aria-label="选择项目表情" title="选择项目表情" className="h-8 w-8 rounded-md text-base">{activeProjectEmoji}</Button>
+              <Button type="button" variant="ghost" size="iconSm" onClick={() => setProjectEmojiOpen((open) => !open)} aria-label="选择项目表情" title="选择项目表情" className="h-8 w-8 rounded-full bg-muted p-0 text-[20px] leading-none">{activeProjectEmoji}</Button>
               {projectEmojiOpen && <Card padding="none" className="absolute left-0 top-10 z-50 grid w-[176px] grid-cols-6 gap-1 p-2 shadow-xl">{PROJECT_EMOJIS.map((emoji) => <Button key={emoji} type="button" variant="ghost" size="iconSm" onClick={() => selectProjectEmoji(emoji)} aria-label={`使用${emoji}表情`} className="h-7 w-7 text-base">{emoji}</Button>)}</Card>}
             </div>
             <div className="min-w-0 flex-1 truncate text-xs font-semibold">{editingProjectName ? <Input autoFocus value={projectNameDraft} onChange={(event) => setProjectNameDraft(event.target.value)} onBlur={commitProjectName} onKeyDown={(event) => { if (event.key === 'Enter') commitProjectName(); if (event.key === 'Escape') setEditingProjectName(false); }} aria-label="编辑项目名称" inputSize="sm" className="h-8 px-2 text-xs" /> : <button type="button" onDoubleClick={beginProjectNameEdit} className="block w-full truncate text-left" title="双击编辑项目名称">{activeProjectName}</button>}</div>
@@ -425,7 +425,7 @@ const CanvasInner = ({ onBack }: { onBack?: () => void }) => {
           className="design-work-flow h-full w-full bg-background"
         >
           <Background gap={18} size={0.8} color="color-mix(in srgb, transparent, var(--foreground) 13%)" />
-          {showMinimap && (
+          {showMinimap && !showAgent && (
             <MiniMap
               pannable
               zoomable
@@ -437,10 +437,7 @@ const CanvasInner = ({ onBack }: { onBack?: () => void }) => {
               maskStrokeColor="var(--border)"
               maskStrokeWidth={1}
               style={{ width: 192, height: 108, backdropFilter: 'blur(18px) saturate(120%)' }}
-              className={cn(
-                '!bottom-3 !left-auto !m-0 !overflow-hidden !rounded-lg !border-border !shadow-[0_8px_24px_rgba(0,0,0,0.08)] dark:!shadow-[0_8px_24px_rgba(0,0,0,0.18)]',
-                showAgent ? '!right-[376px]' : '!right-3',
-              )}
+              className="!bottom-3 !left-auto !right-3 !m-0 !overflow-hidden !rounded-lg !border-border !shadow-[0_8px_24px_rgba(0,0,0,0.08)] dark:!shadow-[0_8px_24px_rgba(0,0,0,0.18)]"
             />
           )}
         </ReactFlow>
@@ -459,7 +456,7 @@ const CanvasInner = ({ onBack }: { onBack?: () => void }) => {
                 title={tool === 'select' ? '选择与移动（V）' : '拖动画布（H）'}
                 className="h-8 w-8 rounded-r-none bg-foreground p-0 text-background hover:bg-foreground/90 hover:text-background"
               >
-                {tool === 'select' ? <MousePointer2 size={14} /> : <Hand size={14} />}
+                {tool === 'select' ? <MousePointer2 size={16} /> : <Hand size={16} />}
               </Button>
               <Button
                 type="button"
@@ -512,7 +509,7 @@ const CanvasInner = ({ onBack }: { onBack?: () => void }) => {
                 title="添加图片节点"
                 className="h-8 w-8 rounded-r-none p-0"
               >
-                <ImagePlus size={14} />
+                <ImagePlus size={16} />
               </Button>
             </div>
           </div>
@@ -527,14 +524,14 @@ const CanvasInner = ({ onBack }: { onBack?: () => void }) => {
                 title="添加视频节点"
                 className="h-8 w-8 rounded-r-none p-0"
               >
-                <Video size={14} />
+                <Video size={16} />
               </Button>
             </div>
           </div>
           <span aria-hidden="true" className="h-6 w-px shrink-0 bg-border" />
           <div className="flex h-8 items-center gap-1 rounded-lg bg-muted p-0.5">
-            <CanvasToolButton icon={Map} label="小地图" active={showMinimap} onClick={() => setShowMinimap((visible) => !visible)} className="h-7 w-7" />
-            <CanvasToolButton icon={Bot} label={showAgent ? '收起 Agent' : '展开 Agent'} active={showAgent} onClick={() => setShowAgent((visible) => !visible)} className="h-7 w-7" />
+            <CanvasToolButton icon={Map} label="小地图" active={showMinimap} onClick={() => { const nextVisible = !showMinimap; setShowMinimap(nextVisible); if (nextVisible) setShowAgent(false); }} className="h-7 w-7" />
+            <CanvasToolButton icon={Bot} label={showAgent ? '收起 Agent' : '展开 Agent'} active={showAgent} onClick={() => { const nextVisible = !showAgent; setShowAgent(nextVisible); if (nextVisible) setShowMinimap(false); }} className="h-7 w-7" />
           </div>
         </Card>
 
@@ -571,7 +568,7 @@ const CanvasInner = ({ onBack }: { onBack?: () => void }) => {
 };
 
 const CanvasToolButton = ({ icon: Icon, label, active, disabled, onClick, className }: { icon: React.ElementType; label: string; active?: boolean; disabled?: boolean; onClick: () => void; className?: string }) => (
-  <Button type="button" variant={active ? 'secondary' : 'ghost'} size="iconSm" aria-label={label} title={label} aria-pressed={active} disabled={disabled} onClick={onClick} className={cn('h-8 w-8 shrink-0', className)}><Icon size={14} strokeWidth={active ? 2.2 : 1.8} /></Button>
+  <Button type="button" variant={active ? 'secondary' : 'ghost'} size="iconSm" aria-label={label} title={label} aria-pressed={active} disabled={disabled} onClick={onClick} className={cn('h-8 w-8 shrink-0', className)}><Icon size={16} strokeWidth={active ? 2.2 : 1.8} /></Button>
 );
 
 export const Canvas = ({ onBack }: { onBack?: () => void }) => <ReactFlowProvider><CanvasInner onBack={onBack} /></ReactFlowProvider>;

@@ -1,6 +1,5 @@
 import {
   ArrowRight,
-  Film,
   Image as ImageIcon,
   Presentation,
   Scissors,
@@ -70,14 +69,12 @@ const ToolsHub = () => {
   const setActiveModule = useUIStore((state) => state.setActiveModule);
 
   return (
-    <div className="module-workspace h-full overflow-y-auto px-8 pb-4 pt-6 text-foreground sm:pb-6 lg:pb-8">
-      <div className="w-full">
-        <div className="mb-4 flex items-end justify-between">
-          <div>
-            <h2 className="text-xl font-semibold tracking-[-0.02em]">工具</h2>
-          </div>
-          <div className="hidden items-center gap-2 text-xs text-muted-foreground md:flex"><Film size={14} /> 所有产出自动进入资产库</div>
-        </div>
+    <div className="module-workspace h-full overflow-y-auto bg-[var(--module-workspace-bg,var(--background))] px-8 pb-4 pt-6 text-foreground sm:pb-6 lg:pb-8">
+      <div className="mx-auto w-full max-w-[1080px]">
+        <header className="mb-6">
+          <h1 className="text-xl font-semibold tracking-[-0.02em]">工具</h1>
+          <p className="mt-2 text-sm text-muted-foreground">选择工具开始创作，所有产出自动进入资产库。</p>
+        </header>
 
         <div
           className="grid w-full gap-3"

@@ -227,12 +227,12 @@ export const SourceCenter = ({ initialSection = 'notes' }: { initialSection?: 'n
   const [query, setQuery] = useState('');
 
   return (
-    <div className="module-workspace flex h-full min-h-0 flex-col">
+    <div className="module-workspace flex h-full min-h-0 flex-col bg-[var(--module-workspace-bg,var(--background))]">
       <Tabs value={activeSection} onValueChange={(value) => setActiveSection(value as typeof activeSection)} className="ui-module-toolbar mx-3 h-14 shrink-0 border-0 px-0 shadow-none">
         <TabsList aria-label="知识中心内容" className="h-8 gap-1 rounded-none border-0 bg-transparent p-0 shadow-none"><TabsTrigger value="notes" className="h-8 border-0 bg-transparent px-4 py-0 text-sm text-muted-foreground shadow-none focus-visible:ring-offset-0 data-[state=inactive]:hover:text-foreground data-[state=active]:!bg-[var(--surface-control)] data-[state=active]:!text-[var(--surface-control-foreground)] data-[state=active]:!shadow-none">词库</TabsTrigger><TabsTrigger value="documents" className="h-8 border-0 bg-transparent px-4 py-0 text-sm text-muted-foreground shadow-none focus-visible:ring-offset-0 data-[state=inactive]:hover:text-foreground data-[state=active]:!bg-[var(--surface-control)] data-[state=active]:!text-[var(--surface-control-foreground)] data-[state=active]:!shadow-none">笔记</TabsTrigger></TabsList>
         <div className="relative ml-auto w-[240px] shrink-0">
           <Search size={16} className="pointer-events-none absolute left-3 top-1/2 z-10 -translate-y-1/2 text-secondary-foreground/60" />
-          <Input value={query} onChange={(event) => setQuery(event.target.value)} aria-label="搜索知识内容" placeholder={activeSection === 'documents' ? '搜索笔记和文件夹…' : '搜索标题、描述和提取文字…'} className="h-8 border border-neutral-border bg-neutral-surface py-0 pl-9 text-neutral-foreground placeholder:text-muted-foreground shadow-none focus-visible:ring-1 focus-visible:ring-neutral-border" />
+          <Input value={query} onChange={(event) => setQuery(event.target.value)} aria-label="搜索知识内容" placeholder={activeSection === 'documents' ? '搜索笔记和文件夹…' : '搜索标题、描述和提取文字…'} className="module-search-input h-8 border border-neutral-border bg-neutral-surface py-0 pl-9 text-neutral-foreground placeholder:text-muted-foreground shadow-none focus:placeholder:text-transparent focus-visible:ring-1 focus-visible:ring-neutral-border" />
         </div>
       </Tabs>
       <div className="mx-3 mb-3 min-h-0 flex-1 overflow-visible bg-transparent p-0">

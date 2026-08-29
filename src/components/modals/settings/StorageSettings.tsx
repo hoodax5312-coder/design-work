@@ -32,6 +32,9 @@ const requestJson = async (url: string, init?: RequestInit) => {
   return payload as StorageSettingsState;
 };
 
+const storageGroupClassName =
+  'rounded-[var(--surface-panel-radius)] [border-color:var(--surface-panel-border)] [border-style:solid] [border-width:var(--settings-group-border-width,var(--surface-panel-border-width))] bg-[var(--surface-panel-bg)] text-[var(--surface-panel-foreground)] [box-shadow:var(--settings-group-shadow,var(--surface-panel-shadow))]';
+
 export function StorageSettings() {
   const [settings, setSettings] = useState<StorageSettingsState>(defaultSettings);
   const [loading, setLoading] = useState(true);
@@ -149,7 +152,7 @@ export function StorageSettings() {
           本地数据目录
         </h4>
 
-        <div className="rounded-xl border border-border bg-card p-4 text-card-foreground">
+        <div className={`p-4 ${storageGroupClassName}`}>
           <div className="mb-2 text-sm font-medium text-foreground">
             保存位置
           </div>
@@ -163,7 +166,7 @@ export function StorageSettings() {
                 setSettings((current) => ({ ...current, dataDirectory: event.target.value }))
               }
               placeholder="/Users/you/Documents/LIZUO"
-              className="h-9 min-w-0 flex-1 text-xs"
+              className="storage-path-input h-9 min-w-0 flex-1 text-xs"
             />
             <Button
               onClick={() => void chooseDirectory('data')}
@@ -182,7 +185,7 @@ export function StorageSettings() {
             缓存位置
           </h4>
 
-          <div className="rounded-xl border border-border bg-card p-4 text-card-foreground">
+          <div className={`p-4 ${storageGroupClassName}`}>
             <div className="mb-2 flex items-center justify-between gap-3">
               <span className="text-sm font-medium text-foreground">
                 缓存目录
@@ -202,7 +205,7 @@ export function StorageSettings() {
                 }
                 placeholder="/Users/you/Library/Caches/LIZUO"
                 aria-label="缓存目录"
-                className="h-9 min-w-0 flex-1 text-xs"
+                className="storage-path-input h-9 min-w-0 flex-1 text-xs"
               />
               <Button
                 onClick={() => void chooseDirectory('cache')}
@@ -216,7 +219,7 @@ export function StorageSettings() {
           </div>
         </div>
 
-        <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-border bg-card p-4 text-card-foreground">
+        <label className={`flex cursor-pointer items-start gap-3 p-4 ${storageGroupClassName}`}>
           <Switch
             checked={settings.autoSaveGeneratedAssets}
             onCheckedChange={(checked) =>
@@ -242,7 +245,7 @@ export function StorageSettings() {
             <Layers size={16} />
             按模块查找
           </h4>
-          <div className="divide-y divide-border rounded-xl border border-border bg-card text-card-foreground">
+          <div className={`divide-y divide-border ${storageGroupClassName}`}>
             {modules.map((module) => (
               <div key={module.id} className="flex items-center gap-3 px-4 py-3">
                 <div className="min-w-0 flex-1">

@@ -27,11 +27,14 @@ export const SettingsPage = () => {
 
   return (
     <main className="module-workspace flex h-full min-h-0 flex-col overflow-hidden px-8 pb-8 pt-3 text-foreground" aria-label="工作台设置">
-      <header className="mb-4 flex w-full shrink-0 items-center pt-3">
-        <h1 className="text-xl font-semibold tracking-[-0.02em]">设置</h1>
+      <header className="mx-auto mb-4 flex w-full max-w-[1080px] shrink-0 items-center pt-3">
+        <div>
+          <h1 className="text-xl font-semibold tracking-[-0.02em]">设置</h1>
+          <p className="mt-2 text-sm text-muted-foreground">管理工作台偏好、数据存储与模型服务。</p>
+        </div>
       </header>
-      <div className="ui-module-panel flex min-h-0 min-w-0 w-full flex-1 overflow-hidden">
-        <aside className="ui-module-divider-r flex w-[200px] shrink-0 flex-col bg-sidebar p-3 text-sidebar-foreground">
+      <div className="ui-module-panel mx-auto flex min-h-0 min-w-0 w-full max-w-[1080px] flex-1 overflow-hidden bg-[var(--module-workspace-bg,var(--background))]">
+        <aside className="ui-module-divider-r flex w-[200px] shrink-0 flex-col bg-[var(--module-workspace-bg,var(--background))] p-3 text-foreground">
         <nav aria-label="设置分类" className="space-y-2">
           {SETTINGS_TABS.map(({ id, label, icon: Icon }) => {
             const active = activeTab === id;
@@ -45,8 +48,8 @@ export const SettingsPage = () => {
                 className={cn(
                   'h-8 w-full justify-start gap-3 px-3 text-left',
                   active
-                    ? 'border-[var(--surface-panel-border-width)] border-[var(--action-secondary-border)] bg-[var(--action-secondary-bg)] text-[var(--action-secondary-foreground)] hover:bg-[var(--action-secondary-bg-hover)] hover:text-[var(--action-secondary-foreground)]'
-                    : 'text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground',
+                    ? 'bg-[var(--surface-control)] text-[var(--surface-control-foreground)] hover:bg-[var(--surface-control)] hover:text-[var(--surface-control-foreground)]'
+                    : 'text-foreground/70 hover:bg-[var(--surface-hover)] hover:text-[var(--surface-hover-foreground)]',
                 )}
               >
                 <Icon size={17} className="shrink-0" />
@@ -57,7 +60,7 @@ export const SettingsPage = () => {
         </nav>
       </aside>
 
-      <section className="flex min-w-0 flex-1 flex-col bg-background text-foreground">
+      <section className="flex min-w-0 flex-1 flex-col bg-[var(--module-workspace-bg,var(--background))] text-foreground">
         {showSectionHeader && (
           <header className="flex min-h-20 shrink-0 items-center px-3">
             <div className="mx-auto flex w-full max-w-[800px] items-center justify-between gap-4">

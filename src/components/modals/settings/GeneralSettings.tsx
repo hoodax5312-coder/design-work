@@ -68,20 +68,43 @@ const ThemeCardOverlay = ({
   label,
   icon: Icon,
   selected,
+  overlayColors,
+  labelTone,
+  checkTone = labelTone,
 }: {
   label: string;
   icon?: React.ElementType;
   selected: boolean;
+  overlayColors: string | readonly [string, string];
+  labelTone: 'light' | 'dark';
+  checkTone?: 'light' | 'dark';
 }) => (
-  <div className="absolute inset-x-0 bottom-0 z-10 flex h-16 items-end justify-between gap-2 bg-gradient-to-b from-transparent via-black/20 to-black/50 px-3 pb-2 text-white">
-    <span className="flex min-w-0 items-center gap-2 text-sm font-medium">
+  <div className="absolute inset-x-0 bottom-0 z-10 flex h-16 items-end justify-between gap-2 px-3 pb-2">
+    <div className="pointer-events-none absolute inset-0 flex" aria-hidden="true">
+      {(typeof overlayColors === 'string' ? [overlayColors] : overlayColors).map((color, index) => (
+        <span
+          key={`${color}-${index}`}
+          className="h-full flex-1"
+          style={{ backgroundImage: `linear-gradient(to bottom, transparent 0%, ${color} 100%)` }}
+        />
+      ))}
+    </div>
+    <span className={cn(
+      'relative z-10 flex min-w-0 items-center gap-2 text-sm font-medium',
+      labelTone === 'light' ? 'text-white' : 'text-black',
+    )}>
       {Icon && <Icon size={16} aria-hidden="true" />}
       <span className="truncate">{label}</span>
     </span>
     <span className={cn(
-      'flex h-5 w-5 shrink-0 items-center justify-center rounded-full border transition-[opacity,scale] duration-150',
+      'relative z-10 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border transition-[opacity,scale] duration-150',
       selected
-        ? 'scale-100 border-white bg-white text-black opacity-100'
+        ? cn(
+            'scale-100 opacity-100',
+            checkTone === 'light'
+              ? 'border-white bg-white text-black'
+              : 'border-black bg-black text-white',
+          )
         : 'scale-75 border-transparent opacity-0',
     )}>
       <Check size={12} aria-hidden="true" />
@@ -168,7 +191,7 @@ const SegmentedControl = <T extends string>({
   onChange: (value: T) => void;
   themeAction?: boolean;
 }) => (
-  <div role="tablist" aria-label={label} className="grid h-8 w-full grid-flow-col auto-cols-fr gap-0.5 rounded-md bg-[var(--neutral-surface-subtle)] p-0.5">
+  <div role="tablist" aria-label={label} className="settings-segmented-control grid h-8 w-full grid-flow-col auto-cols-fr gap-0.5 rounded-md bg-[var(--neutral-surface-subtle)] p-0.5">
     {options.map((option) => (
       <button
         key={option.value}
@@ -181,10 +204,10 @@ const SegmentedControl = <T extends string>({
         className={cn(
           'min-w-0 rounded-[4px] px-2 text-xs font-medium text-muted-foreground transition-colors',
           value === option.value && (themeAction
-            ? 'bg-[var(--action-secondary-bg)] text-[var(--action-secondary-foreground)] shadow-sm'
+            ? 'bg-primary text-primary-foreground shadow-sm'
             : 'bg-accent text-accent-foreground shadow-sm'),
           !option.disabled && value !== option.value && (themeAction
-            ? 'hover:bg-primary hover:text-white'
+            ? 'hover:bg-[var(--neutral-surface-hover)] hover:text-foreground'
             : 'hover:text-foreground'),
           option.disabled && 'cursor-not-allowed opacity-40',
         )}
@@ -222,7 +245,7 @@ const SettingsModule = ({
 );
 
 const SettingsGroup = ({ title, children }: { title?: string; children: React.ReactNode }) => (
-  <div className="space-y-4 rounded-[var(--surface-panel-radius)] border-[var(--surface-panel-border-width)] border-[var(--surface-panel-border)] bg-[var(--surface-panel-bg)] p-4 text-[var(--surface-panel-foreground)] shadow-[var(--surface-panel-shadow)]">
+  <div className="space-y-4 rounded-[var(--surface-panel-radius)] [border-color:var(--surface-panel-border)] [border-style:solid] [border-width:var(--settings-group-border-width,var(--surface-panel-border-width))] bg-[var(--surface-panel-bg)] p-4 text-[var(--surface-panel-foreground)] [box-shadow:var(--settings-group-shadow,var(--surface-panel-shadow))]">
     {title && <h3 className="text-sm font-semibold text-foreground">{title}</h3>}
     {children}
   </div>
@@ -274,7 +297,14 @@ export function GeneralSettings() {
                     <div className="h-full">
                       <ThemeModePreview mode={value} />
                     </div>
-                    <ThemeCardOverlay label={label} icon={Icon} selected={selected} />
+                    <ThemeCardOverlay
+                      label={label}
+                      icon={Icon}
+                      selected={selected}
+                      overlayColors={value === 'system' ? ['#fafafa', '#000000'] : value === 'dark' ? '#000000' : '#fafafa'}
+                      labelTone={value === 'dark' ? 'light' : 'dark'}
+                      checkTone={value === 'light' ? 'dark' : 'light'}
+                    />
                   </button>
                 );
               })}
@@ -302,7 +332,12 @@ export function GeneralSettings() {
                       <div className="h-full">
                         <ThemeStylePreview preset={preset} />
                       </div>
-                      <ThemeCardOverlay label={label} selected={selected} />
+                      <ThemeCardOverlay
+                        label={label}
+                        selected={selected}
+                        overlayColors={THEME_PRESETS[preset].preview.background}
+                        labelTone="dark"
+                      />
                     </button>
                   );
                 })}
@@ -365,7 +400,7 @@ export function GeneralSettings() {
               onChange={(event) => setFontPreset(event.target.value as FontPreset)}
               options={(Object.entries(FONT_PRESETS) as Array<[FontPreset, (typeof FONT_PRESETS)[FontPreset]]>)
                 .map(([value, preset]) => ({ value, label: preset.label }))}
-              className="h-9"
+              className="settings-font-select h-9"
             />
           </SettingRow>
           <SettingRow title="语言">

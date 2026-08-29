@@ -337,7 +337,7 @@ export const Ecommerce = () => {
                   key={String(id)}
                   onClick={() => setLeftTab(id as 'upload' | 'config')}
                   className={cn(
-                    'text-xs',
+                    'h-9 text-xs',
                     leftTab === id
                       ? 'bg-foreground text-background hover:bg-foreground/90 hover:text-background'
                       : 'text-muted-foreground',
@@ -612,7 +612,7 @@ const WorkspaceTabButton = ({
     variant="ghost"
     onClick={onClick}
     className={cn(
-      'h-full rounded-none border-b-2 px-1 text-sm font-semibold',
+      'h-8 rounded-none border-b-2 px-1 text-sm font-semibold',
       active
         ? 'border-primary text-foreground'
         : 'border-transparent text-muted-foreground',

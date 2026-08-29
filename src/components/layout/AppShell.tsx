@@ -105,8 +105,8 @@ export const AppShell = ({ children }: AppShellProps) => {
   return (
     <div
       className={navigationPosition === 'top'
-        ? 'flex h-[100dvh] w-screen flex-col overflow-hidden bg-sidebar font-sans text-foreground'
-        : 'flex h-[100dvh] w-screen flex-row overflow-hidden bg-sidebar font-sans text-foreground'}
+        ? 'flex h-[100dvh] w-screen flex-col overflow-hidden bg-[var(--workspace-bg)] font-sans text-foreground'
+        : 'flex h-[100dvh] w-screen flex-row overflow-hidden bg-[var(--workspace-bg)] font-sans text-foreground'}
       data-sidebar-style={sidebarStyle}
       data-top-navigation={topNavigationMode}
       data-navigation-position={navigationPosition}
