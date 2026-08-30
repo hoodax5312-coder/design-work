@@ -133,8 +133,9 @@ const AssetWorkspace = () => {
               type="button"
               role="tab"
               aria-selected={section === value}
+              data-state={section === value ? 'active' : 'inactive'}
               onClick={() => setSection(value)}
-              className={`flex h-8 items-center rounded-md border-0 bg-transparent px-4 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground ${section === value ? 'bg-[var(--surface-control)] text-[var(--surface-control-foreground)]' : ''}`}
+              className="flex h-8 items-center rounded-md border-0 bg-transparent px-4 py-0 text-sm font-medium text-muted-foreground shadow-none transition-colors focus-visible:ring-offset-0 data-[state=inactive]:hover:text-foreground data-[state=active]:!bg-[var(--surface-control)] data-[state=active]:!text-[var(--surface-control-foreground)] data-[state=active]:!shadow-none"
             >
               {label}
             </button>
