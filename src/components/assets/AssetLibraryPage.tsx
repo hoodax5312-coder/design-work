@@ -392,10 +392,6 @@ export const AssetLibraryPage = ({ initialSource = 'uploaded', showSourceTabs = 
   const assetViewTitle = source === 'online'
     ? '案例资源'
     : activeTagLabel || activeFolderLabel || (favoritesOnly ? '收藏' : activeTypeLabel);
-  const caseModelCounts = useMemo(() => caseTabs.map((tab) => ({
-    ...tab,
-    count: caseItems.filter((item) => caseModelMatches(item.imageModel, tab.id)).length,
-  })), [caseItems]);
   const caseTagCounts = useMemo(() => {
     const counts = new Map<string, number>();
     caseItems.forEach((item) => item.tags.forEach((tag) => counts.set(tag, (counts.get(tag) || 0) + 1)));
@@ -585,26 +581,6 @@ export const AssetLibraryPage = ({ initialSource = 'uploaded', showSourceTabs = 
               </div>
             </section>}
             {source === 'online' && <>
-              <section className="px-0 pb-2" data-filter-section="case-category">
-                <div className="mb-1 flex h-8 items-center px-2.5 text-xs font-medium text-muted-foreground">分类</div>
-                <div className="flex flex-col gap-0.5">
-                  {caseModelCounts.map((tab) => {
-                    const active = caseTab === tab.id;
-                    return <button
-                      key={tab.id}
-                      type="button"
-                      onClick={() => { setCaseTab(tab.id); setCaseTag(''); }}
-                      aria-pressed={active}
-                      className={cn(
-                        'flex h-8 w-full items-center justify-between rounded-md px-2.5 text-left text-xs font-medium text-foreground transition-colors hover:bg-[var(--surface-hover)] hover:text-[var(--surface-hover-foreground)]',
-                        active && 'bg-[var(--surface-control)] text-[var(--surface-control-foreground)] hover:bg-[var(--surface-control)] hover:text-[var(--surface-control-foreground)]',
-                      )}
-                    >
-                      <span>{tab.label}</span><span className="text-[11px] opacity-60">{tab.count}</span>
-                    </button>;
-                  })}
-                </div>
-              </section>
               <section className="px-0 py-1" data-filter-section="case-sources">
                 <div className="mb-1 flex h-8 items-center px-2.5 text-xs font-medium text-muted-foreground">来源</div>
                 <div className="flex flex-col gap-0.5">
