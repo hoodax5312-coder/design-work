@@ -7,6 +7,7 @@ import { createStorageRouter } from './storageGateway';
 import { createLibraryRuntimeProvider } from './libraryRuntime';
 import { createTaskRouter } from './taskGateway';
 import { createWorkspaceRouter } from './workspaceGateway';
+import { createCasesRouter, createPromptSourcesRouter } from './promptSourcesGateway';
 
 export const createApiApp = (projectRoot: string) => {
   const app = express();
@@ -23,6 +24,8 @@ export const createApiApp = (projectRoot: string) => {
   app.use('/api/assets', createAssetRouter(getRuntime));
   app.use('/api/workspace', createWorkspaceRouter(projectRoot));
   app.use('/api/higgsfield', createHiggsfieldRouter(projectRoot));
+  app.use('/api/prompt-sources', createPromptSourcesRouter(getRuntime));
+  app.use('/api/cases', createCasesRouter(getRuntime));
 
   return app;
 };

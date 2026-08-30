@@ -27,7 +27,7 @@ test('applies migrations once and safely reopens an existing library database', 
     first.close();
     const second = openLibraryDatabase(databasePath);
     const migrations = second.prepare('SELECT version FROM schema_migrations ORDER BY version').all();
-    assert.deepEqual(migrations.map((row) => Number(row.version)), [1, 2, 3, 4, 5]);
+    assert.deepEqual(migrations.map((row) => Number(row.version)), [1, 2, 3, 4, 5, 6]);
     second.close();
   } finally {
     fs.rmSync(directory, { recursive: true, force: true });

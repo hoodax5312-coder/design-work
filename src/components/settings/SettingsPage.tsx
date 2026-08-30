@@ -1,11 +1,11 @@
 import { useState } from 'react';
-import { Database, Key, RotateCcw, Settings } from '@/lib/remixIconShim';
+import { Database, Globe2, Key, RotateCcw, Settings } from '@/lib/remixIconShim';
 import { cn } from '../../lib/utils';
 import { Button } from '../ui/Button';
-import { ApiSettings, GeneralSettings, StorageSettings } from '../modals/settings';
+import { ApiSettings, GeneralSettings, StorageSettings, PromptSourcesSettings } from '../modals/settings';
 import { useUIStore } from '../../stores/useUIStore';
 
-type SettingsTab = 'general' | 'storage' | 'api';
+type SettingsTab = 'general' | 'storage' | 'sources' | 'api';
 
 const SETTINGS_TABS: Array<{
   id: SettingsTab;
@@ -15,6 +15,7 @@ const SETTINGS_TABS: Array<{
 }> = [
   { id: 'general', label: '个性化设置', description: '外观与工作台偏好', icon: Settings },
   { id: 'storage', label: '数据存储', description: '本地目录与缓存策略', icon: Database },
+  { id: 'sources', label: '案例来源', description: '公开提示词来源与同步状态', icon: Globe2 },
   { id: 'api', label: 'API 与模型', description: '服务商、密钥和模型能力', icon: Key },
 ];
 
@@ -84,6 +85,7 @@ export const SettingsPage = () => {
           <div className="mx-auto w-full max-w-[800px]">
             {activeTab === 'general' && <GeneralSettings />}
             {activeTab === 'storage' && <StorageSettings />}
+            {activeTab === 'sources' && <PromptSourcesSettings />}
             {activeTab === 'api' && <ApiSettings onEditingChange={setIsApiEditing} />}
           </div>
         </div>

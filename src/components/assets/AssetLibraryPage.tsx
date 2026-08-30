@@ -96,6 +96,7 @@ export const AssetLibraryPage = ({ initialSource = 'uploaded', showSourceTabs = 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [taskRefreshKey, setTaskRefreshKey] = useState(0);
   const [generatedItems, setGeneratedItems] = useState<GeneratedContentItem[]>([]);
+  const [caseItems, setCaseItems] = useState<Array<{ id: string; sourceId: string; title: string; prompt: string; description: string; coverUrl: string | null; tags: string[]; author: string; sourceUrl: string; imageModel: string }>>([]);
 
   useEffect(() => {
     const sync = () => setGeneratedItems(contentFeed.list());
@@ -103,6 +104,11 @@ export const AssetLibraryPage = ({ initialSource = 'uploaded', showSourceTabs = 
     window.addEventListener('design-work:content-feed-updated', sync);
     return () => window.removeEventListener('design-work:content-feed-updated', sync);
   }, []);
+
+  useEffect(() => {
+    if (source !== 'online') return;
+    assetService.cases(debouncedQuery).then((result) => setCaseItems(result.items)).catch((caught) => setError(caught instanceof Error ? caught.message : '案例读取失败'));
+  }, [debouncedQuery, source]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -576,14 +582,14 @@ export const AssetLibraryPage = ({ initialSource = 'uploaded', showSourceTabs = 
               })}
             </div>
           </header>
-          <div className="flex min-h-0 flex-1 items-center justify-center px-6">
-            <div className="flex max-w-sm flex-col items-center text-center">
+          <div className="min-h-0 flex-1 overflow-y-auto p-4">
+            {caseItems.length ? <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">{caseItems.filter((item) => caseTab === 'all' || item.imageModel.toLowerCase().includes(caseTab)).map((item) => <article key={item.id} className="group overflow-hidden rounded-lg border border-border bg-card"><div className="aspect-[16/10] bg-muted">{item.coverUrl ? <img src={item.coverUrl} alt="" className="h-full w-full object-cover" loading="lazy" /> : <div className="grid h-full place-items-center text-xs text-muted-foreground">暂无封面</div>}</div><div className="space-y-2 p-3"><h2 className="truncate text-sm font-semibold">{item.title}</h2><p className="line-clamp-3 text-xs leading-5 text-muted-foreground">{item.prompt}</p><div className="flex items-center justify-between gap-2 text-[11px] text-muted-foreground"><span className="truncate">{item.author || '公开来源'}</span><a href={item.sourceUrl} target="_blank" rel="noreferrer" className="shrink-0 hover:text-foreground">查看来源</a></div></div></article>)}</div> : <div className="flex h-full items-center justify-center px-6"><div className="flex max-w-sm flex-col items-center text-center">
               <span className="grid h-11 w-11 place-items-center rounded-full bg-[var(--surface-control)] text-[var(--surface-control-foreground)]">
                 <Globe2 size={20} aria-hidden="true" />
               </span>
               <h2 className="mt-4 text-sm font-semibold">暂无案例资源</h2>
               <p className="mt-1.5 text-xs leading-5 text-muted-foreground">接入案例资源来源后，内容会显示在这里。</p>
-            </div>
+            </div></div>}
           </div>
         </main>
       ) : <main className="flex min-w-0 flex-1 flex-col overflow-hidden bg-transparent">

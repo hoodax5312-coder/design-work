@@ -21,6 +21,7 @@ export interface LibraryPaths {
     knowledge: string;
     tools: string;
     settings: string;
+    promptSources: string;
   };
 }
 
@@ -34,6 +35,7 @@ export const createLibraryPaths = (dataDirectory: string, cacheDirectory = dataD
     knowledge: dataRoot,
     tools: cacheRoot,
     settings: path.join(dataRoot, 'library.sqlite'),
+    promptSources: path.join(cacheRoot, 'prompt-sources'),
   };
   return {
     root: cacheRoot,
@@ -64,6 +66,7 @@ export const ensureLibraryDirectories = async (paths: LibraryPaths) => {
     paths.managedAssets,
     paths.taskTemp,
     paths.backups,
+    paths.modules.promptSources,
   ].map((directory) => fs.mkdir(directory, { recursive: true })));
 };
 
