@@ -11,6 +11,7 @@ type SourceRow = {
   last_attempt_at: number | null; last_success_at: number | null; item_count: number;
   error_message: string | null; cache_path: string | null; created_at: number; updated_at: number;
 };
+type CatalogSource = { id: string; name: string; homepageUrl: string | null; itemCount: number };
 const toSource = (row: SourceRow) => ({ id: row.id, name: row.name, manifestUrl: row.manifest_url, homepageUrl: row.homepage_url, enabled: Boolean(row.enabled), lastAttemptAt: row.last_attempt_at, lastSuccessAt: row.last_success_at, itemCount: row.item_count, errorMessage: row.error_message, cachePath: row.cache_path, createdAt: row.created_at, updatedAt: row.updated_at });
 const safeUrl = (value: unknown) => {
   if (typeof value !== 'string' || value.length > 2048) throw new Error('Manifest URL 无效');
@@ -57,15 +58,17 @@ const normalizeItems = (value: unknown, sourceId: string, sourceUrl: string) => 
     const object = bodyObject(item);
     const prompt = typeof object.prompt === 'string' ? object.prompt.trim() : '';
     if (!prompt) return [];
-    return [{ id: String(object.id || `${sourceId}:${index + 1}`), sourceId, title: String(object.title || object.name || `案例 ${index + 1}`), prompt, description: String(object.description || ''), coverUrl: typeof object.coverUrl === 'string' ? object.coverUrl : null, tags: Array.isArray(object.tags) ? object.tags.filter((tag): tag is string => typeof tag === 'string') : [], author: typeof object.author === 'string' ? object.author : '', sourceUrl: typeof object.sourceUrl === 'string' ? object.sourceUrl : sourceUrl, imageModel: typeof object.imageModel === 'string' ? object.imageModel : '' }];
+    return [{ id: String(object.id || `${sourceId}:${index + 1}`), sourceId: typeof object.sourceId === 'string' && object.sourceId.trim() ? object.sourceId : sourceId, title: String(object.title || object.name || `案例 ${index + 1}`), prompt, description: String(object.description || ''), coverUrl: typeof object.coverUrl === 'string' ? object.coverUrl : null, tags: Array.isArray(object.tags) ? object.tags.filter((tag): tag is string => typeof tag === 'string') : [], author: typeof object.author === 'string' ? object.author : '', sourceUrl: typeof object.sourceUrl === 'string' ? object.sourceUrl : sourceUrl, imageModel: typeof object.imageModel === 'string' ? object.imageModel : '' }];
   });
 };
 const getRows = (db: DatabaseSync) => db.prepare('SELECT * FROM prompt_sources ORDER BY created_at ASC').all() as unknown as SourceRow[];
 const readCases = async (runtime: LibraryRuntime, queryValue: unknown, sourceValue: unknown) => {
   const query = String(queryValue || '').toLowerCase(); const source = String(sourceValue || '');
   const rows = getRows(runtime.database).filter((row) => row.enabled);
-  const items = (await Promise.all(rows.map(async (row) => { if (!row.cache_path) return []; try { const data = JSON.parse(await fs.readFile(row.cache_path, 'utf8')); return Array.isArray(data.items) ? data.items : []; } catch { return []; } }))).flat().filter((item) => !source || item.sourceId === source).filter((item) => !query || `${item.title} ${item.prompt} ${item.description} ${(item.tags || []).join(' ')}`.toLowerCase().includes(query));
-  return { items, total: items.length, sources: rows.map((row) => ({ id: row.id, name: row.name, homepageUrl: row.homepage_url, itemCount: row.item_count })) };
+  const caches = await Promise.all(rows.map(async (row) => { if (!row.cache_path) return { items: [], sources: [] as CatalogSource[] }; try { const data = JSON.parse(await fs.readFile(row.cache_path, 'utf8')); return { items: Array.isArray(data.items) ? data.items : [], sources: Array.isArray(data.sources) ? data.sources as CatalogSource[] : [] }; } catch { return { items: [], sources: [] as CatalogSource[] }; } }));
+  const catalog = caches.flatMap((cache) => cache.sources).length ? caches.flatMap((cache) => cache.sources) : rows.map((row) => ({ id: row.id, name: row.name, homepageUrl: row.homepage_url, itemCount: row.item_count }));
+  const items = caches.flatMap((cache) => cache.items).filter((item) => !source || item.sourceId === source).filter((item) => !query || `${item.title} ${item.prompt} ${item.description} ${(item.tags || []).join(' ')}`.toLowerCase().includes(query));
+  return { items, total: items.length, sources: catalog };
 };
 const syncSource = async (runtime: LibraryRuntime, source: SourceRow) => {
   const now = Date.now();
@@ -76,8 +79,17 @@ const syncSource = async (runtime: LibraryRuntime, source: SourceRow) => {
     const promptsUrl = promptsPath ? new URL(promptsPath, source.manifest_url).toString() : source.manifest_url;
     const promptsData = promptsUrl === source.manifest_url ? manifest : await fetchJson(safeUrl(promptsUrl), 50 * 1024 * 1024);
     const items = normalizeItems(promptsData, source.id, source.homepage_url || source.manifest_url);
+    const manifestSources = Array.isArray(manifest.sources) ? manifest.sources : [];
+    const sources: CatalogSource[] = manifestSources.flatMap((entry) => {
+      const object = bodyObject(entry);
+      const id = typeof object.id === 'string' ? object.id : '';
+      const name = typeof object.name === 'string' ? object.name : '';
+      if (!id || !name) return [];
+      const count = items.filter((item) => item.sourceId === id).length;
+      return [{ id, name, homepageUrl: typeof object.homepage === 'string' ? object.homepage : null, itemCount: count }];
+    });
     const cachePath = path.join(runtime.paths.modules.promptSources, `${source.id}.json`);
-    await atomicWriteFile(cachePath, JSON.stringify({ source: toSource(source), syncedAt: now, items }, null, 2));
+    await atomicWriteFile(cachePath, JSON.stringify({ source: toSource(source), syncedAt: now, sources, items }, null, 2));
     runtime.database.prepare('UPDATE prompt_sources SET last_success_at=?, item_count=?, cache_path=?, error_message=NULL, updated_at=? WHERE id=?').run(now, items.length, cachePath, now, source.id);
     return { ...toSource(source), lastAttemptAt: now, lastSuccessAt: now, itemCount: items.length, cachePath, errorMessage: null };
   } catch (error) {
