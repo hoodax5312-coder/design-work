@@ -143,7 +143,7 @@ const AssetWorkspace = () => {
         </div>
       </div>
       <div className="mx-3 mb-3 min-h-0 flex-1 overflow-hidden">
-        {section === 'assets' && <AssetLibraryPage showSourceTabs={false} />}
+        {section === 'assets' && <AssetLibraryPage showSourceTabs={false} showSearch={false} />}
         {section === 'prompts' && <QuickNotes />}
         {section === 'notes' && <PersonalSpace embedded />}
       </div>
@@ -169,7 +169,7 @@ function App() {
         {activeModule === 'background-remove' && <ModulePlaceholder title="抠图去背景" description="上传图片后即可进行主体分离与背景移除。" />}
         {activeModule === 'product-retouch' && <ModulePlaceholder title="产品图精修" description="上传产品图后即可进行光影、质感与细节优化。" />}
         {activeModule === 'assets' && <AssetWorkspace />}
-        {activeModule === 'cases' && <AssetLibraryPage initialSource="online" showSourceTabs={false} />}
+        {activeModule === 'cases' && <AssetLibraryPage initialSource="online" showSourceTabs={false} showSearch />}
         {activeModule === 'tools' && <ToolsHub />}
         {activeModule === 'sources' && <SourceCenter />}
         {activeModule === 'exports' && <ExportCenter />}

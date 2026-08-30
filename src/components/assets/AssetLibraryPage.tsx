@@ -67,7 +67,7 @@ const formatDate = (value: number) =>
     year: 'numeric',
   }).format(value);
 
-export const AssetLibraryPage = ({ initialSource = 'uploaded', showSourceTabs = true }: { initialSource?: AssetSource; showSourceTabs?: boolean }) => {
+export const AssetLibraryPage = ({ initialSource = 'uploaded', showSourceTabs = true, showSearch = true }: { initialSource?: AssetSource; showSourceTabs?: boolean; showSearch?: boolean }) => {
   const [page, setPage] = useState<AssetPage>({ items: [], total: 0, limit: 60, offset: 0 });
   const [folders, setFolders] = useState<AssetFolder[]>([]);
   const [tags, setTags] = useState<AssetTag[]>([]);
@@ -421,7 +421,7 @@ export const AssetLibraryPage = ({ initialSource = 'uploaded', showSourceTabs = 
             })}
           </div>}
 
-          {source !== 'online' && <div className="relative order-2 ml-auto w-[240px] max-w-full">
+          {showSearch && <div className="relative order-2 ml-auto w-[240px] max-w-full">
               <Search size={16} className="pointer-events-none absolute left-3 top-1/2 z-10 -translate-y-1/2 text-muted-foreground" />
             <Input
               value={query}
