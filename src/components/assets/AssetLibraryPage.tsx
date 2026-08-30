@@ -605,6 +605,38 @@ export const AssetLibraryPage = ({ initialSource = 'uploaded', showSourceTabs = 
                   })}
                 </div>
               </section>
+              <section className="px-0 py-1" data-filter-section="case-sources">
+                <div className="mb-1 flex h-8 items-center px-2.5 text-xs font-medium text-muted-foreground">来源</div>
+                <div className="flex flex-col gap-0.5">
+                  <button
+                    type="button"
+                    onClick={() => setCaseSourceTab('all')}
+                    aria-pressed={caseSourceTab === 'all'}
+                    className={cn(
+                      'flex h-8 w-full items-center justify-between rounded-md px-2.5 text-left text-xs font-medium text-foreground transition-colors hover:bg-[var(--surface-hover)] hover:text-[var(--surface-hover-foreground)]',
+                      caseSourceTab === 'all' && 'bg-[var(--surface-control)] text-[var(--surface-control-foreground)] hover:bg-[var(--surface-control)] hover:text-[var(--surface-control-foreground)]',
+                    )}
+                  >
+                    <span>全部来源</span><span className="text-[11px] opacity-60">{caseItems.length}</span>
+                  </button>
+                  {caseSources.map((sourceItem) => (
+                    <button
+                      key={sourceItem.id}
+                      type="button"
+                      onClick={() => setCaseSourceTab(sourceItem.id)}
+                      aria-pressed={caseSourceTab === sourceItem.id}
+                      title={sourceItem.homepageUrl || sourceItem.name}
+                      className={cn(
+                        'flex h-8 w-full items-center justify-between rounded-md px-2.5 text-left text-xs font-medium text-foreground transition-colors hover:bg-[var(--surface-hover)] hover:text-[var(--surface-hover-foreground)]',
+                        caseSourceTab === sourceItem.id && 'bg-[var(--surface-control)] text-[var(--surface-control-foreground)] hover:bg-[var(--surface-control)] hover:text-[var(--surface-control-foreground)]',
+                      )}
+                    >
+                      <span className="min-w-0 truncate">{sourceItem.name}</span><span className="ml-2 shrink-0 text-[11px] opacity-60">{sourceItem.itemCount}</span>
+                    </button>
+                  ))}
+                  {!caseSources.length && <div className="px-2.5 py-3 text-xs text-muted-foreground">暂无来源</div>}
+                </div>
+              </section>
               <section className="px-0 py-1" data-filter-section="case-tags">
                 <div className="mb-1 flex h-8 items-center gap-2 px-2.5 text-xs font-medium text-muted-foreground">
                   <Hash size={12} aria-hidden="true" />
@@ -645,13 +677,7 @@ export const AssetLibraryPage = ({ initialSource = 'uploaded', showSourceTabs = 
         </aside>}
       {source === 'online' ? (
         <main className="flex min-w-0 flex-1 flex-col overflow-hidden bg-transparent">
-          <header className="ui-module-divider-b flex min-h-20 shrink-0 flex-col items-start justify-center gap-1 px-4 py-2">
-            <div role="tablist" aria-label="案例来源" className="flex min-w-0 max-w-full items-center gap-1 overflow-x-auto">
-              <button type="button" role="tab" aria-selected={caseSourceTab === 'all'} onClick={() => setCaseSourceTab('all')} className={cn('flex h-8 shrink-0 items-center rounded-md border-0 bg-transparent px-3 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground', caseSourceTab === 'all' && 'bg-[var(--surface-control)] text-[var(--surface-control-foreground)]')}>全部来源</button>
-              {caseSources.map((sourceItem) => {
-                return <button key={sourceItem.id} type="button" role="tab" aria-selected={caseSourceTab === sourceItem.id} onClick={() => setCaseSourceTab(sourceItem.id)} title={sourceItem.homepageUrl || sourceItem.name} className={cn('flex h-8 max-w-64 shrink-0 items-center gap-1.5 truncate rounded-md border-0 bg-transparent px-3 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground', caseSourceTab === sourceItem.id && 'bg-[var(--surface-control)] text-[var(--surface-control-foreground)]')}><span className="truncate">{sourceItem.name}</span><span className="text-xs opacity-60">{sourceItem.itemCount}</span></button>;
-              })}
-            </div>
+          <header className="ui-module-divider-b flex h-12 shrink-0 items-center px-4">
             <div role="tablist" aria-label="案例模型" className="flex min-w-0 items-center gap-1">
               {caseTabs.map(({ id, label }) => {
                 const active = caseTab === id;
