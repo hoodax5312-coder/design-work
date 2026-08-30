@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Archive,
   CheckSquare2,
@@ -60,6 +60,11 @@ const caseTabs: Array<{ id: string; label: string }> = [
   { id: 'nanobanana', label: 'Nanobanana' },
   { id: 'midjourney', label: 'Midjourney' },
 ];
+const caseModelMatches = (model: string, tabId: string) => {
+  if (tabId === 'all') return true;
+  const normalized = model.toLowerCase().replace(/[^a-z0-9]+/g, '');
+  return normalized.includes(tabId.replace(/[^a-z0-9]+/g, ''));
+};
 const formatDate = (value: number) =>
   new Intl.DateTimeFormat('zh-CN', {
     month: '2-digit',
@@ -76,6 +81,7 @@ export const AssetLibraryPage = ({ initialSource = 'uploaded', showSourceTabs = 
   const [source, setSource] = useState<AssetSource>(initialSource);
   const [caseTab, setCaseTab] = useState('all');
   const [caseSourceTab, setCaseSourceTab] = useState('all');
+  const [caseTag, setCaseTag] = useState('');
   const [type, setType] = useState<AssetTypeFilter>('image');
   const [folderId, setFolderId] = useState('');
   const [tagIds, setTagIds] = useState<string[]>([]);
@@ -386,6 +392,21 @@ export const AssetLibraryPage = ({ initialSource = 'uploaded', showSourceTabs = 
   const assetViewTitle = source === 'online'
     ? '案例资源'
     : activeTagLabel || activeFolderLabel || (favoritesOnly ? '收藏' : activeTypeLabel);
+  const caseModelCounts = useMemo(() => caseTabs.map((tab) => ({
+    ...tab,
+    count: caseItems.filter((item) => caseModelMatches(item.imageModel, tab.id)).length,
+  })), [caseItems]);
+  const caseTagCounts = useMemo(() => {
+    const counts = new Map<string, number>();
+    caseItems.forEach((item) => item.tags.forEach((tag) => counts.set(tag, (counts.get(tag) || 0) + 1)));
+    return [...counts.entries()]
+      .map(([name, count]) => ({ name, count }))
+      .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name, 'zh-CN'));
+  }, [caseItems]);
+  const visibleCaseItems = useMemo(() => caseItems.filter((item) =>
+    (caseSourceTab === 'all' || item.sourceId === caseSourceTab)
+      && caseModelMatches(item.imageModel, caseTab)
+      && (!caseTag || item.tags.includes(caseTag))), [caseItems, caseSourceTab, caseTab, caseTag]);
   return (
     <div className="module-workspace ui-workspace-surface relative flex h-full min-w-0 flex-col bg-[var(--module-workspace-bg,var(--background))] text-foreground">
       {(showSourceTabs || showSearch) && <header className={cn(flushLayout ? 'mx-0' : 'mx-3', 'shrink-0 p-0')}>
@@ -411,6 +432,9 @@ export const AssetLibraryPage = ({ initialSource = 'uploaded', showSourceTabs = 
                     setType(type !== 'project' ? type : 'image');
                     setFolderId('');
                     setTagIds([]);
+                    setCaseTag('');
+                    setCaseTab('all');
+                    setCaseSourceTab('all');
                     setDropZoneOpen(false);
                     setSelectedIds(new Set());
                     setSelectedId(null);
@@ -560,6 +584,63 @@ export const AssetLibraryPage = ({ initialSource = 'uploaded', showSourceTabs = 
                 {!tags.length && <div className="px-3 py-3 text-xs text-muted-foreground">暂无标签，点击右上角添加</div>}
               </div>
             </section>}
+            {source === 'online' && <>
+              <section className="px-0 pb-2" data-filter-section="case-category">
+                <div className="mb-1 flex h-8 items-center px-2.5 text-xs font-medium text-muted-foreground">分类</div>
+                <div className="flex flex-col gap-0.5">
+                  {caseModelCounts.map((tab) => {
+                    const active = caseTab === tab.id;
+                    return <button
+                      key={tab.id}
+                      type="button"
+                      onClick={() => { setCaseTab(tab.id); setCaseTag(''); }}
+                      aria-pressed={active}
+                      className={cn(
+                        'flex h-8 w-full items-center justify-between rounded-md px-2.5 text-left text-xs font-medium text-foreground transition-colors hover:bg-[var(--surface-hover)] hover:text-[var(--surface-hover-foreground)]',
+                        active && 'bg-[var(--surface-control)] text-[var(--surface-control-foreground)] hover:bg-[var(--surface-control)] hover:text-[var(--surface-control-foreground)]',
+                      )}
+                    >
+                      <span>{tab.label}</span><span className="text-[11px] opacity-60">{tab.count}</span>
+                    </button>;
+                  })}
+                </div>
+              </section>
+              <section className="px-0 py-1" data-filter-section="case-tags">
+                <div className="mb-1 flex h-8 items-center gap-2 px-2.5 text-xs font-medium text-muted-foreground">
+                  <Hash size={12} aria-hidden="true" />
+                  <span>标签</span>
+                </div>
+                <div className="flex flex-col gap-0.5">
+                  <button
+                    type="button"
+                    onClick={() => setCaseTag('')}
+                    aria-pressed={!caseTag}
+                    className={cn(
+                      'flex h-8 w-full items-center justify-between rounded-md px-2.5 text-left text-xs font-medium text-foreground transition-colors hover:bg-[var(--surface-hover)] hover:text-[var(--surface-hover-foreground)]',
+                      !caseTag && 'bg-[var(--surface-control)] text-[var(--surface-control-foreground)] hover:bg-[var(--surface-control)] hover:text-[var(--surface-control-foreground)]',
+                    )}
+                  >
+                    <span>全部标签</span><span className="text-[11px] opacity-60">{caseItems.length}</span>
+                  </button>
+                  {caseTagCounts.map((tag) => {
+                    const active = caseTag === tag.name;
+                    return <button
+                      key={tag.name}
+                      type="button"
+                      onClick={() => setCaseTag(tag.name)}
+                      aria-pressed={active}
+                      className={cn(
+                        'flex h-8 w-full items-center justify-between rounded-md px-2.5 text-left text-xs font-medium text-foreground transition-colors hover:bg-[var(--surface-hover)] hover:text-[var(--surface-hover-foreground)]',
+                        active && 'bg-[var(--surface-control)] text-[var(--surface-control-foreground)] hover:bg-[var(--surface-control)] hover:text-[var(--surface-control-foreground)]',
+                      )}
+                    >
+                      <span className="min-w-0 truncate">{tag.name}</span><span className="text-[11px] opacity-60">{tag.count}</span>
+                    </button>;
+                  })}
+                  {!caseTagCounts.length && <div className="px-2.5 py-3 text-xs text-muted-foreground">暂无标签</div>}
+                </div>
+              </section>
+            </>}
           </nav>
         </aside>}
       {source === 'online' ? (
@@ -579,7 +660,7 @@ export const AssetLibraryPage = ({ initialSource = 'uploaded', showSourceTabs = 
                     role="tab"
                     aria-selected={active}
                     data-state={active ? 'active' : 'inactive'}
-                    onClick={() => setCaseTab(id)}
+                    onClick={() => { setCaseTab(id); setCaseTag(''); }}
                     className="flex h-8 shrink-0 items-center rounded-md border-0 bg-transparent px-4 py-0 text-sm font-medium text-muted-foreground shadow-none transition-colors focus-visible:ring-offset-0 data-[state=inactive]:hover:text-foreground data-[state=active]:!bg-[var(--surface-control)] data-[state=active]:!text-[var(--surface-control-foreground)] data-[state=active]:!shadow-none"
                   >
                     {label}
@@ -589,7 +670,7 @@ export const AssetLibraryPage = ({ initialSource = 'uploaded', showSourceTabs = 
             </div>
           </header>
           <div className="min-h-0 flex-1 overflow-y-auto p-4">
-            {caseItems.filter((item) => (caseSourceTab === 'all' || item.sourceId === caseSourceTab) && (caseTab === 'all' || item.imageModel.toLowerCase().includes(caseTab))).length ? <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">{caseItems.filter((item) => (caseSourceTab === 'all' || item.sourceId === caseSourceTab) && (caseTab === 'all' || item.imageModel.toLowerCase().includes(caseTab))).map((item) => <article key={item.id} className="group overflow-hidden rounded-lg border border-border bg-card"><div className="aspect-[16/10] bg-muted">{item.coverUrl ? <img src={item.coverUrl} alt="" className="h-full w-full object-cover" loading="lazy" /> : <div className="grid h-full place-items-center text-xs text-muted-foreground">暂无封面</div>}</div><div className="space-y-2 p-3"><h2 className="truncate text-sm font-semibold">{item.title}</h2><p className="line-clamp-3 text-xs leading-5 text-muted-foreground">{item.prompt}</p><div className="flex items-center justify-between gap-2 text-[11px] text-muted-foreground"><span className="truncate">{item.author || '公开来源'}</span><a href={item.sourceUrl} target="_blank" rel="noreferrer" className="shrink-0 hover:text-foreground">查看来源</a></div></div></article>)}</div> : <div className="flex h-full items-center justify-center px-6"><div className="flex max-w-sm flex-col items-center text-center">
+            {visibleCaseItems.length ? <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">{visibleCaseItems.map((item) => <article key={item.id} className="group overflow-hidden rounded-lg border border-border bg-card"><div className="aspect-[16/10] bg-muted">{item.coverUrl ? <img src={item.coverUrl} alt="" className="h-full w-full object-cover" loading="lazy" /> : <div className="grid h-full place-items-center text-xs text-muted-foreground">暂无封面</div>}</div><div className="space-y-2 p-3"><h2 className="truncate text-sm font-semibold">{item.title}</h2><p className="line-clamp-3 text-xs leading-5 text-muted-foreground">{item.prompt}</p><div className="flex min-h-5 flex-wrap gap-1">{item.tags.slice(0, 4).map((tag) => <button key={tag} type="button" onClick={() => setCaseTag(tag)} className="max-w-full truncate rounded bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground transition-colors hover:bg-[var(--surface-control)] hover:text-[var(--surface-control-foreground)]">{tag}</button>)}</div><div className="flex items-center justify-between gap-2 text-[11px] text-muted-foreground"><span className="truncate">{item.author || '公开来源'}</span><a href={item.sourceUrl} target="_blank" rel="noreferrer" className="shrink-0 hover:text-foreground">查看来源</a></div></div></article>)}</div> : <div className="flex h-full items-center justify-center px-6"><div className="flex max-w-sm flex-col items-center text-center">
               <span className="grid h-11 w-11 place-items-center rounded-full bg-[var(--surface-control)] text-[var(--surface-control-foreground)]">
                 <Globe2 size={20} aria-hidden="true" />
               </span>
