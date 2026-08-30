@@ -88,6 +88,11 @@ const syncSource = async (runtime: LibraryRuntime, source: SourceRow) => {
       const count = items.filter((item) => item.sourceId === id).length;
       return [{ id, name, homepageUrl: typeof object.homepage === 'string' ? object.homepage : null, itemCount: count }];
     });
+    const sourceHomepages = new Map(sources.map((entry) => [entry.id, entry.homepageUrl]));
+    items.forEach((item) => {
+      const homepage = sourceHomepages.get(item.sourceId);
+      if (homepage && (!item.sourceUrl || item.sourceUrl === source.homepage_url || item.sourceUrl === source.manifest_url)) item.sourceUrl = homepage;
+    });
     const cachePath = path.join(runtime.paths.modules.promptSources, `${source.id}.json`);
     await atomicWriteFile(cachePath, JSON.stringify({ source: toSource(source), syncedAt: now, sources, items }, null, 2));
     runtime.database.prepare('UPDATE prompt_sources SET last_success_at=?, item_count=?, cache_path=?, error_message=NULL, updated_at=? WHERE id=?').run(now, items.length, cachePath, now, source.id);
