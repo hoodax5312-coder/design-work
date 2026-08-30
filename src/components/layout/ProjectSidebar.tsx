@@ -54,7 +54,7 @@ const navigationGroups: Array<{
   {
     title: '管理',
     items: [
-      { module: 'assets', label: '素材', lineIcon: RiArchiveStackLine, fillIcon: RiArchiveStackFill },
+      { module: 'assets', label: '资产', lineIcon: RiArchiveStackLine, fillIcon: RiArchiveStackFill },
       { module: 'magic-canvas', label: '画布', lineIcon: RiInfinityLine, fillIcon: RiInfinityFill },
       { module: 'tools', label: '工具', lineIcon: RiToolsLine, fillIcon: RiToolsFill },
       { module: 'settings', label: '设置', lineIcon: RiSettings3Line, fillIcon: RiSettings3Fill },
