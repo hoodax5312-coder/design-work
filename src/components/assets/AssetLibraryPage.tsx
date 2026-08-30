@@ -23,6 +23,14 @@ import {
   UploadCloud,
   X,
 } from '@/lib/remixIconShim';
+import {
+  RiApps2Line,
+  RiGoogleLine,
+  RiMagicLine,
+  RiOpenaiLine,
+  RiVideoAiLine,
+  type RemixiconComponentType,
+} from '@remixicon/react';
 import { cn } from '../../lib/utils';
 import { assetService, waitForTask } from '../../services/assetService';
 import type {
@@ -53,6 +61,13 @@ const assetTypeOptions: Array<{ id: AssetTypeFilter; label: string; icon: React.
   { id: 'audio', label: '音频', icon: Music },
 ];
 const visibleAssetTypes = new Set(['image', 'video', 'audio']);
+const caseTabs: Array<{ id: string; label: string; icon: RemixiconComponentType }> = [
+  { id: 'all', label: 'All', icon: RiApps2Line },
+  { id: 'gpt-image', label: 'GPT Image', icon: RiOpenaiLine },
+  { id: 'seedance', label: 'Seedance', icon: RiVideoAiLine },
+  { id: 'nanobanana', label: 'Nanobanana', icon: RiGoogleLine },
+  { id: 'midjourney', label: 'Midjourney', icon: RiMagicLine },
+];
 const formatDate = (value: number) =>
   new Intl.DateTimeFormat('zh-CN', {
     month: '2-digit',
@@ -67,6 +82,7 @@ export const AssetLibraryPage = ({ initialSource = 'uploaded', showSourceTabs = 
   const [query, setQuery] = useState('');
   const [debouncedQuery, setDebouncedQuery] = useState('');
   const [source, setSource] = useState<AssetSource>(initialSource);
+  const [caseTab, setCaseTab] = useState('all');
   const [type, setType] = useState<AssetTypeFilter>('image');
   const [folderId, setFolderId] = useState('');
   const [tagIds, setTagIds] = useState<string[]>([]);
@@ -437,7 +453,34 @@ export const AssetLibraryPage = ({ initialSource = 'uploaded', showSourceTabs = 
           className="asset-filter-panel ui-module-divider-r flex h-full w-[200px] shrink-0 flex-col overflow-hidden bg-[var(--module-workspace-bg,var(--background))] text-foreground"
         >
           <nav className="min-h-0 flex-1 overflow-y-auto px-3 py-3" aria-label="素材标签筛选">
-            <section className="px-0 pb-1" data-filter-section="type">
+            {source === 'online' && (
+              <section className="px-0 pb-2" aria-label="案例模型">
+                <div role="tablist" aria-label="案例模型" className="flex flex-col gap-0.5">
+                  {caseTabs.map(({ id, label, icon: Icon }) => {
+                    const active = caseTab === id;
+                    return (
+                      <button
+                        key={id}
+                        type="button"
+                        role="tab"
+                        aria-selected={active}
+                        onClick={() => setCaseTab(id)}
+                        className={cn(
+                          'flex h-8 w-full items-center gap-2 rounded-md px-2.5 text-sm font-medium text-foreground transition-colors',
+                          active
+                            ? 'bg-[var(--surface-control)] text-[var(--surface-control-foreground)]'
+                            : 'hover:bg-[var(--surface-hover)] hover:text-[var(--surface-hover-foreground)]',
+                        )}
+                      >
+                        <Icon size={16} aria-hidden="true" />
+                        <span>{label}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </section>
+            )}
+            {source === 'uploaded' && <section className="px-0 pb-1" data-filter-section="type">
               <div className="flex flex-col gap-0.5">
                 {assetTypeOptions
                   .filter((option) => option.id !== 'project')
@@ -467,8 +510,8 @@ export const AssetLibraryPage = ({ initialSource = 'uploaded', showSourceTabs = 
                     );
                   })}
               </div>
-            </section>
-            <section className="px-0 py-1" data-filter-section="tags">
+            </section>}
+            {source === 'uploaded' && <section className="px-0 py-1" data-filter-section="tags">
               <div className="flex h-10 items-center gap-2 text-sidebar-foreground/70">
                 <Hash size={12} className="shrink-0" aria-hidden="true" />
                 <span className="text-xs font-medium">标签</span>
@@ -543,7 +586,7 @@ export const AssetLibraryPage = ({ initialSource = 'uploaded', showSourceTabs = 
                 })}
                 {!tags.length && <div className="px-3 py-3 text-xs text-muted-foreground">暂无标签，点击右上角添加</div>}
               </div>
-            </section>
+            </section>}
           </nav>
         </aside>}
       {source === 'online' ? (
