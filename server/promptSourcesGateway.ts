@@ -65,7 +65,7 @@ const readCases = async (runtime: LibraryRuntime, queryValue: unknown, sourceVal
   const query = String(queryValue || '').toLowerCase(); const source = String(sourceValue || '');
   const rows = getRows(runtime.database).filter((row) => row.enabled);
   const items = (await Promise.all(rows.map(async (row) => { if (!row.cache_path) return []; try { const data = JSON.parse(await fs.readFile(row.cache_path, 'utf8')); return Array.isArray(data.items) ? data.items : []; } catch { return []; } }))).flat().filter((item) => !source || item.sourceId === source).filter((item) => !query || `${item.title} ${item.prompt} ${item.description} ${(item.tags || []).join(' ')}`.toLowerCase().includes(query));
-  return { items, total: items.length };
+  return { items, total: items.length, sources: rows.map((row) => ({ id: row.id, name: row.name, homepageUrl: row.homepage_url, itemCount: row.item_count })) };
 };
 const syncSource = async (runtime: LibraryRuntime, source: SourceRow) => {
   const now = Date.now();

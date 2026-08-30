@@ -55,7 +55,7 @@ export interface AssetQuery {
 }
 
 export const assetService = {
-  cases: (query = '') => request<{ items: Array<{ id: string; sourceId: string; title: string; prompt: string; description: string; coverUrl: string | null; tags: string[]; author: string; sourceUrl: string; imageModel: string }>; total: number }>(`/api/cases?query=${encodeURIComponent(query)}`),
+  cases: (query = '') => request<{ items: Array<{ id: string; sourceId: string; title: string; prompt: string; description: string; coverUrl: string | null; tags: string[]; author: string; sourceUrl: string; imageModel: string }>; total: number; sources: Array<{ id: string; name: string; homepageUrl: string | null; itemCount: number }> }>(`/api/cases?query=${encodeURIComponent(query)}`),
   create: (input: {
     type: string;
     title: string;

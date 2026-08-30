@@ -75,6 +75,7 @@ export const AssetLibraryPage = ({ initialSource = 'uploaded', showSourceTabs = 
   const [debouncedQuery, setDebouncedQuery] = useState('');
   const [source, setSource] = useState<AssetSource>(initialSource);
   const [caseTab, setCaseTab] = useState('all');
+  const [caseSourceTab, setCaseSourceTab] = useState('all');
   const [type, setType] = useState<AssetTypeFilter>('image');
   const [folderId, setFolderId] = useState('');
   const [tagIds, setTagIds] = useState<string[]>([]);
@@ -97,6 +98,7 @@ export const AssetLibraryPage = ({ initialSource = 'uploaded', showSourceTabs = 
   const [taskRefreshKey, setTaskRefreshKey] = useState(0);
   const [generatedItems, setGeneratedItems] = useState<GeneratedContentItem[]>([]);
   const [caseItems, setCaseItems] = useState<Array<{ id: string; sourceId: string; title: string; prompt: string; description: string; coverUrl: string | null; tags: string[]; author: string; sourceUrl: string; imageModel: string }>>([]);
+  const [caseSources, setCaseSources] = useState<Array<{ id: string; name: string; homepageUrl: string | null; itemCount: number }>>([]);
 
   useEffect(() => {
     const sync = () => setGeneratedItems(contentFeed.list());
@@ -107,7 +109,7 @@ export const AssetLibraryPage = ({ initialSource = 'uploaded', showSourceTabs = 
 
   useEffect(() => {
     if (source !== 'online') return;
-    assetService.cases(debouncedQuery).then((result) => setCaseItems(result.items)).catch((caught) => setError(caught instanceof Error ? caught.message : '案例读取失败'));
+    assetService.cases(debouncedQuery).then((result) => { setCaseItems(result.items); setCaseSources(result.sources); }).catch((caught) => setError(caught instanceof Error ? caught.message : '案例读取失败'));
   }, [debouncedQuery, source]);
 
   useEffect(() => {
@@ -562,7 +564,11 @@ export const AssetLibraryPage = ({ initialSource = 'uploaded', showSourceTabs = 
         </aside>}
       {source === 'online' ? (
         <main className="flex min-w-0 flex-1 flex-col overflow-hidden bg-transparent">
-          <header className="ui-module-divider-b flex h-12 shrink-0 items-center px-4">
+          <header className="ui-module-divider-b flex min-h-20 shrink-0 flex-col items-start justify-center gap-1 px-4 py-2">
+            <div role="tablist" aria-label="案例来源" className="flex min-w-0 max-w-full items-center gap-1 overflow-x-auto">
+              <button type="button" role="tab" aria-selected={caseSourceTab === 'all'} onClick={() => setCaseSourceTab('all')} className={cn('flex h-8 shrink-0 items-center rounded-md border-0 bg-transparent px-3 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground', caseSourceTab === 'all' && 'bg-[var(--surface-control)] text-[var(--surface-control-foreground)]')}>全部来源</button>
+              {caseSources.map((sourceItem) => <button key={sourceItem.id} type="button" role="tab" aria-selected={caseSourceTab === sourceItem.id} onClick={() => setCaseSourceTab(sourceItem.id)} title={sourceItem.homepageUrl || sourceItem.name} className={cn('flex h-8 max-w-64 shrink-0 items-center gap-1.5 truncate rounded-md border-0 bg-transparent px-3 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground', caseSourceTab === sourceItem.id && 'bg-[var(--surface-control)] text-[var(--surface-control-foreground)]')}><span className="truncate">{sourceItem.name}</span><span className="text-xs opacity-60">{sourceItem.itemCount}</span></button>)}
+            </div>
             <div role="tablist" aria-label="案例模型" className="flex min-w-0 items-center gap-1">
               {caseTabs.map(({ id, label }) => {
                 const active = caseTab === id;
@@ -583,7 +589,7 @@ export const AssetLibraryPage = ({ initialSource = 'uploaded', showSourceTabs = 
             </div>
           </header>
           <div className="min-h-0 flex-1 overflow-y-auto p-4">
-            {caseItems.length ? <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">{caseItems.filter((item) => caseTab === 'all' || item.imageModel.toLowerCase().includes(caseTab)).map((item) => <article key={item.id} className="group overflow-hidden rounded-lg border border-border bg-card"><div className="aspect-[16/10] bg-muted">{item.coverUrl ? <img src={item.coverUrl} alt="" className="h-full w-full object-cover" loading="lazy" /> : <div className="grid h-full place-items-center text-xs text-muted-foreground">暂无封面</div>}</div><div className="space-y-2 p-3"><h2 className="truncate text-sm font-semibold">{item.title}</h2><p className="line-clamp-3 text-xs leading-5 text-muted-foreground">{item.prompt}</p><div className="flex items-center justify-between gap-2 text-[11px] text-muted-foreground"><span className="truncate">{item.author || '公开来源'}</span><a href={item.sourceUrl} target="_blank" rel="noreferrer" className="shrink-0 hover:text-foreground">查看来源</a></div></div></article>)}</div> : <div className="flex h-full items-center justify-center px-6"><div className="flex max-w-sm flex-col items-center text-center">
+            {caseItems.filter((item) => (caseSourceTab === 'all' || item.sourceId === caseSourceTab) && (caseTab === 'all' || item.imageModel.toLowerCase().includes(caseTab))).length ? <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">{caseItems.filter((item) => (caseSourceTab === 'all' || item.sourceId === caseSourceTab) && (caseTab === 'all' || item.imageModel.toLowerCase().includes(caseTab))).map((item) => <article key={item.id} className="group overflow-hidden rounded-lg border border-border bg-card"><div className="aspect-[16/10] bg-muted">{item.coverUrl ? <img src={item.coverUrl} alt="" className="h-full w-full object-cover" loading="lazy" /> : <div className="grid h-full place-items-center text-xs text-muted-foreground">暂无封面</div>}</div><div className="space-y-2 p-3"><h2 className="truncate text-sm font-semibold">{item.title}</h2><p className="line-clamp-3 text-xs leading-5 text-muted-foreground">{item.prompt}</p><div className="flex items-center justify-between gap-2 text-[11px] text-muted-foreground"><span className="truncate">{item.author || '公开来源'}</span><a href={item.sourceUrl} target="_blank" rel="noreferrer" className="shrink-0 hover:text-foreground">查看来源</a></div></div></article>)}</div> : <div className="flex h-full items-center justify-center px-6"><div className="flex max-w-sm flex-col items-center text-center">
               <span className="grid h-11 w-11 place-items-center rounded-full bg-[var(--surface-control)] text-[var(--surface-control-foreground)]">
                 <Globe2 size={20} aria-hidden="true" />
               </span>
