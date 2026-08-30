@@ -22,6 +22,7 @@ const moduleNames = {
   'ppt-gen': 'PPT 生成',
   'video-gen': '视频生成',
   assets: '资产库',
+  cases: '案例',
   projects: '个人空间',
   tools: 'AI 应用',
   ecommerce: '电商设计',

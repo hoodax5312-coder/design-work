@@ -18,8 +18,6 @@ import {
 import {
   RiArchiveStackFill,
   RiArchiveStackLine,
-  RiFileTextFill,
-  RiFileTextLine,
   RiImageAiFill,
   RiImageAiLine,
   RiInfinityFill,
@@ -49,14 +47,14 @@ const navigationGroups: Array<{
   {
     title: '创作',
     items: [
+      { module: 'cases', label: '案例', lineIcon: RiArchiveStackLine, fillIcon: RiArchiveStackFill },
       { module: 'image-gen', label: '生成', lineIcon: RiImageAiLine, fillIcon: RiImageAiFill },
     ],
   },
   {
     title: '管理',
     items: [
-      { module: 'assets', label: '资产', lineIcon: RiArchiveStackLine, fillIcon: RiArchiveStackFill },
-      { module: 'sources', label: '知识', lineIcon: RiFileTextLine, fillIcon: RiFileTextFill },
+      { module: 'assets', label: '素材', lineIcon: RiArchiveStackLine, fillIcon: RiArchiveStackFill },
       { module: 'magic-canvas', label: '画布', lineIcon: RiInfinityLine, fillIcon: RiInfinityFill },
       { module: 'tools', label: '工具', lineIcon: RiToolsLine, fillIcon: RiToolsFill },
       { module: 'settings', label: '设置', lineIcon: RiSettings3Line, fillIcon: RiSettings3Fill },
@@ -112,6 +110,7 @@ const explorerContent: Record<ModuleType, { title: string; section: string; entr
     ],
   },
   assets: { title: '资产', section: '资料库', entries: [] },
+  cases: { title: '案例', section: '案例资源', entries: [] },
   sources: {
     title: '资源来源',
     section: '存储与连接',

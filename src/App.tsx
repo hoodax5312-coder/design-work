@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import {
   ArrowRight,
   Image as ImageIcon,
@@ -11,6 +12,8 @@ import { ImageGeneration } from './components/image-gen/ImageGeneration';
 import { VideoGeneration } from './components/video-gen/VideoGeneration';
 import { PptGeneration } from './components/ppt-gen/PptGeneration';
 import { AssetLibraryPage } from './components/assets/AssetLibraryPage';
+import { QuickNotes } from './components/knowledge/QuickNotes';
+import { PersonalSpace } from './components/spaces/PersonalSpace';
 import { Ecommerce } from './components/ecommerce/Ecommerce';
 import { ExportCenter, SourceCenter } from './components/delivery/DeliveryCenter';
 import { WorkflowModal } from './components/modals/WorkflowModal';
@@ -114,6 +117,39 @@ const ToolsHub = () => {
   );
 };
 
+const AssetWorkspace = () => {
+  const [section, setSection] = useState<'assets' | 'prompts' | 'notes'>('assets');
+  return (
+    <div className="module-workspace flex h-full min-h-0 flex-col bg-[var(--module-workspace-bg,var(--background))]">
+      <div className="ui-module-toolbar mx-3 flex h-14 shrink-0 items-center justify-between border-0 px-0 shadow-none">
+        <div role="tablist" aria-label="资产内容" className="flex h-8 items-center gap-1">
+          {([
+            ['assets', '素材'],
+            ['prompts', '词库'],
+            ['notes', '笔记'],
+          ] as const).map(([value, label]) => (
+            <button
+              key={value}
+              type="button"
+              role="tab"
+              aria-selected={section === value}
+              onClick={() => setSection(value)}
+              className={`flex h-8 items-center rounded-md border-0 bg-transparent px-4 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground ${section === value ? 'bg-[var(--surface-control)] text-[var(--surface-control-foreground)]' : ''}`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      </div>
+      <div className="mx-3 mb-3 min-h-0 flex-1 overflow-hidden">
+        {section === 'assets' && <AssetLibraryPage showSourceTabs={false} />}
+        {section === 'prompts' && <QuickNotes />}
+        {section === 'notes' && <PersonalSpace embedded />}
+      </div>
+    </div>
+  );
+};
+
 function App() {
   const { activeModule } = useUIStore();
 
@@ -131,13 +167,14 @@ function App() {
         {activeModule === 'ecommerce' && <Ecommerce />}
         {activeModule === 'background-remove' && <ModulePlaceholder title="抠图去背景" description="上传图片后即可进行主体分离与背景移除。" />}
         {activeModule === 'product-retouch' && <ModulePlaceholder title="产品图精修" description="上传产品图后即可进行光影、质感与细节优化。" />}
-        {activeModule === 'assets' && <AssetLibraryPage />}
+        {activeModule === 'assets' && <AssetWorkspace />}
+        {activeModule === 'cases' && <AssetLibraryPage initialSource="online" showSourceTabs={false} />}
         {activeModule === 'tools' && <ToolsHub />}
         {activeModule === 'sources' && <SourceCenter />}
         {activeModule === 'exports' && <ExportCenter />}
         {activeModule === 'settings' && <SettingsPage />}
         {/* Render Canvas as fallback or specific placeholders for other modules */}
-        {activeModule !== 'magic-canvas' && activeModule !== 'image-gen' && activeModule !== 'ppt-gen' && activeModule !== 'video-gen' && activeModule !== 'projects' && activeModule !== 'ecommerce' && activeModule !== 'background-remove' && activeModule !== 'product-retouch' && activeModule !== 'assets' && activeModule !== 'tools' && activeModule !== 'sources' && activeModule !== 'exports' && activeModule !== 'settings' && (
+        {activeModule !== 'magic-canvas' && activeModule !== 'image-gen' && activeModule !== 'ppt-gen' && activeModule !== 'video-gen' && activeModule !== 'projects' && activeModule !== 'ecommerce' && activeModule !== 'background-remove' && activeModule !== 'product-retouch' && activeModule !== 'assets' && activeModule !== 'cases' && activeModule !== 'tools' && activeModule !== 'sources' && activeModule !== 'exports' && activeModule !== 'settings' && (
           <ModulePlaceholder title="模块建设中" description="这个入口还没有接入具体页面。" />
         )}
         <WorkflowModal />

@@ -60,13 +60,13 @@ const formatDate = (value: number) =>
     year: 'numeric',
   }).format(value);
 
-export const AssetLibraryPage = () => {
+export const AssetLibraryPage = ({ initialSource = 'uploaded', showSourceTabs = true }: { initialSource?: AssetSource; showSourceTabs?: boolean }) => {
   const [page, setPage] = useState<AssetPage>({ items: [], total: 0, limit: 60, offset: 0 });
   const [folders, setFolders] = useState<AssetFolder[]>([]);
   const [tags, setTags] = useState<AssetTag[]>([]);
   const [query, setQuery] = useState('');
   const [debouncedQuery, setDebouncedQuery] = useState('');
-  const [source, setSource] = useState<AssetSource>('uploaded');
+  const [source, setSource] = useState<AssetSource>(initialSource);
   const [type, setType] = useState<AssetTypeFilter>('image');
   const [folderId, setFolderId] = useState('');
   const [tagIds, setTagIds] = useState<string[]>([]);
@@ -374,7 +374,7 @@ export const AssetLibraryPage = () => {
     <div className="module-workspace ui-workspace-surface relative flex h-full min-w-0 flex-col bg-[var(--module-workspace-bg,var(--background))] text-foreground">
       <header className="mx-3 shrink-0 p-0">
         <div className="flex min-h-14 w-full items-center justify-between gap-4">
-          <div
+          {showSourceTabs && <div
             role="tablist"
             aria-label="素材来源"
             className="order-1 flex h-8 shrink-0 items-center gap-1 bg-transparent p-0"
@@ -411,7 +411,7 @@ export const AssetLibraryPage = () => {
                 </button>
               );
             })}
-          </div>
+          </div>}
 
           <div className="relative order-2 ml-auto w-[240px] max-w-full">
               <Search size={16} className="pointer-events-none absolute left-3 top-1/2 z-10 -translate-y-1/2 text-muted-foreground" />

@@ -72,6 +72,7 @@ export interface ContextMenuState {
 export type ModuleType =
   | 'magic-canvas'
   | 'assets'
+  | 'cases'
   | 'image-gen'
   | 'ppt-gen'
   | 'video-gen'
