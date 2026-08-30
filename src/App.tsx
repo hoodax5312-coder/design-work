@@ -143,7 +143,7 @@ const AssetWorkspace = () => {
           ))}
         </div>
       </div>
-      <div className={cn('mx-3 min-h-0 flex-1 overflow-hidden', section === 'assets' ? 'mb-6' : 'mb-3')}>
+      <div className={cn('mx-3 min-h-0 flex-1 overflow-hidden', section === 'assets' ? 'mb-0' : 'mb-3')}>
         {section === 'assets' && <AssetLibraryPage showSourceTabs={false} showSearch={false} flushLayout />}
         {section === 'prompts' && <QuickNotes />}
         {section === 'notes' && <PersonalSpace embedded />}
