@@ -421,7 +421,7 @@ export const AssetLibraryPage = ({ initialSource = 'uploaded', showSourceTabs = 
             })}
           </div>}
 
-          <div className="relative order-2 ml-auto w-[240px] max-w-full">
+          {source !== 'online' && <div className="relative order-2 ml-auto w-[240px] max-w-full">
               <Search size={16} className="pointer-events-none absolute left-3 top-1/2 z-10 -translate-y-1/2 text-muted-foreground" />
             <Input
               value={query}
@@ -432,7 +432,7 @@ export const AssetLibraryPage = ({ initialSource = 'uploaded', showSourceTabs = 
             {query && (
               <Button variant="ghost" size="iconSm" onClick={() => setQuery('')} aria-label="清空搜索" className="absolute right-0.5 top-1/2 h-6 w-6 -translate-y-1/2"><X size={13} /></Button>
             )}
-          </div>
+          </div>}
 
         </div>
       </header>
