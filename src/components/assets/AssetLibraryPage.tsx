@@ -23,14 +23,6 @@ import {
   UploadCloud,
   X,
 } from '@/lib/remixIconShim';
-import {
-  RiApps2Line,
-  RiGoogleLine,
-  RiMagicLine,
-  RiOpenaiLine,
-  RiVideoAiLine,
-  type RemixiconComponentType,
-} from '@remixicon/react';
 import { cn } from '../../lib/utils';
 import { assetService, waitForTask } from '../../services/assetService';
 import type {
@@ -61,12 +53,12 @@ const assetTypeOptions: Array<{ id: AssetTypeFilter; label: string; icon: React.
   { id: 'audio', label: '音频', icon: Music },
 ];
 const visibleAssetTypes = new Set(['image', 'video', 'audio']);
-const caseTabs: Array<{ id: string; label: string; icon: RemixiconComponentType }> = [
-  { id: 'all', label: 'All', icon: RiApps2Line },
-  { id: 'gpt-image', label: 'GPT Image', icon: RiOpenaiLine },
-  { id: 'seedance', label: 'Seedance', icon: RiVideoAiLine },
-  { id: 'nanobanana', label: 'Nanobanana', icon: RiGoogleLine },
-  { id: 'midjourney', label: 'Midjourney', icon: RiMagicLine },
+const caseTabs: Array<{ id: string; label: string }> = [
+  { id: 'all', label: 'All' },
+  { id: 'gpt-image', label: 'GPT Image' },
+  { id: 'seedance', label: 'Seedance' },
+  { id: 'nanobanana', label: 'Nanobanana' },
+  { id: 'midjourney', label: 'Midjourney' },
 ];
 const formatDate = (value: number) =>
   new Intl.DateTimeFormat('zh-CN', {
@@ -453,33 +445,6 @@ export const AssetLibraryPage = ({ initialSource = 'uploaded', showSourceTabs = 
           className="asset-filter-panel ui-module-divider-r flex h-full w-[200px] shrink-0 flex-col overflow-hidden bg-[var(--module-workspace-bg,var(--background))] text-foreground"
         >
           <nav className="min-h-0 flex-1 overflow-y-auto px-3 py-3" aria-label="素材标签筛选">
-            {source === 'online' && (
-              <section className="px-0 pb-2" aria-label="案例模型">
-                <div role="tablist" aria-label="案例模型" className="flex flex-col gap-0.5">
-                  {caseTabs.map(({ id, label, icon: Icon }) => {
-                    const active = caseTab === id;
-                    return (
-                      <button
-                        key={id}
-                        type="button"
-                        role="tab"
-                        aria-selected={active}
-                        onClick={() => setCaseTab(id)}
-                        className={cn(
-                          'flex h-8 w-full items-center gap-2 rounded-md px-2.5 text-sm font-medium text-foreground transition-colors',
-                          active
-                            ? 'bg-[var(--surface-control)] text-[var(--surface-control-foreground)]'
-                            : 'hover:bg-[var(--surface-hover)] hover:text-[var(--surface-hover-foreground)]',
-                        )}
-                      >
-                        <Icon size={16} aria-hidden="true" />
-                        <span>{label}</span>
-                      </button>
-                    );
-                  })}
-                </div>
-              </section>
-            )}
             {source === 'uploaded' && <section className="px-0 pb-1" data-filter-section="type">
               <div className="flex flex-col gap-0.5">
                 {assetTypeOptions
@@ -591,8 +556,29 @@ export const AssetLibraryPage = ({ initialSource = 'uploaded', showSourceTabs = 
         </aside>}
       {source === 'online' ? (
         <main className="flex min-w-0 flex-1 flex-col overflow-hidden bg-transparent">
-          <header className="ui-module-divider-b flex h-12 shrink-0 items-center px-6">
-            <h1 className="text-sm font-semibold tracking-[-0.01em]">案例资源</h1>
+          <header className="ui-module-divider-b flex h-12 shrink-0 items-center px-4">
+            <div role="tablist" aria-label="案例模型" className="flex min-w-0 items-center gap-1">
+              {caseTabs.map(({ id, label }) => {
+                const active = caseTab === id;
+                return (
+                  <button
+                    key={id}
+                    type="button"
+                    role="tab"
+                    aria-selected={active}
+                    onClick={() => setCaseTab(id)}
+                    className={cn(
+                      'flex h-8 shrink-0 items-center rounded-md px-3 text-xs font-medium text-muted-foreground transition-colors',
+                      active
+                        ? 'bg-[var(--surface-control)] text-[var(--surface-control-foreground)]'
+                        : 'hover:bg-[var(--surface-hover)] hover:text-[var(--surface-hover-foreground)]',
+                    )}
+                  >
+                    {label}
+                  </button>
+                );
+              })}
+            </div>
           </header>
           <div className="flex min-h-0 flex-1 items-center justify-center px-6">
             <div className="flex max-w-sm flex-col items-center text-center">
