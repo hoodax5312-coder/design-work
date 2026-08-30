@@ -407,6 +407,22 @@ export const AssetLibraryPage = ({ initialSource = 'uploaded', showSourceTabs = 
     <div className="module-workspace ui-workspace-surface relative flex h-full min-w-0 flex-col bg-[var(--module-workspace-bg,var(--background))] text-foreground">
       {(showSourceTabs || showSearch) && <header className={cn(flushLayout ? 'mx-0' : 'mx-3', 'shrink-0 p-0')}>
         <div className="flex min-h-14 w-full items-center justify-between gap-4">
+          {source === 'online' && <div role="tablist" aria-label="案例分类" className="order-1 flex min-w-0 items-center gap-1 overflow-x-auto">
+            {caseTabs.map(({ id, label }) => {
+              const active = caseTab === id;
+              return <button
+                key={id}
+                type="button"
+                role="tab"
+                aria-selected={active}
+                data-state={active ? 'active' : 'inactive'}
+                onClick={() => { setCaseTab(id); setCaseTag(''); }}
+                className="flex h-8 shrink-0 items-center rounded-md border-0 bg-transparent px-4 py-0 text-sm font-medium text-muted-foreground shadow-none transition-colors focus-visible:ring-offset-0 data-[state=inactive]:hover:text-foreground data-[state=active]:!bg-[var(--surface-control)] data-[state=active]:!text-[var(--surface-control-foreground)] data-[state=active]:!shadow-none"
+              >
+                {label}
+              </button>;
+            })}
+          </div>}
           {showSourceTabs && <div
             role="tablist"
             aria-label="素材来源"
@@ -653,26 +669,6 @@ export const AssetLibraryPage = ({ initialSource = 'uploaded', showSourceTabs = 
         </aside>}
       {source === 'online' ? (
         <main className="flex min-w-0 flex-1 flex-col overflow-hidden bg-transparent">
-          <header className="ui-module-divider-b flex h-12 shrink-0 items-center px-4">
-            <div role="tablist" aria-label="案例模型" className="flex min-w-0 items-center gap-1">
-              {caseTabs.map(({ id, label }) => {
-                const active = caseTab === id;
-                return (
-                  <button
-                    key={id}
-                    type="button"
-                    role="tab"
-                    aria-selected={active}
-                    data-state={active ? 'active' : 'inactive'}
-                    onClick={() => { setCaseTab(id); setCaseTag(''); }}
-                    className="flex h-8 shrink-0 items-center rounded-md border-0 bg-transparent px-4 py-0 text-sm font-medium text-muted-foreground shadow-none transition-colors focus-visible:ring-offset-0 data-[state=inactive]:hover:text-foreground data-[state=active]:!bg-[var(--surface-control)] data-[state=active]:!text-[var(--surface-control-foreground)] data-[state=active]:!shadow-none"
-                  >
-                    {label}
-                  </button>
-                );
-              })}
-            </div>
-          </header>
           <div className="min-h-0 flex-1 overflow-y-auto p-4">
             {visibleCaseItems.length ? <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">{visibleCaseItems.map((item) => { const sourceItem = caseSources.find((entry) => entry.id === item.sourceId); let sourceHost = ''; try { sourceHost = item.sourceUrl ? new URL(item.sourceUrl).hostname.replace(/^www\./, '') : ''; } catch { /* ignore malformed upstream item URL */ } return <article key={item.id} className="group overflow-hidden rounded-lg border border-border bg-card"><div className="aspect-[16/10] bg-muted">{item.coverUrl ? <img src={item.coverUrl} alt="" className="h-full w-full object-cover" loading="lazy" /> : <div className="grid h-full place-items-center text-xs text-muted-foreground">暂无封面</div>}</div><div className="space-y-2 p-3"><h2 className="truncate text-sm font-semibold">{item.title}</h2><p className="line-clamp-3 text-xs leading-5 text-muted-foreground">{item.prompt}</p><div className="flex min-h-5 flex-wrap gap-1">{item.tags.slice(0, 4).map((tag) => <button key={tag} type="button" onClick={() => setCaseTag(tag)} className="max-w-full truncate rounded bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground transition-colors hover:bg-[var(--surface-control)] hover:text-[var(--surface-control-foreground)]">{tag}</button>)}</div><div className="flex items-center justify-between gap-2 text-[11px] text-muted-foreground"><span className="truncate" title={sourceItem?.name || item.author || '公开来源'}>{sourceHost || sourceItem?.name || item.author || '公开来源'}</span><a href={item.sourceUrl} target="_blank" rel="noreferrer" className="shrink-0 hover:text-foreground">查看来源</a></div></div></article>; })}</div> : <div className="flex h-full items-center justify-center px-6"><div className="flex max-w-sm flex-col items-center text-center">
               <span className="grid h-11 w-11 place-items-center rounded-full bg-[var(--surface-control)] text-[var(--surface-control-foreground)]">
