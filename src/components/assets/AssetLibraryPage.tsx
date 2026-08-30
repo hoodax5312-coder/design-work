@@ -380,7 +380,7 @@ export const AssetLibraryPage = ({ initialSource = 'uploaded', showSourceTabs = 
     : activeTagLabel || activeFolderLabel || (favoritesOnly ? '收藏' : activeTypeLabel);
   return (
     <div className="module-workspace ui-workspace-surface relative flex h-full min-w-0 flex-col bg-[var(--module-workspace-bg,var(--background))] text-foreground">
-      <header className="mx-3 shrink-0 p-0">
+      {(showSourceTabs || showSearch) && <header className="mx-3 shrink-0 p-0">
         <div className="flex min-h-14 w-full items-center justify-between gap-4">
           {showSourceTabs && <div
             role="tablist"
@@ -435,7 +435,7 @@ export const AssetLibraryPage = ({ initialSource = 'uploaded', showSourceTabs = 
           </div>}
 
         </div>
-      </header>
+      </header>}
 
       <div className="ui-module-panel mx-3 mb-3 mt-0 flex min-h-0 flex-1 bg-[var(--module-workspace-bg,var(--background))]">
         <div className="flex min-h-0 flex-1 gap-0">
