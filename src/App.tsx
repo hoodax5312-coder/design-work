@@ -21,6 +21,7 @@ import { SettingsPage } from './components/settings/SettingsPage';
 import { useUIStore } from './stores/useUIStore';
 import { type ModuleType } from './stores/useUIStore';
 import { Badge, Card } from './components/ui';
+import { cn } from './lib/utils';
 
 const ModulePlaceholder = ({ title, description }: { title: string; description: string }) => (
   <div className="module-workspace flex h-full w-full items-center justify-center px-6 text-center">
@@ -142,7 +143,7 @@ const AssetWorkspace = () => {
           ))}
         </div>
       </div>
-      <div className="mx-3 mb-3 min-h-0 flex-1 overflow-hidden">
+      <div className={cn('mx-3 min-h-0 flex-1 overflow-hidden', section === 'assets' ? 'mb-6' : 'mb-3')}>
         {section === 'assets' && <AssetLibraryPage showSourceTabs={false} showSearch={false} flushLayout />}
         {section === 'prompts' && <QuickNotes />}
         {section === 'notes' && <PersonalSpace embedded />}
