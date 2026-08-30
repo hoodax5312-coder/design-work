@@ -566,13 +566,9 @@ export const AssetLibraryPage = ({ initialSource = 'uploaded', showSourceTabs = 
                     type="button"
                     role="tab"
                     aria-selected={active}
+                    data-state={active ? 'active' : 'inactive'}
                     onClick={() => setCaseTab(id)}
-                    className={cn(
-                      'flex h-8 shrink-0 items-center rounded-md px-3 text-xs font-medium text-muted-foreground transition-colors',
-                      active
-                        ? 'bg-[var(--surface-control)] text-[var(--surface-control-foreground)]'
-                        : 'hover:bg-[var(--surface-hover)] hover:text-[var(--surface-hover-foreground)]',
-                    )}
+                    className="flex h-8 shrink-0 items-center rounded-md border-0 bg-transparent px-4 py-0 text-sm font-medium text-muted-foreground shadow-none transition-colors focus-visible:ring-offset-0 data-[state=inactive]:hover:text-foreground data-[state=active]:!bg-[var(--surface-control)] data-[state=active]:!text-[var(--surface-control-foreground)] data-[state=active]:!shadow-none"
                   >
                     {label}
                   </button>
