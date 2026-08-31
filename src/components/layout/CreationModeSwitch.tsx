@@ -10,10 +10,10 @@ export const CreationModeSwitch = () => {
       <Tabs value={generationMode} onValueChange={(value) => setGenerationMode(value as 'image' | 'video')}>
         <TabsList className="h-8 gap-1 rounded-none border-0 bg-transparent p-0 shadow-none">
           <TabsTrigger value="image" className="h-8 border-0 bg-transparent px-4 py-0 text-sm text-muted-foreground shadow-none focus-visible:ring-offset-0 data-[state=inactive]:hover:text-foreground data-[state=active]:!bg-[var(--surface-control)] data-[state=active]:!text-[var(--surface-control-foreground)] data-[state=active]:!shadow-none">
-            图片
+            图片生成
           </TabsTrigger>
           <TabsTrigger value="video" className="h-8 border-0 bg-transparent px-4 py-0 text-sm text-muted-foreground shadow-none focus-visible:ring-offset-0 data-[state=inactive]:hover:text-foreground data-[state=active]:!bg-[var(--surface-control)] data-[state=active]:!text-[var(--surface-control-foreground)] data-[state=active]:!shadow-none">
-            视频
+            视频生成
           </TabsTrigger>
         </TabsList>
       </Tabs>

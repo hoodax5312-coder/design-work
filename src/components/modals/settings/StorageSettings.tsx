@@ -171,7 +171,9 @@ export function StorageSettings() {
             <Button
               onClick={() => void chooseDirectory('data')}
               disabled={saving}
-              variant="secondary" size="sm" className="h-9"
+              variant="primary"
+              size="sm"
+              className="h-9 bg-foreground text-background hover:bg-foreground/85 hover:text-background"
             >
               <FolderOpen size={16} />
               选择文件夹
@@ -210,7 +212,9 @@ export function StorageSettings() {
               <Button
                 onClick={() => void chooseDirectory('cache')}
                 disabled={saving}
-                variant="secondary" size="sm" className="h-9"
+                variant="primary"
+                size="sm"
+                className="h-9 bg-foreground text-background hover:bg-foreground/85 hover:text-background"
               >
                 <FolderOpen size={16} />
                 选择文件夹

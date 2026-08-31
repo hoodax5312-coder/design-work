@@ -29,6 +29,7 @@
     --sidebar-primary-foreground: var(--primary-foreground);
     --sidebar-accent: var(--accent);
     --sidebar-accent-foreground: var(--accent-foreground);
+    --sidebar-accent-hover: var(--sidebar-accent);
     --sidebar-border: var(--border);
     --sidebar-ring: var(--ring);
     --radius: .5rem;
@@ -72,6 +73,14 @@
     --neutral-border: lab(90% 0 0);
     --generation-control-border-width: 0px;
     --generation-control-border: transparent;
+    --generation-control-bg: var(--neutral-surface-subtle);
+    --generation-count-selected-bg: var(--neutral-control-selected);
+    --generation-segment-selected-bg: var(--neutral-control-selected);
+    --generation-segment-selected-foreground: var(--neutral-foreground);
+    --generation-segment-hover-bg: var(--neutral-surface-hover);
+    --generation-segment-hover-foreground: var(--neutral-foreground);
+    --generation-count-option-height: 32px;
+    --generation-count-option-offset-y: 0px;
     /* Theme style tokens. Components consume these instead of hard-coding a single card treatment. */
     --surface-card-bg: var(--card);
     --surface-card-foreground: var(--card-foreground);
@@ -169,6 +178,12 @@
     --sidebar-border: #000000; --sidebar-ring: #FACC15;
     --neutral-surface-subtle: #FFFFFF; --neutral-field-surface: #FFFFFF;
     --neutral-control-selected: #FFF3B0;
+    --generation-control-border-width: 3px;
+    --generation-control-border: #000000;
+    --generation-control-bg: #FFF3B0;
+    --generation-count-selected-bg: #FFFFFF;
+    --generation-count-option-height: 26px;
+    --generation-count-option-offset-y: 0px;
     --theme-neo-yellow: #FFD93D; --theme-neo-purple: #FFF3B0;
     --radius: 0; --theme-font: "Space Grotesk", "PingFang SC", system-ui, sans-serif;
   }
@@ -185,6 +200,12 @@
     --sidebar-primary: #FACC15; --sidebar-primary-foreground: #000000;
     --sidebar-accent: #F2C200; --sidebar-accent-foreground: #000000;
     --sidebar-border: #000000; --sidebar-ring: #FFD93D;
+    --generation-control-border-width: 3px;
+    --generation-control-border: #000000;
+    --generation-control-bg: #FFF3B0;
+    --generation-count-selected-bg: #FFFFFF;
+    --generation-count-option-height: 26px;
+    --generation-count-option-offset-y: 0px;
     --theme-neo-yellow: #FFD93D; --theme-neo-purple: #FFF3B0;
     --radius: 0; --theme-font: "Space Grotesk", "PingFang SC", system-ui, sans-serif;
   }
@@ -200,11 +221,19 @@
     --border: lab(86.6716% -.311345 2.61091); --input: lab(72.5085% -.742853 5.92517); --ring: lab(54.5081% 39.1499 38.3555);
     --sidebar: oklch(0.9663 0.0080 98.8792); --sidebar-foreground: oklch(0.3590 0.0051 106.6524);
     --sidebar-primary: oklch(0.6171 0.1375 39.0427); --sidebar-primary-foreground: oklch(0.9881 0 0);
-    --sidebar-accent: oklch(0.9245 0.0138 92.9892); --sidebar-accent-foreground: oklch(0.3250 0 0);
+    --sidebar-accent: color-mix(in srgb, var(--surface-control) 90%, var(--foreground)); --sidebar-accent-foreground: var(--surface-control-foreground);
+    --sidebar-accent-hover: color-mix(in srgb, var(--surface-control) 85%, var(--sidebar));
     --sidebar-border: oklch(0.9401 0 0); --sidebar-ring: oklch(0.7731 0 0);
     --neutral-surface-subtle: #FFFFFF;
     --generation-control-border-width: 1px;
     --generation-control-border: var(--neutral-border);
+    --generation-control-bg: lab(100% 0 0);
+    --generation-count-selected-bg: var(--surface-control);
+    --generation-segment-selected-bg: var(--surface-control);
+    --generation-segment-selected-foreground: var(--neutral-foreground);
+    --generation-segment-hover-bg: color-mix(in srgb, var(--surface-control) 58%, var(--background));
+    --generation-segment-hover-foreground: var(--neutral-foreground);
+    --generation-count-option-height: 30px;
     --radius: .5rem; --theme-font: ui-sans-serif, system-ui, "PingFang SC", sans-serif;
   }
 
@@ -241,6 +270,8 @@
     --action-secondary-bg: color-mix(in srgb, var(--primary) 8%, var(--background));
     --action-secondary-bg-hover: color-mix(in srgb, var(--primary) 12%, var(--background));
     --action-secondary-border: color-mix(in srgb, var(--primary) 16%, var(--border));
+    --generation-control-border-width: 1px;
+    --generation-control-border: var(--neutral-border);
     --radius: .5rem; --theme-font: Geist, "PingFang SC", system-ui, sans-serif;
   }
 
@@ -260,6 +291,8 @@
     --surface-control-foreground: lab(100% 0 0);
     --workspace-bg: lab(0% 0 0);
     --module-workspace-bg: lab(7% 0 0);
+    --generation-control-border-width: 1px;
+    --generation-control-border: var(--neutral-border);
   }
 
   :root[data-theme='soft-pop'] {
@@ -558,6 +591,18 @@
 
   :root[data-theme='nature']:not(.dark) .module-search-input:focus {
     border-color: var(--neutral-border) !important;
+  }
+
+  :root[data-theme='nature']:not(.dark) .theme-default-input {
+    border-color: transparent !important;
+    background: var(--neutral-field-surface) !important;
+    box-shadow: none !important;
+  }
+
+  :root[data-theme='nature']:not(.dark) .theme-default-input:focus {
+    border-color: var(--neutral-border) !important;
+    background: var(--card) !important;
+    box-shadow: none !important;
   }
 
   :root[data-theme='nature']:not(.dark) .storage-path-input {
@@ -1121,5 +1166,12 @@
 
   .node-selected {
     @apply border-primary/60 shadow-lg shadow-primary/10;
+  }
+
+  /* Prompt source cards use compact icon-only actions. */
+  button[title="删除来源"] {
+    height: 2rem;
+    width: 2rem;
+    padding: 0;
   }
 }

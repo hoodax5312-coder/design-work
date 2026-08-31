@@ -1,15 +1,18 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Archive,
+  BookmarkPlus,
   CheckSquare2,
   ChevronDown,
   Copy,
+  Download,
   FileText,
   Film,
   FolderPlus,
   Globe2,
   Hash,
   Image as ImageIcon,
+  Maximize2,
   PanelLeftClose,
   PanelLeftOpen,
   Pencil,
@@ -37,7 +40,15 @@ import { AssetThumbnail } from './AssetThumbnail';
 import { ImportCenter } from './ImportCenter';
 import { TaskDrawer } from './TaskDrawer';
 import { contentFeed, type GeneratedContentItem } from '../../services/contentFeed';
-import { Alert, AlertDescription, AlertTitle, Button, Input, Select, Skeleton } from '../ui';
+import {
+  Alert,
+  AlertDescription,
+  AlertTitle,
+  Button,
+  Input,
+  Select,
+  Skeleton,
+} from '../ui';
 
 const sortOptions = [
   { id: 'updatedAt', label: '时间', hint: '最新优先' },
@@ -46,6 +57,18 @@ const sortOptions = [
 
 type AssetSource = 'uploaded' | 'online';
 type AssetTypeFilter = 'image' | 'video' | 'audio' | 'project';
+type CaseItem = {
+  id: string;
+  sourceId: string;
+  title: string;
+  prompt: string;
+  description: string;
+  coverUrl: string | null;
+  tags: string[];
+  author: string;
+  sourceUrl: string;
+  imageModel: string;
+};
 
 const assetTypeOptions: Array<{ id: AssetTypeFilter; label: string; icon: React.ElementType }> = [
   { id: 'image', label: '图片', icon: ImageIcon },
@@ -65,6 +88,12 @@ const caseModelMatches = (model: string, tabId: string) => {
   const normalized = model.toLowerCase().replace(/[^a-z0-9]+/g, '');
   return normalized.includes(tabId.replace(/[^a-z0-9]+/g, ''));
 };
+
+const CaseActionIcon = ({ kind }: { kind: 'download' | 'save' | 'fullscreen' }) => {
+  const Icon = kind === 'download' ? Download : kind === 'save' ? BookmarkPlus : Maximize2;
+  const opticalScale = kind === 'save' ? 'scale-[1.15]' : kind === 'fullscreen' ? 'scale-[0.95]' : 'scale-[1.05]';
+  return <span className="grid h-6 w-6 shrink-0 place-items-center"><Icon size={20} className={opticalScale} aria-hidden="true" /></span>;
+};
 const formatDate = (value: number) =>
   new Intl.DateTimeFormat('zh-CN', {
     month: '2-digit',
@@ -72,7 +101,17 @@ const formatDate = (value: number) =>
     year: 'numeric',
   }).format(value);
 
-export const AssetLibraryPage = ({ initialSource = 'uploaded', showSourceTabs = true, showSearch = true, flushLayout = false }: { initialSource?: AssetSource; showSourceTabs?: boolean; showSearch?: boolean; flushLayout?: boolean }) => {
+export const AssetLibraryPage = ({
+  initialSource = 'uploaded',
+  showSourceTabs = true,
+  showSearch = true,
+  flushLayout = false,
+}: {
+  initialSource?: AssetSource;
+  showSourceTabs?: boolean;
+  showSearch?: boolean;
+  flushLayout?: boolean;
+}) => {
   const [page, setPage] = useState<AssetPage>({ items: [], total: 0, limit: 60, offset: 0 });
   const [folders, setFolders] = useState<AssetFolder[]>([]);
   const [tags, setTags] = useState<AssetTag[]>([]);
@@ -103,8 +142,10 @@ export const AssetLibraryPage = ({ initialSource = 'uploaded', showSourceTabs = 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [taskRefreshKey, setTaskRefreshKey] = useState(0);
   const [generatedItems, setGeneratedItems] = useState<GeneratedContentItem[]>([]);
-  const [caseItems, setCaseItems] = useState<Array<{ id: string; sourceId: string; title: string; prompt: string; description: string; coverUrl: string | null; tags: string[]; author: string; sourceUrl: string; imageModel: string }>>([]);
+  const [caseItems, setCaseItems] = useState<CaseItem[]>([]);
   const [caseSources, setCaseSources] = useState<Array<{ id: string; name: string; homepageUrl: string | null; itemCount: number }>>([]);
+  const [selectedCase, setSelectedCase] = useState<CaseItem | null>(null);
+  const [savedCaseIds, setSavedCaseIds] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     const sync = () => setGeneratedItems(contentFeed.list());
@@ -115,8 +156,20 @@ export const AssetLibraryPage = ({ initialSource = 'uploaded', showSourceTabs = 
 
   useEffect(() => {
     if (source !== 'online') return;
-    assetService.cases(debouncedQuery).then((result) => { setCaseItems(result.items); setCaseSources(result.sources); }).catch((caught) => setError(caught instanceof Error ? caught.message : '案例读取失败'));
+    const loadCases = () => assetService.cases(debouncedQuery).then((result) => { setCaseItems(result.items); setCaseSources(result.sources); }).catch((caught) => setError(caught instanceof Error ? caught.message : '案例读取失败'));
+    void loadCases();
+    window.addEventListener('design-work:prompt-sources-updated', loadCases);
+    return () => window.removeEventListener('design-work:prompt-sources-updated', loadCases);
   }, [debouncedQuery, source]);
+
+  useEffect(() => {
+    if (!selectedCase) return;
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setSelectedCase(null);
+    };
+    document.addEventListener('keydown', closeOnEscape);
+    return () => document.removeEventListener('keydown', closeOnEscape);
+  }, [selectedCase]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -247,6 +300,43 @@ export const AssetLibraryPage = ({ initialSource = 'uploaded', showSourceTabs = 
     loadAssets();
     loadTaxonomy();
   }, [loadAssets, loadTaxonomy]);
+
+  const downloadCaseImage = (item: CaseItem) => {
+    if (!item.coverUrl) return;
+    const anchor = document.createElement('a');
+    anchor.href = item.coverUrl;
+    anchor.download = `${item.title || 'case-image'}.jpg`;
+    anchor.target = '_blank';
+    anchor.rel = 'noreferrer';
+    anchor.click();
+  };
+
+  const saveCaseToAssets = async (item: CaseItem) => {
+    if (!item.coverUrl || savedCaseIds.has(item.id)) return;
+    try {
+      await assetService.create({
+        type: 'image',
+        title: item.title,
+        description: item.prompt || item.description,
+        sourceUrl: item.coverUrl,
+        userMetadata: {
+          source: 'case-library',
+          prompt: item.prompt,
+          model: item.imageModel,
+          generatedUrl: item.coverUrl,
+          caseId: item.id,
+          caseSourceId: item.sourceId,
+          upstreamUrl: item.sourceUrl,
+        },
+      });
+      setSavedCaseIds((current) => new Set(current).add(item.id));
+      setNotice('已保存到素材');
+      window.setTimeout(() => setNotice(''), 2200);
+      refresh();
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : '保存到素材失败');
+    }
+  };
 
   const selectAll = () =>
     setSelectedIds((current) =>
@@ -488,7 +578,13 @@ export const AssetLibraryPage = ({ initialSource = 'uploaded', showSourceTabs = 
           aria-label="资产筛选"
           className="asset-filter-panel ui-module-divider-r flex h-full w-[200px] shrink-0 flex-col overflow-hidden bg-[var(--module-workspace-bg,var(--background))] text-foreground"
         >
-          <nav className="min-h-0 flex-1 overflow-y-auto px-3 py-3" aria-label="素材标签筛选">
+          <nav
+            className={cn(
+              'min-h-0 flex-1 overflow-y-auto px-3 pb-3',
+              source === 'online' ? 'pt-2' : 'pt-3',
+            )}
+            aria-label="素材标签筛选"
+          >
             {source === 'uploaded' && <section className="px-0 pb-1" data-filter-section="type">
               <div className="flex flex-col gap-0.5">
                 {assetTypeOptions
@@ -597,8 +693,8 @@ export const AssetLibraryPage = ({ initialSource = 'uploaded', showSourceTabs = 
               </div>
             </section>}
             {source === 'online' && <>
-              <section className="px-0 py-1" data-filter-section="case-sources">
-                <div className="mb-1 flex h-8 items-center px-2.5 text-xs font-medium text-muted-foreground">来源</div>
+              <section className="px-0 pb-1" data-filter-section="case-sources">
+                <div className="mb-1 flex h-8 items-center text-xs font-medium text-muted-foreground">来源</div>
                 <div className="flex flex-col gap-0.5">
                   <button
                     type="button"
@@ -630,21 +726,20 @@ export const AssetLibraryPage = ({ initialSource = 'uploaded', showSourceTabs = 
                 </div>
               </section>
               <section className="px-0 py-1" data-filter-section="case-tags">
-                <div className="mb-1 flex h-8 items-center gap-2 px-2.5 text-xs font-medium text-muted-foreground">
-                  <Hash size={12} aria-hidden="true" />
+                <div className="mb-1 flex h-8 items-center text-xs font-medium text-muted-foreground">
                   <span>标签</span>
                 </div>
-                <div className="flex flex-col gap-0.5">
+                <div className="flex flex-wrap gap-1">
                   <button
                     type="button"
                     onClick={() => setCaseTag('')}
                     aria-pressed={!caseTag}
                     className={cn(
-                      'flex h-8 w-full items-center justify-between rounded-md px-2.5 text-left text-xs font-medium text-foreground transition-colors hover:bg-[var(--surface-hover)] hover:text-[var(--surface-hover-foreground)]',
+                      'flex h-7 w-auto max-w-full items-center rounded bg-transparent px-2.5 text-left text-xs font-medium text-muted-foreground transition-colors hover:bg-[var(--surface-hover)] hover:text-[var(--surface-hover-foreground)]',
                       !caseTag && 'bg-[var(--surface-control)] text-[var(--surface-control-foreground)] hover:bg-[var(--surface-control)] hover:text-[var(--surface-control-foreground)]',
                     )}
                   >
-                    <span>全部标签</span><span className="text-[11px] opacity-60">{caseItems.length}</span>
+                    <span>全部标签</span>
                   </button>
                   {caseTagCounts.map((tag) => {
                     const active = caseTag === tag.name;
@@ -654,14 +749,14 @@ export const AssetLibraryPage = ({ initialSource = 'uploaded', showSourceTabs = 
                       onClick={() => setCaseTag(tag.name)}
                       aria-pressed={active}
                       className={cn(
-                        'flex h-8 w-full items-center justify-between rounded-md px-2.5 text-left text-xs font-medium text-foreground transition-colors hover:bg-[var(--surface-hover)] hover:text-[var(--surface-hover-foreground)]',
+                        'flex h-7 w-auto max-w-full items-center gap-1.5 rounded bg-transparent px-2.5 text-left text-xs font-medium text-muted-foreground transition-colors hover:bg-[var(--surface-hover)] hover:text-[var(--surface-hover-foreground)]',
                         active && 'bg-[var(--surface-control)] text-[var(--surface-control-foreground)] hover:bg-[var(--surface-control)] hover:text-[var(--surface-control-foreground)]',
                       )}
                     >
-                      <span className="min-w-0 truncate">{tag.name}</span><span className="text-[11px] opacity-60">{tag.count}</span>
+                      <span className="min-w-0 truncate">{tag.name}</span>
                     </button>;
                   })}
-                  {!caseTagCounts.length && <div className="px-2.5 py-3 text-xs text-muted-foreground">暂无标签</div>}
+                  {!caseTagCounts.length && <div className="py-3 text-xs text-muted-foreground">暂无标签</div>}
                 </div>
               </section>
             </>}
@@ -670,7 +765,48 @@ export const AssetLibraryPage = ({ initialSource = 'uploaded', showSourceTabs = 
       {source === 'online' ? (
         <main className="flex min-w-0 flex-1 flex-col overflow-hidden bg-transparent">
           <div className="min-h-0 flex-1 overflow-y-auto p-4">
-            {visibleCaseItems.length ? <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">{visibleCaseItems.map((item) => { const sourceItem = caseSources.find((entry) => entry.id === item.sourceId); let sourceHost = ''; try { sourceHost = item.sourceUrl ? new URL(item.sourceUrl).hostname.replace(/^www\./, '') : ''; } catch { /* ignore malformed upstream item URL */ } return <article key={item.id} className="group overflow-hidden rounded-lg border border-border bg-card"><div className="aspect-[16/10] bg-muted">{item.coverUrl ? <img src={item.coverUrl} alt="" className="h-full w-full object-cover" loading="lazy" /> : <div className="grid h-full place-items-center text-xs text-muted-foreground">暂无封面</div>}</div><div className="space-y-2 p-3"><h2 className="truncate text-sm font-semibold">{item.title}</h2><p className="line-clamp-3 text-xs leading-5 text-muted-foreground">{item.prompt}</p><div className="flex min-h-5 flex-wrap gap-1">{item.tags.slice(0, 4).map((tag) => <button key={tag} type="button" onClick={() => setCaseTag(tag)} className="max-w-full truncate rounded bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground transition-colors hover:bg-[var(--surface-control)] hover:text-[var(--surface-control-foreground)]">{tag}</button>)}</div><div className="flex items-center justify-between gap-2 text-[11px] text-muted-foreground"><span className="truncate" title={sourceItem?.name || item.author || '公开来源'}>{sourceHost || sourceItem?.name || item.author || '公开来源'}</span><a href={item.sourceUrl} target="_blank" rel="noreferrer" className="shrink-0 hover:text-foreground">查看来源</a></div></div></article>; })}</div> : <div className="flex h-full items-center justify-center px-6"><div className="flex max-w-sm flex-col items-center text-center">
+            {visibleCaseItems.length ? <div className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">{visibleCaseItems.map((item) => {
+              const sourceItem = caseSources.find((entry) => entry.id === item.sourceId);
+              const saved = savedCaseIds.has(item.id);
+              let sourceHost = '';
+              try { sourceHost = item.sourceUrl ? new URL(item.sourceUrl).hostname.replace(/^www\./, '') : ''; } catch { /* ignore malformed upstream item URL */ }
+              return <article
+                key={item.id}
+                role="button"
+                tabIndex={0}
+                aria-label={`查看案例详情：${item.title}`}
+                onClick={() => setSelectedCase(item)}
+                onKeyDown={(event) => {
+                  if (event.target !== event.currentTarget || (event.key !== 'Enter' && event.key !== ' ')) return;
+                  event.preventDefault();
+                  setSelectedCase(item);
+                }}
+                className="group overflow-hidden rounded-md border border-border bg-card transition-shadow hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              >
+                <div className="relative aspect-[16/10] overflow-hidden bg-muted">
+                  {item.coverUrl ? <>
+                    <img src={item.coverUrl} alt="" className="h-full w-full object-cover" loading="lazy" />
+                    <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center bg-black/20 opacity-0 transition-opacity group-hover:pointer-events-auto group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:opacity-100">
+                      <div className="pointer-events-none absolute inset-x-0 bottom-0 h-3/4 bg-gradient-to-t from-black/85 via-black/45 to-transparent" aria-hidden="true" />
+                      <div className="relative z-10 flex items-center gap-3">
+                        <Button type="button" variant="ghost" size="iconSm" onClick={(event) => { event.stopPropagation(); downloadCaseImage(item); }} aria-label={`下载${item.title}`} title="下载图片" className="h-10 w-10 bg-black/60 p-0 text-white shadow-lg hover:bg-black/85 hover:text-white"><CaseActionIcon kind="download" /></Button>
+                        <Button type="button" variant="ghost" size="iconSm" onClick={(event) => { event.stopPropagation(); void saveCaseToAssets(item); }} disabled={saved} aria-label={saved ? `已保存${item.title}` : `保存${item.title}到素材`} title={saved ? '已保存到素材' : '保存到素材'} className={cn('h-10 w-10 bg-black/60 p-0 text-white shadow-lg hover:bg-black/85 hover:text-white', saved && 'cursor-default bg-white/20 text-white/45 hover:bg-white/20 hover:text-white/45')}><CaseActionIcon kind="save" /></Button>
+                        <Button type="button" variant="ghost" size="iconSm" onClick={(event) => { event.stopPropagation(); setSelectedCase(item); }} aria-label={`全屏查看${item.title}`} title="全屏查看" className="h-10 w-10 bg-black/60 p-0 text-white shadow-lg hover:bg-black/85 hover:text-white"><CaseActionIcon kind="fullscreen" /></Button>
+                      </div>
+                    </div>
+                  </> : <div className="grid h-full place-items-center text-xs text-muted-foreground">暂无封面</div>}
+                </div>
+                <div className="space-y-2 p-3">
+                  <h2 className="truncate text-sm font-semibold">{item.title}</h2>
+                  <p className="truncate text-xs leading-5 text-muted-foreground">{item.prompt}</p>
+                  <div className="flex min-h-5 flex-wrap gap-1">{item.tags.slice(0, 4).map((tag) => <button key={tag} type="button" onClick={(event) => { event.stopPropagation(); setCaseTag(tag); }} className="max-w-full truncate rounded bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground transition-colors hover:bg-[var(--surface-control)] hover:text-[var(--surface-control-foreground)]">{tag}</button>)}</div>
+                  <div className="flex items-center justify-between gap-2 text-[11px] text-muted-foreground">
+                    <span className="truncate" title={sourceItem?.name || item.author || '公开来源'}>{sourceHost || sourceItem?.name || item.author || '公开来源'}</span>
+                    {item.sourceUrl ? <a href={item.sourceUrl} target="_blank" rel="noreferrer" onClick={(event) => event.stopPropagation()} className="shrink-0 hover:text-foreground">查看来源</a> : null}
+                  </div>
+                </div>
+              </article>;
+            })}</div> : <div className="flex h-full items-center justify-center px-6"><div className="flex max-w-sm flex-col items-center text-center">
               <span className="grid h-11 w-11 place-items-center rounded-full bg-[var(--surface-control)] text-[var(--surface-control-foreground)]">
                 <Globe2 size={20} aria-hidden="true" />
               </span>
@@ -926,6 +1062,49 @@ export const AssetLibraryPage = ({ initialSource = 'uploaded', showSourceTabs = 
         }}
         onChanged={refresh}
       />
+      {selectedCase && (
+        <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/30 backdrop-blur-xl" role="dialog" aria-modal="true" aria-label={`${selectedCase.title}详情`} onClick={() => setSelectedCase(null)}>
+          <aside className="flex h-screen w-screen flex-col overflow-hidden bg-black/25 text-white shadow-2xl backdrop-blur-xl" onClick={(event) => event.stopPropagation()}>
+            <header className="flex h-12 w-full shrink-0 items-center justify-between gap-4 px-4">
+              <span className="min-w-0 truncate text-sm font-semibold" title={selectedCase.title}>{selectedCase.title}</span>
+              <div className="flex h-8 shrink-0 items-center gap-1 rounded-lg bg-white/10 text-white/85 backdrop-blur-xl">
+                {selectedCase.coverUrl ? <>
+                  <Button type="button" variant="ghost" size="iconSm" onClick={() => downloadCaseImage(selectedCase)} aria-label="下载图片" title="下载图片" className="h-8 w-8 text-white hover:bg-white/10 hover:text-white"><Download size={15} /></Button>
+                  <Button type="button" variant="ghost" size="iconSm" onClick={() => void saveCaseToAssets(selectedCase)} disabled={savedCaseIds.has(selectedCase.id)} aria-label={savedCaseIds.has(selectedCase.id) ? '已保存到素材' : '保存到素材'} title={savedCaseIds.has(selectedCase.id) ? '已保存到素材' : '保存到素材'} className="h-8 w-8 text-white hover:bg-white/10 hover:text-white"><BookmarkPlus size={15} /></Button>
+                </> : null}
+                <Button type="button" variant="ghost" size="iconSm" onClick={() => setSelectedCase(null)} aria-label="关闭详情" title="关闭详情" className="h-8 w-8 text-white hover:bg-white/10 hover:text-white"><X size={16} /></Button>
+              </div>
+            </header>
+            <div className="flex min-h-0 flex-1 flex-col items-stretch md:flex-row">
+              <div className="relative flex min-h-[280px] min-w-0 flex-1 items-center justify-center overflow-hidden px-4 pb-4">
+                {selectedCase.coverUrl
+                  ? <img src={selectedCase.coverUrl} alt={selectedCase.title} className="block max-h-full max-w-full rounded-md object-contain" />
+                  : <div className="grid h-full w-full place-items-center text-sm text-white/55">暂无封面</div>}
+              </div>
+              <div className="flex min-h-0 w-full flex-col border-t border-white/10 bg-black/45 text-white backdrop-blur-xl md:mb-4 md:mr-2 md:max-w-[400px] md:rounded-xl md:border md:border-white/10 md:shadow-lg">
+                <div className="min-h-0 flex-1 space-y-2 overflow-y-auto p-3">
+                  <section className="space-y-3 rounded-lg bg-white/10 p-3">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-xs font-medium text-white/75">提示词</span>
+                      <Button type="button" variant="ghost" size="iconSm" onClick={() => void navigator.clipboard?.writeText(selectedCase.prompt || selectedCase.description)} aria-label="复制提示词" title="复制提示词" className="h-7 w-7 text-white/70 hover:bg-white/10 hover:text-white"><Copy size={13} /></Button>
+                    </div>
+                    <p className="whitespace-pre-wrap break-words text-sm leading-6 text-white">{selectedCase.prompt || selectedCase.description || '暂无提示词'}</p>
+                  </section>
+                  <section className="space-y-3 rounded-lg bg-white/10 p-3">
+                    <span className="text-xs font-medium text-white/75">案例信息</span>
+                    <dl className="space-y-2 text-xs">
+                      <div className="flex min-w-0 items-center gap-2"><dt className="shrink-0 text-white/55">模型</dt><dd className="truncate font-medium text-white" title={selectedCase.imageModel}>{selectedCase.imageModel || '未记录'}</dd></div>
+                      <div className="flex min-w-0 items-center gap-2"><dt className="shrink-0 text-white/55">来源</dt><dd className="truncate font-medium text-white">{caseSources.find((item) => item.id === selectedCase.sourceId)?.name || selectedCase.author || '公开来源'}</dd></div>
+                    </dl>
+                    {selectedCase.tags.length ? <div className="flex flex-wrap gap-1">{selectedCase.tags.map((tag) => <button key={tag} type="button" onClick={() => { setCaseTag(tag); setSelectedCase(null); }} className="rounded bg-white/10 px-1.5 py-0.5 text-[10px] text-white/75 transition-colors hover:bg-white/20 hover:text-white">{tag}</button>)}</div> : null}
+                    {selectedCase.sourceUrl ? <a href={selectedCase.sourceUrl} target="_blank" rel="noreferrer" className="inline-flex h-8 items-center rounded-md px-2 text-xs font-medium text-white/70 transition-colors hover:bg-white/10 hover:text-white">查看来源</a> : null}
+                  </section>
+                </div>
+              </div>
+            </div>
+          </aside>
+        </div>
+      )}
       {importSession && (
         <ImportCenter
           session={importSession}

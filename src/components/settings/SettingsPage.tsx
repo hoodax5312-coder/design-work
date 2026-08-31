@@ -13,7 +13,7 @@ const SETTINGS_TABS: Array<{
   description: string;
   icon: React.ElementType;
 }> = [
-  { id: 'general', label: '个性化设置', description: '外观与工作台偏好', icon: Settings },
+  { id: 'general', label: '个性化', description: '外观与工作台偏好', icon: Settings },
   { id: 'storage', label: '数据存储', description: '本地目录与缓存策略', icon: Database },
   { id: 'sources', label: '案例来源', description: '公开提示词来源与同步状态', icon: Globe2 },
   { id: 'api', label: 'API 与模型', description: '服务商、密钥和模型能力', icon: Key },

@@ -418,7 +418,7 @@ export const ProjectSidebar = () => {
                       : 'h-12 w-14 flex-col justify-center gap-1 px-0 text-[10px] leading-none',
                   active
                     ? 'bg-sidebar-accent text-sidebar-accent-foreground shadow-none hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
-                    : 'bg-transparent text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground',
+                    : 'bg-transparent text-sidebar-foreground/70 hover:bg-[var(--sidebar-accent-hover)] hover:text-sidebar-accent-foreground',
                 )}
               >
                 <Icon

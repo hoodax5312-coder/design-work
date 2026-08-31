@@ -63,8 +63,8 @@ const VIDEO_RATIO_OPTIONS = [
 
 const segmentedOptionClass = (selected: boolean) => cn(
   'h-8 w-full border-0 px-1 text-xs shadow-none ring-0',
-  'hover:bg-[var(--neutral-control-selected)] hover:text-[var(--neutral-foreground)]',
-  selected && 'bg-[var(--neutral-control-selected)] text-[var(--neutral-foreground)] hover:bg-[var(--neutral-control-selected)]'
+  'hover:bg-[var(--generation-segment-hover-bg)] hover:text-[var(--generation-segment-hover-foreground)]',
+  selected && 'bg-[var(--generation-segment-selected-bg)] text-[var(--generation-segment-selected-foreground)] hover:bg-[var(--generation-segment-selected-bg)] hover:text-[var(--generation-segment-selected-foreground)]'
 );
 
 interface ReferenceImage {
@@ -632,7 +632,7 @@ export const ImageGeneration = () => {
 
   return (
     <main className="module-workspace mx-3 mb-3 mt-0 grid h-[calc(100%-12px)] min-h-0 grid-cols-[minmax(0,480px)_minmax(0,1fr)] gap-0 !bg-transparent p-0 text-foreground">
-      <section className="flex min-h-0 min-w-0 flex-col overflow-hidden rounded-l-lg border border-border bg-card p-4 text-card-foreground" aria-label="生成输入与参数">
+      <section className="flex min-h-0 min-w-0 flex-col overflow-hidden rounded-l-lg border border-border bg-[var(--module-workspace-bg,var(--background))] p-4 text-foreground" aria-label="生成输入与参数">
         <header className="mb-5 shrink-0">
           <h1 className="text-xl font-semibold tracking-tight">{generationMode === 'image' ? '图片生成' : '视频生成'}</h1>
         </header>
@@ -644,7 +644,7 @@ export const ImageGeneration = () => {
               onDragOver={(event) => { event.preventDefault(); setDraggingReference(true); }}
               onDragLeave={(event) => { if (!event.currentTarget.contains(event.relatedTarget as Node)) setDraggingReference(false); }}
               onDrop={(event) => { event.preventDefault(); setDraggingReference(false); addReferences(event.dataTransfer.files); }}
-              className={cn('relative overflow-hidden rounded-lg border-solid [border-color:var(--generation-control-border)] [border-width:var(--generation-control-border-width)] bg-[var(--neutral-surface-subtle)] text-[var(--neutral-foreground)] transition-colors focus-within:ring-1 focus-within:ring-inset focus-within:ring-[var(--neutral-border)]', draggingReference && 'bg-[var(--neutral-surface)] text-[var(--neutral-foreground)] ring-2 ring-inset ring-[var(--neutral-border)]')}
+              className={cn('relative overflow-hidden rounded-lg border-solid [border-color:var(--generation-control-border)] [border-width:var(--generation-control-border-width)] bg-[var(--generation-control-bg)] text-[var(--neutral-foreground)] transition-colors focus-within:ring-1 focus-within:ring-inset focus-within:ring-[var(--neutral-border)]', draggingReference && 'bg-[var(--neutral-surface)] text-[var(--neutral-foreground)] ring-2 ring-inset ring-[var(--neutral-border)]')}
             >
               <input ref={fileInputRef} type="file" accept="image/*" multiple className="sr-only" onChange={(event) => { if (event.target.files) addReferences(event.target.files); event.target.value = ''; }} />
               <Textarea
@@ -660,7 +660,7 @@ export const ImageGeneration = () => {
                 className="min-h-[260px] resize-none rounded-none border-0 bg-transparent p-4 text-sm leading-6 shadow-none focus-visible:ring-0"
               />
 
-              <div className="flex min-w-0 items-center gap-2 overflow-x-auto px-3 py-2">
+              <div className="flex min-w-0 items-center gap-2 overflow-x-auto px-2 py-2">
                   {referenceImages.map((image, index) => (
                     <div key={image.id} className="group relative h-14 w-14 shrink-0 overflow-hidden rounded-md border border-[var(--surface-border)]">
                       <Button type="button" variant="ghost" onClick={() => insertReferenceMention(index)} aria-label={`引用图片${index + 1}`} title={`在输入框中引用图片${index + 1}`} className="relative block h-full w-full rounded-none p-0">
@@ -752,13 +752,13 @@ export const ImageGeneration = () => {
                 }}
                 aria-haspopup="listbox"
                 aria-expanded={modelPanelOpen}
-                className="h-10 w-full justify-between rounded-lg border-solid [border-color:var(--generation-control-border)] [border-width:var(--generation-control-border-width)] bg-[var(--neutral-surface-subtle)] px-3 text-sm font-normal text-[var(--neutral-foreground)] shadow-none hover:bg-[var(--neutral-surface-hover)] hover:text-[var(--neutral-foreground)]"
+                className="h-10 w-full justify-between rounded-lg border-solid [border-color:var(--generation-control-border)] [border-width:var(--generation-control-border-width)] bg-[var(--generation-control-bg)] px-3 text-sm font-normal text-[var(--neutral-foreground)] shadow-none hover:bg-[var(--neutral-surface-hover)] hover:text-[var(--neutral-foreground)]"
               >
                 <span className="truncate">{selectedModel || `选择${generationMode === 'image' ? '图像' : '视频'}模型`}</span>
                 <ChevronDown size={15} className={cn('shrink-0 text-muted-foreground transition-transform', modelPanelOpen && 'rotate-180')} />
               </Button>
               {modelPanelOpen && (
-                <div role="listbox" aria-label={`${generationMode === 'image' ? '图像' : '视频'}生成模型`} className="absolute bottom-12 left-0 z-[90] max-h-[360px] w-full overflow-y-auto rounded-lg border border-[var(--surface-border-strong)] bg-popover p-1.5 text-popover-foreground shadow-xl">
+                <div role="listbox" aria-label={`${generationMode === 'image' ? '图像' : '视频'}生成模型`} className="absolute bottom-12 left-0 z-[90] max-h-[360px] w-full overflow-y-auto rounded-lg border border-[var(--surface-border)] bg-popover p-1.5 text-popover-foreground shadow-xl">
                   {modelOptions.map((model) => {
                     const selected = selectedModel === model;
                     return (
@@ -771,7 +771,7 @@ export const ImageGeneration = () => {
                         onClick={() => selectModel(model)}
                         className={cn(
                           'h-9 w-full min-w-0 justify-between rounded-md border-0 px-2.5 text-sm font-normal shadow-none',
-                          selected ? 'bg-[var(--neutral-control-selected)] text-[var(--neutral-foreground)]' : 'hover:bg-[var(--neutral-surface-subtle)] hover:text-[var(--neutral-foreground)]',
+                          selected ? 'bg-[var(--neutral-control-selected)] text-[var(--neutral-foreground)]' : 'hover:bg-[var(--generation-segment-hover-bg)] hover:text-[var(--generation-segment-hover-foreground)]',
                         )}
                       >
                         <span className="truncate">{model}</span>
@@ -785,9 +785,9 @@ export const ImageGeneration = () => {
             {generationMode === 'image' && (
               <fieldset ref={generationCountPanelRef} className="relative min-w-0">
                 <legend className="mb-2 text-xs font-semibold">生成数量</legend>
-                <div className="grid h-10 grid-cols-5 rounded-lg border-solid [border-color:var(--generation-control-border)] [border-width:var(--generation-control-border-width)] bg-[var(--neutral-surface-subtle)] p-1 text-[var(--neutral-foreground)]">
+                <div className="grid h-10 grid-cols-5 gap-1 rounded-lg border-solid [border-color:var(--generation-control-border)] [border-width:var(--generation-control-border-width)] bg-[var(--generation-control-bg)] p-1 text-[var(--neutral-foreground)]">
                   {GENERATION_COUNT_OPTIONS.map((option) => (
-                    <Button key={option} type="button" variant="ghost" aria-pressed={generationCount === option} onClick={() => { setGenerationCount(option); setGenerationCountPanelOpen(false); }} className={cn('h-8 min-w-0 whitespace-nowrap px-0 text-xs', generationCount === option && 'bg-[var(--neutral-control-selected)] text-[var(--neutral-foreground)] hover:bg-[var(--neutral-control-selected)]')}>
+                    <Button key={option} type="button" variant="ghost" aria-pressed={generationCount === option} onClick={() => { setGenerationCount(option); setGenerationCountPanelOpen(false); }} className={cn('h-[var(--generation-count-option-height)] min-w-0 self-center whitespace-nowrap border-0 px-0 text-xs [transform:translateY(var(--generation-count-option-offset-y))] hover:bg-[var(--generation-segment-hover-bg)] hover:text-[var(--generation-segment-hover-foreground)]', generationCount === option && 'bg-[var(--generation-count-selected-bg)] text-[var(--generation-segment-selected-foreground)] hover:bg-[var(--generation-count-selected-bg)] hover:text-[var(--generation-segment-selected-foreground)]')}>
                       {option}张
                     </Button>
                   ))}
@@ -803,13 +803,13 @@ export const ImageGeneration = () => {
                       setParameterPanelOpen(false);
                       setGenerationCountPanelOpen((open) => !open);
                     }}
-                    className={cn('h-8 min-w-0 whitespace-nowrap px-0 text-xs', generationCount === 'custom' && 'bg-[var(--neutral-control-selected)] text-[var(--neutral-foreground)] hover:bg-[var(--neutral-control-selected)]')}
+                    className={cn('h-[var(--generation-count-option-height)] min-w-0 self-center whitespace-nowrap px-0 text-xs [transform:translateY(var(--generation-count-option-offset-y))] hover:bg-[var(--generation-segment-hover-bg)] hover:text-[var(--generation-segment-hover-foreground)]', generationCount === 'custom' && 'bg-[var(--generation-segment-selected-bg)] text-[var(--generation-segment-selected-foreground)] hover:bg-[var(--generation-segment-selected-bg)] hover:text-[var(--generation-segment-selected-foreground)]')}
                   >
                     {generationCount === 'custom' ? `${customGenerationCount}张 +` : '自定义'}
                   </Button>
                 </div>
                 {generationCountPanelOpen && (
-                  <div role="dialog" aria-label="自定义生成张数" className="absolute bottom-12 right-0 z-[90] w-[180px] rounded-lg border border-[var(--surface-border-strong)] bg-popover p-3 text-popover-foreground shadow-xl">
+                  <div role="dialog" aria-label="自定义生成张数" className="absolute bottom-12 right-0 z-[90] w-[180px] rounded-lg border border-[var(--surface-border)] bg-popover p-3 text-popover-foreground shadow-xl">
                     <label className="mb-2 block text-xs font-semibold" htmlFor="custom-generation-count">自定义数量</label>
                     <div className="relative">
                       <Input
@@ -836,7 +836,7 @@ export const ImageGeneration = () => {
             {generationMode === 'video' && (
               <fieldset ref={videoDurationPanelRef} className="relative min-w-0">
                 <legend className="mb-2 text-xs font-semibold">秒数</legend>
-                <div className="grid h-10 grid-cols-4 rounded-lg bg-[var(--neutral-surface-subtle)] p-1 text-[var(--neutral-foreground)]">
+                <div className="grid h-10 grid-cols-4 gap-1 rounded-lg bg-[var(--neutral-surface-subtle)] p-1 text-[var(--neutral-foreground)]">
                   {VIDEO_DURATION_OPTIONS.map((option) => (
                     <Button key={option} type="button" variant="ghost" aria-pressed={videoDuration === option} onClick={() => { setVideoDuration(option); setVideoDurationPanelOpen(false); }} className={segmentedOptionClass(videoDuration === option)}>
                       {option}s
@@ -861,7 +861,7 @@ export const ImageGeneration = () => {
                   </Button>
                 </div>
                 {videoDurationPanelOpen && (
-                  <div role="dialog" aria-label="自定义视频秒数" className="absolute bottom-12 right-0 z-[90] w-[180px] rounded-lg border border-[var(--surface-border-strong)] bg-popover p-3 text-popover-foreground shadow-xl">
+                  <div role="dialog" aria-label="自定义视频秒数" className="absolute bottom-12 right-0 z-[90] w-[180px] rounded-lg border border-[var(--surface-border)] bg-popover p-3 text-popover-foreground shadow-xl">
                     <label className="mb-2 block text-xs font-semibold" htmlFor="custom-video-duration">自定义秒数</label>
                     <div className="relative">
                       <Input
@@ -900,18 +900,18 @@ export const ImageGeneration = () => {
               }}
               aria-haspopup="true"
               aria-expanded={parameterPanelOpen}
-              className="h-10 w-full justify-between rounded-lg border-solid [border-color:var(--generation-control-border)] [border-width:var(--generation-control-border-width)] bg-[var(--neutral-surface-subtle)] px-3 text-sm font-normal text-[var(--neutral-foreground)] shadow-none hover:bg-[var(--neutral-surface-hover)] hover:text-[var(--neutral-foreground)]"
+              className="h-10 w-full justify-between rounded-lg border-solid [border-color:var(--generation-control-border)] [border-width:var(--generation-control-border-width)] bg-[var(--generation-control-bg)] px-3 text-sm font-normal text-[var(--neutral-foreground)] shadow-none hover:bg-[var(--neutral-surface-hover)] hover:text-[var(--neutral-foreground)]"
             >
               <span className="truncate">{parameterSummary}</span>
               <ChevronDown size={15} className={cn('shrink-0 text-muted-foreground transition-transform', parameterPanelOpen && 'rotate-180')} />
             </Button>
 
             {parameterPanelOpen && (
-              <div role="dialog" aria-label="参数设置" className="absolute bottom-12 left-0 z-[90] w-full rounded-lg border border-[var(--surface-border-strong)] bg-popover p-4 text-popover-foreground shadow-xl">
+              <div role="dialog" aria-label="参数设置" className="absolute bottom-12 left-0 z-[90] w-full rounded-lg border border-[var(--surface-border)] bg-popover p-4 text-popover-foreground shadow-xl">
                 <div className="space-y-4">
                   <fieldset>
                     <legend className="mb-2 text-xs font-semibold">画面比例</legend>
-                    <div className={cn('grid rounded-lg bg-[var(--neutral-surface-subtle)] text-[var(--neutral-foreground)]', generationMode === 'video' ? 'grid-cols-3 gap-2 p-2' : 'grid-cols-6 gap-1 p-1.5')}>
+                    <div className={cn('grid gap-1 rounded-lg border-solid [border-color:var(--generation-control-border)] [border-width:var(--generation-control-border-width)] bg-[var(--generation-control-bg)] text-[var(--neutral-foreground)]', generationMode === 'video' ? 'grid-cols-3 p-2' : 'grid-cols-6 p-1.5')}>
                       {ratioOptions.map((option) => {
                         const selected = ratio === option.value;
                         return (
@@ -924,19 +924,19 @@ export const ImageGeneration = () => {
                             className={cn(
                               'w-full flex-col rounded-md border-0 px-1 text-xs shadow-none ring-0',
                               generationMode === 'video' ? 'h-20 gap-2 py-2' : 'h-14 gap-1 py-1',
-                              'hover:bg-[var(--neutral-control-selected)] hover:text-[var(--neutral-foreground)]',
-                              selected && 'bg-[var(--neutral-control-selected)] text-[var(--neutral-foreground)] shadow-sm hover:bg-[var(--neutral-control-selected)]',
+                              'hover:bg-[var(--generation-segment-hover-bg)] hover:text-[var(--generation-segment-hover-foreground)]',
+                              selected && 'bg-[var(--generation-segment-selected-bg)] text-[var(--generation-segment-selected-foreground)] shadow-sm hover:bg-[var(--generation-segment-selected-bg)] hover:text-[var(--generation-segment-selected-foreground)]',
                             )}
                           >
                             <span
                               aria-hidden="true"
-                              className={cn('shrink-0 rounded-[2px] border-[1.5px] border-current', selected ? 'text-foreground' : 'text-muted-foreground')}
+                              className={cn('shrink-0 rounded-[2px] border-[1.5px] border-current', selected ? 'text-current' : 'text-muted-foreground')}
                               style={{ width: Math.max(10, Math.round(option.width * 0.82)), height: Math.max(10, Math.round(option.height * 0.82)) }}
                             />
                             {'label' in option ? (
                               <span className="flex flex-col items-center leading-none">
                                 <span>{option.label}</span>
-                                {option.resolutionLabel && <span className="mt-1 text-[10px] font-normal text-muted-foreground">{option.resolutionLabel}</span>}
+                                {option.resolutionLabel && <span className={cn('mt-1 text-[10px] font-normal', selected ? 'text-current' : 'text-muted-foreground')}>{option.resolutionLabel}</span>}
                               </span>
                             ) : <span>{option.value}</span>}
                           </Button>
@@ -948,7 +948,7 @@ export const ImageGeneration = () => {
                   {generationMode === 'video' ? (
                     <fieldset>
                       <legend className="mb-2 text-xs font-semibold">清晰度</legend>
-                      <div className="grid grid-cols-3 rounded-lg bg-[var(--neutral-surface-subtle)] p-1 text-[var(--neutral-foreground)]">
+                      <div className="grid grid-cols-3 gap-1 rounded-lg border-solid [border-color:var(--generation-control-border)] [border-width:var(--generation-control-border-width)] bg-[var(--generation-control-bg)] p-1 text-[var(--neutral-foreground)]">
                         {VIDEO_CLARITY_OPTIONS.map((option) => (
                           <Button key={option} type="button" variant="ghost" aria-pressed={videoClarity === option} onClick={() => setVideoClarity(option)} className={segmentedOptionClass(videoClarity === option)}>
                             {option}
@@ -960,7 +960,7 @@ export const ImageGeneration = () => {
                     <div className="grid grid-cols-2 gap-3">
                       <fieldset>
                         <legend className="mb-2 text-xs font-semibold">质量</legend>
-                        <div className="grid grid-cols-3 rounded-lg bg-[var(--neutral-surface-subtle)] p-1 text-[var(--neutral-foreground)]">
+                        <div className="grid grid-cols-3 gap-1 rounded-lg border-solid [border-color:var(--generation-control-border)] [border-width:var(--generation-control-border-width)] bg-[var(--generation-control-bg)] p-1 text-[var(--neutral-foreground)]">
                           {QUALITY_OPTIONS.map((option) => (
                             <Button key={option} type="button" variant="ghost" aria-pressed={quality === option} onClick={() => setQuality(option)} className={segmentedOptionClass(quality === option)}>
                               {option}
@@ -970,7 +970,7 @@ export const ImageGeneration = () => {
                       </fieldset>
                       <fieldset>
                         <legend className="mb-2 text-xs font-semibold">分辨率</legend>
-                        <div className="grid grid-cols-3 rounded-lg bg-[var(--neutral-surface-subtle)] p-1 text-[var(--neutral-foreground)]">
+                        <div className="grid grid-cols-3 gap-1 rounded-lg border-solid [border-color:var(--generation-control-border)] [border-width:var(--generation-control-border-width)] bg-[var(--generation-control-bg)] p-1 text-[var(--neutral-foreground)]">
                           {RESOLUTION_OPTIONS.map((option) => (
                             <Button key={option} type="button" variant="ghost" aria-pressed={resolution === option} onClick={() => setResolution(option)} className={segmentedOptionClass(resolution === option)}>
                               {option}
@@ -995,7 +995,7 @@ export const ImageGeneration = () => {
         </div>
       </section>
 
-      <section className="flex min-h-0 min-w-0 overflow-hidden rounded-r-lg border !border-l-0 border-border bg-card pl-3 text-card-foreground" aria-label="生成结果列表">
+      <section className="flex min-h-0 min-w-0 overflow-hidden rounded-r-lg border !border-l-0 border-border bg-[var(--module-workspace-bg,var(--background))] pl-3 text-foreground" aria-label="生成结果列表">
         <div className="min-w-0 flex-1 overflow-x-hidden overflow-y-auto scroll-smooth">
           {isGenerating && (
             <div className="flex min-h-40 items-center justify-center gap-3 pb-4 text-sm text-muted-foreground">
@@ -1014,7 +1014,7 @@ export const ImageGeneration = () => {
                     <div className="min-w-[120px] flex-1">
                       <div className="flex min-w-0 flex-wrap items-center gap-2">
                         <h2 className="shrink-0 text-sm font-semibold">
-                          {isVideoRecord ? '视频生成' : '图片生成'}-{formatGenerationDate(record.createdAt)}
+                          {formatGenerationDate(record.createdAt)}-{isVideoRecord ? '视频生成' : '图片生成'}
                         </h2>
                         <span className="whitespace-nowrap text-xs text-muted-foreground">{formatGenerationParameters(record)}</span>
                       </div>
@@ -1027,7 +1027,7 @@ export const ImageGeneration = () => {
                   </div>
 
                   <div className="group/prompt relative">
-                    <div className="flex min-w-0 items-center gap-2 rounded-md border-solid [border-color:var(--generation-control-border)] [border-width:var(--generation-control-border-width)] bg-[var(--neutral-surface-subtle)] px-3 py-2">
+                    <div className="flex h-10 min-w-0 items-center gap-2 rounded-md border-solid [border-color:var(--generation-control-border)] [border-width:var(--generation-control-border-width)] bg-[var(--generation-control-bg)] px-3">
                       <p tabIndex={0} title={record.prompt} className="min-w-0 flex-1 truncate text-sm text-muted-foreground outline-none focus-visible:ring-1 focus-visible:ring-ring">{record.prompt}</p>
                       <Button
                         type="button"

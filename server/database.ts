@@ -32,6 +32,14 @@ const migrations: Migration[] = [
     version: 6,
     sql: fs.readFileSync(new URL('./migrations/006_prompt_sources.sql', import.meta.url), 'utf8'),
   },
+  {
+    version: 7,
+    sql: fs.readFileSync(new URL('./migrations/007_prompt_catalog_sources.sql', import.meta.url), 'utf8'),
+  },
+  {
+    version: 8,
+    sql: fs.readFileSync(new URL('./migrations/008_prompt_catalog_source_deletions.sql', import.meta.url), 'utf8'),
+  },
 ];
 
 export const withTransaction = <T>(database: DatabaseSync, operation: () => T): T => {
