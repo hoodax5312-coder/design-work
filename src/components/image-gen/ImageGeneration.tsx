@@ -30,7 +30,7 @@ import { assetService } from '../../services/assetService';
 import { contentFeed } from '../../services/contentFeed';
 import { workspaceCacheService } from '../../services/workspaceCacheService';
 import { cn } from '../../lib/utils';
-import { GeneratedImageStack } from './GeneratedImageStack';
+import { GeneratedImageSet } from './GeneratedImageSet';
 import {
   Button,
   Input,
@@ -229,9 +229,9 @@ export const ImageGeneration = () => {
   const [outputRatios, setOutputRatios] = useState<Record<string, number>>({});
   const [savedAssetUrls, setSavedAssetUrls] = useState<Set<string>>(new Set());
   const [assetIdsByUrl, setAssetIdsByUrl] = useState<Record<string, string>>({});
-  // Session-only: failed counts of partial generations and which stacks are expanded.
+  // Session-only: failed counts of partial generations and which output each multi-image record shows.
   const [failedCountsByRecord, setFailedCountsByRecord] = useState<Record<string, number>>({});
-  const [expandedRecordIds, setExpandedRecordIds] = useState<Set<string>>(new Set());
+  const [activeOutputByRecord, setActiveOutputByRecord] = useState<Record<string, string>>({});
   const [pendingGeneration, setPendingGeneration] = useState<{ id: string; prompt: string; total: number; outputs: string[]; failed: number } | null>(null);
   const [draggingReference, setDraggingReference] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -761,12 +761,11 @@ export const ImageGeneration = () => {
     return () => window.removeEventListener('keydown', switchOnArrow);
   }, [fullscreenImage, fullscreenRecord]);
   const updateOutputRatio = (url: string, nextRatio: number) => setOutputRatios((current) => current[url] === nextRatio ? current : { ...current, [url]: nextRatio });
-  const toggleRecordExpanded = (recordId: string) => setExpandedRecordIds((current) => {
-    const next = new Set(current);
-    if (next.has(recordId)) next.delete(recordId);
-    else next.add(recordId);
-    return next;
-  });
+  // The selected image wins; otherwise a record keeps showing the thumbnail last picked in it.
+  const activeOutputOf = (recordId: string, outputs: string[]) => (
+    outputs.includes(previewUrl) ? previewUrl : outputs.includes(activeOutputByRecord[recordId]) ? activeOutputByRecord[recordId] : outputs[0]
+  );
+  const activateOutput = (recordId: string, url: string) => setActiveOutputByRecord((current) => current[recordId] === url ? current : { ...current, [recordId]: url });
 
   return (
     <main className="module-workspace mx-3 mb-3 mt-0 grid h-[calc(100%-12px)] min-h-0 grid-cols-[minmax(0,480px)_minmax(0,1fr)] gap-0 !bg-transparent p-0 text-foreground">
@@ -1139,15 +1138,16 @@ export const ImageGeneration = () => {
             <div className="pb-2 pt-2">
               <div className="flex min-h-9 items-center gap-2 px-2 text-sm text-muted-foreground">
                 <Loader2 size={16} className="animate-spin text-foreground" /> 正在生成 {pendingGeneration.total} 张图片…
+                <span className="tabular-nums">{pendingGeneration.outputs.length}/{pendingGeneration.total}</span>
               </div>
-              <GeneratedImageStack
+              <GeneratedImageSet
                 images={pendingGeneration.outputs}
                 alt={pendingGeneration.prompt}
+                activeUrl={activeOutputOf(pendingGeneration.id, pendingGeneration.outputs)}
+                onActivate={(url) => activateOutput(pendingGeneration.id, url)}
+                selected={pendingGeneration.outputs.includes(previewUrl)}
                 pendingCount={Math.max(0, pendingGeneration.total - pendingGeneration.outputs.length - pendingGeneration.failed)}
                 failedCount={pendingGeneration.failed}
-                progress={{ done: pendingGeneration.outputs.length, total: pendingGeneration.total }}
-                expanded={false}
-                selectedUrl={previewUrl}
                 savedUrls={savedAssetUrls}
                 ratios={outputRatios}
                 onRatioChange={updateOutputRatio}
@@ -1162,7 +1162,7 @@ export const ImageGeneration = () => {
 
           {history.length > 0 ? history.map((record, index) => {
             const output = record.outputs[0] || '';
-            const selectedOutput = record.outputs.includes(previewUrl) ? previewUrl : output;
+            const selectedOutput = activeOutputOf(record.id, record.outputs) || output;
             const isVideoRecord = record.mode === 'video';
             return (
               <article id={`generation-result-${index}`} key={record.id} className="scroll-mt-0 pb-2 last:pb-0">
@@ -1213,13 +1213,13 @@ export const ImageGeneration = () => {
                     <ImageBadges saved={savedAssetUrls.has(output)} />
                   </div>
                 ) : record.outputs.length > 1 || failedCountsByRecord[record.id] ? (
-                  <GeneratedImageStack
+                  <GeneratedImageSet
                     images={record.outputs}
                     alt={record.prompt}
+                    activeUrl={activeOutputOf(record.id, record.outputs)}
+                    onActivate={(url) => activateOutput(record.id, url)}
+                    selected={record.outputs.includes(previewUrl)}
                     failedCount={failedCountsByRecord[record.id]}
-                    expanded={expandedRecordIds.has(record.id)}
-                    onToggle={() => toggleRecordExpanded(record.id)}
-                    selectedUrl={previewUrl}
                     savedUrls={savedAssetUrls}
                     ratios={outputRatios}
                     onRatioChange={updateOutputRatio}
