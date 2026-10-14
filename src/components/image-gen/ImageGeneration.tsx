@@ -4,6 +4,8 @@ import {
   BookmarkPlus,
   Check,
   ChevronDown,
+  ChevronLeft,
+  ChevronRight,
   Copy,
   Download,
   Loader2,
@@ -28,6 +30,7 @@ import { assetService } from '../../services/assetService';
 import { contentFeed } from '../../services/contentFeed';
 import { workspaceCacheService } from '../../services/workspaceCacheService';
 import { cn } from '../../lib/utils';
+import { GeneratedImageStack } from './GeneratedImageStack';
 import {
   Button,
   Input,
@@ -196,18 +199,6 @@ const GeneratedImagePreview = ({
   );
 };
 
-const GeneratedImageTile = ({ src, alt, onRatioChange }: { src: string; alt: string; onRatioChange: (ratio: number) => void }) => {
-
-  return (
-    <img
-      src={src}
-      alt={alt}
-      onLoad={(event) => onRatioChange(Math.max(4 / 3, event.currentTarget.naturalWidth / event.currentTarget.naturalHeight))}
-      className="block h-auto max-h-full max-w-full object-contain"
-    />
-  );
-};
-
 export const ImageGeneration = () => {
   const [prompt, setPrompt] = useState('');
   const [ratio, setRatio] = useState('16:9');
@@ -238,6 +229,10 @@ export const ImageGeneration = () => {
   const [outputRatios, setOutputRatios] = useState<Record<string, number>>({});
   const [savedAssetUrls, setSavedAssetUrls] = useState<Set<string>>(new Set());
   const [assetIdsByUrl, setAssetIdsByUrl] = useState<Record<string, string>>({});
+  // Session-only: failed counts of partial generations and which stacks are expanded.
+  const [failedCountsByRecord, setFailedCountsByRecord] = useState<Record<string, number>>({});
+  const [expandedRecordIds, setExpandedRecordIds] = useState<Set<string>>(new Set());
+  const [pendingGeneration, setPendingGeneration] = useState<{ id: string; prompt: string; total: number; outputs: string[]; failed: number } | null>(null);
   const [draggingReference, setDraggingReference] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const videoInputRef = useRef<HTMLInputElement>(null);
@@ -507,17 +502,32 @@ export const ImageGeneration = () => {
         window.setTimeout(() => setAssetNotice(''), 3000);
         return;
       }
-      const results = await Promise.all(Array.from({ length: selectedGenerationCount }, () => generateProviderImage(provider, {
+      // Each image lands on its own so the stack can show progress and keep partial results.
+      const pendingId = `${Date.now()}`;
+      const completed: string[] = [];
+      const requestErrors: unknown[] = [];
+      setPendingGeneration({ id: pendingId, prompt: generationPrompt, total: selectedGenerationCount, outputs: [], failed: 0 });
+      await Promise.all(Array.from({ length: selectedGenerationCount }, () => generateProviderImage(provider, {
           prompt: generationPrompt,
           size: imageSizeForRatio(ratio, imageModel),
           quality: imageModel.toLowerCase().includes('dall-e-3')
             ? quality === '低' ? 'standard' : 'hd'
             : quality === '低' ? 'medium' : 'high',
-        }, imageModel)));
-      const outputs = results.map((result) => result.url);
+        }, imageModel).then((result) => {
+          completed.push(result.url);
+          setPendingGeneration((current) => current?.id === pendingId ? { ...current, outputs: [...completed] } : current);
+        }, (requestError: unknown) => {
+          requestErrors.push(requestError);
+          setPendingGeneration((current) => current?.id === pendingId ? { ...current, failed: requestErrors.length } : current);
+        })));
+      const outputs = [...completed];
+      const failedCount = requestErrors.length;
+      if (!outputs.length) throw requestErrors[0] ?? new Error('图像生成失败');
+      const recordId = `${Date.now()}-${outputs[0]}`;
+      if (failedCount) setFailedCountsByRecord((current) => ({ ...current, [recordId]: failedCount }));
       setPreviewUrl(outputs[0] || '');
       setHistory((current) => [{
-        id: `${Date.now()}-${outputs[0]}`,
+        id: recordId,
         prompt: generationPrompt,
         createdAt: new Date().toISOString(),
         model: imageModel,
@@ -557,15 +567,16 @@ export const ImageGeneration = () => {
           ...current,
           ...Object.fromEntries(outputs.map((output, index) => [output, assets[index].id])),
         }));
-        setAssetNotice('图片生成完成，已保存至生成资产');
+        setAssetNotice(failedCount ? `${outputs.length} 张已保存至生成资产，${failedCount} 张生成失败` : '图片生成完成，已保存至生成资产');
       } catch {
-        setAssetNotice('图片已生成，但保存至生成资产失败');
+        setAssetNotice(failedCount ? `${outputs.length} 张已生成但保存至生成资产失败，${failedCount} 张生成失败` : '图片已生成，但保存至生成资产失败');
       }
       window.setTimeout(() => setAssetNotice(''), 3000);
     } catch (requestError) {
       setError(requestError instanceof Error ? requestError.message : '图像生成失败');
     } finally {
       setIsGenerating(false);
+      setPendingGeneration(null);
     }
   };
 
@@ -731,6 +742,31 @@ export const ImageGeneration = () => {
   const fullscreenRecord = fullscreenImage
     ? history.find((record) => record.outputs.includes(fullscreenImage))
     : null;
+  const fullscreenGroup = fullscreenRecord && fullscreenRecord.mode !== 'video' ? fullscreenRecord.outputs : [];
+  const fullscreenIndex = fullscreenImage ? fullscreenGroup.indexOf(fullscreenImage) : -1;
+  const stepFullscreen = (step: number) => {
+    if (fullscreenGroup.length < 2 || fullscreenIndex < 0) return;
+    setFullscreenImage(fullscreenGroup[(fullscreenIndex + step + fullscreenGroup.length) % fullscreenGroup.length]);
+  };
+  useEffect(() => {
+    const group = fullscreenRecord && fullscreenRecord.mode !== 'video' ? fullscreenRecord.outputs : [];
+    if (!fullscreenImage || group.length < 2) return;
+    const switchOnArrow = (event: KeyboardEvent) => {
+      const step = event.key === 'ArrowLeft' ? -1 : event.key === 'ArrowRight' ? 1 : 0;
+      const index = group.indexOf(fullscreenImage);
+      if (!step || index < 0) return;
+      setFullscreenImage(group[(index + step + group.length) % group.length]);
+    };
+    window.addEventListener('keydown', switchOnArrow);
+    return () => window.removeEventListener('keydown', switchOnArrow);
+  }, [fullscreenImage, fullscreenRecord]);
+  const updateOutputRatio = (url: string, nextRatio: number) => setOutputRatios((current) => current[url] === nextRatio ? current : { ...current, [url]: nextRatio });
+  const toggleRecordExpanded = (recordId: string) => setExpandedRecordIds((current) => {
+    const next = new Set(current);
+    if (next.has(recordId)) next.delete(recordId);
+    else next.add(recordId);
+    return next;
+  });
 
   return (
     <main className="module-workspace mx-3 mb-3 mt-0 grid h-[calc(100%-12px)] min-h-0 grid-cols-[minmax(0,480px)_minmax(0,1fr)] gap-0 !bg-transparent p-0 text-foreground">
@@ -1099,11 +1135,30 @@ export const ImageGeneration = () => {
 
       <section className="flex min-h-0 min-w-0 overflow-hidden rounded-r-lg border !border-l-0 border-border bg-[var(--module-workspace-bg,var(--background))] pl-3 text-foreground" aria-label="生成结果列表">
         <div className="min-w-0 flex-1 overflow-x-hidden overflow-y-auto scroll-smooth">
-          {isGenerating && (
+          {isGenerating && (pendingGeneration && pendingGeneration.total > 1 ? (
+            <div className="pb-2 pt-2">
+              <div className="flex min-h-9 items-center gap-2 px-2 text-sm text-muted-foreground">
+                <Loader2 size={16} className="animate-spin text-foreground" /> 正在生成 {pendingGeneration.total} 张图片…
+              </div>
+              <GeneratedImageStack
+                images={pendingGeneration.outputs}
+                alt={pendingGeneration.prompt}
+                pendingCount={Math.max(0, pendingGeneration.total - pendingGeneration.outputs.length - pendingGeneration.failed)}
+                failedCount={pendingGeneration.failed}
+                progress={{ done: pendingGeneration.outputs.length, total: pendingGeneration.total }}
+                expanded={false}
+                selectedUrl={previewUrl}
+                savedUrls={savedAssetUrls}
+                ratios={outputRatios}
+                onRatioChange={updateOutputRatio}
+                interactions={imageInteractions}
+              />
+            </div>
+          ) : (
             <div className="flex min-h-40 items-center justify-center gap-3 pb-4 text-sm text-muted-foreground">
               <Loader2 size={18} className="animate-spin text-foreground" /> 正在生成新的{generationMode === 'image' ? '图片' : '视频'}…
             </div>
-          )}
+          ))}
 
           {history.length > 0 ? history.map((record, index) => {
             const output = record.outputs[0] || '';
@@ -1157,25 +1212,19 @@ export const ImageGeneration = () => {
                     <video src={output} controls preload="metadata" className="max-h-[680px] w-full object-contain" />
                     <ImageBadges saved={savedAssetUrls.has(output)} />
                   </div>
-                ) : record.outputs.length > 1 ? (
-                  <div className="mx-2 grid grid-cols-2 gap-2 rounded-lg bg-[var(--surface-control)] p-2">
-                    {record.outputs.map((image, outputIndex) => (
-                      <div
-                        key={`${record.id}-${image}`}
-                        {...imageInteractions(image)}
-                        className={cn(
-                          'group relative flex min-w-0 cursor-default items-center justify-center overflow-hidden rounded-md bg-[#0b0b0b] transition-shadow',
-                          selectedOutput === image && 'ring-2 ring-inset ring-foreground'
-                        )}
-                        style={{ aspectRatio: outputRatios[image] || 4 / 3 }}
-                      >
-                        <button type="button" aria-label={`选择第 ${outputIndex + 1} 张生成图片（双击全屏，右键更多操作）`} aria-pressed={selectedOutput === image} className="block min-w-0 max-w-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring">
-                          <GeneratedImageTile src={image} alt={`${record.prompt}，第 ${outputIndex + 1} 张`} onRatioChange={(nextRatio) => setOutputRatios((current) => current[image] === nextRatio ? current : { ...current, [image]: nextRatio })} />
-                        </button>
-                        <ImageBadges saved={savedAssetUrls.has(image)} index={`${outputIndex + 1}/${record.outputs.length}`} />
-                      </div>
-                    ))}
-                  </div>
+                ) : record.outputs.length > 1 || failedCountsByRecord[record.id] ? (
+                  <GeneratedImageStack
+                    images={record.outputs}
+                    alt={record.prompt}
+                    failedCount={failedCountsByRecord[record.id]}
+                    expanded={expandedRecordIds.has(record.id)}
+                    onToggle={() => toggleRecordExpanded(record.id)}
+                    selectedUrl={previewUrl}
+                    savedUrls={savedAssetUrls}
+                    ratios={outputRatios}
+                    onRatioChange={updateOutputRatio}
+                    interactions={imageInteractions}
+                  />
                 ) : (
                   <GeneratedImagePreview src={output} alt={record.prompt} saved={savedAssetUrls.has(output)} selected={previewUrl === output} interactions={imageInteractions(output)} />
                 )}
@@ -1243,6 +1292,11 @@ export const ImageGeneration = () => {
                 ) : (
                   <img src={fullscreenImage} alt={fullscreenRecord?.prompt || '全屏预览'} className="block max-h-full max-w-full rounded-md object-contain" />
                 )}
+                {fullscreenGroup.length > 1 && fullscreenIndex >= 0 && <>
+                  <Button type="button" variant="ghost" size="iconSm" onClick={() => stepFullscreen(-1)} aria-label="上一张" title="上一张（←）" className="absolute left-4 top-1/2 h-10 w-10 -translate-y-1/2 rounded-full bg-white/10 text-white/85 backdrop-blur-xl hover:bg-white/20 hover:text-white"><ChevronLeft size={20} /></Button>
+                  <Button type="button" variant="ghost" size="iconSm" onClick={() => stepFullscreen(1)} aria-label="下一张" title="下一张（→）" className="absolute right-4 top-1/2 h-10 w-10 -translate-y-1/2 rounded-full bg-white/10 text-white/85 backdrop-blur-xl hover:bg-white/20 hover:text-white"><ChevronRight size={20} /></Button>
+                  <span className="pointer-events-none absolute bottom-6 left-1/2 -translate-x-1/2 rounded-full bg-black/45 px-2.5 py-1 text-xs tabular-nums text-white/80">{fullscreenIndex + 1} / {fullscreenGroup.length}</span>
+                </>}
               </div>
               {fullscreenRecord && (
                 <div className="flex min-h-0 w-full flex-col border-t border-white/10 bg-black/45 text-white backdrop-blur-xl md:mb-4 md:mr-2 md:max-w-[400px] md:rounded-xl md:border md:border-white/10 md:shadow-lg">
