@@ -25,6 +25,7 @@ const moduleNames = {
   cases: '案例',
   projects: '个人空间',
   tools: 'AI 应用',
+  'document-editor': '文档编辑器',
   ecommerce: '电商设计',
   'background-remove': '抠图去背景',
   'product-retouch': '产品图精修',

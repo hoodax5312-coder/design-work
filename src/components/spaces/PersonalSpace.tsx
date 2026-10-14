@@ -486,7 +486,7 @@ export const PersonalSpace = ({ embedded = false, query: externalQuery }: { embe
   return (
     <main className={cn('flex h-full min-h-0 flex-col text-foreground', embedded ? 'bg-transparent' : 'module-workspace bg-background')}>
       {!embedded && <header className="mx-16 flex h-14 shrink-0 items-center justify-between gap-4 border-0 px-0">
-        <h1 className="text-base font-semibold tracking-[-0.02em]">知识</h1>
+        <h1 className="text-base font-semibold tracking-[-0.02em]">文档编辑器</h1>
         <label className="flex h-9 w-[240px] max-w-[48vw] items-center gap-2 rounded-md bg-muted px-2.5">
           <Search aria-hidden="true" size={15} className="shrink-0 text-muted-foreground" />
           <Input
@@ -495,14 +495,14 @@ export const PersonalSpace = ({ embedded = false, query: externalQuery }: { embe
             aria-label="搜索空间文件"
             value={query}
             onChange={(event) => setLocalQuery(event.target.value)}
-            placeholder="搜索知识"
+            placeholder="搜索文档"
             className="h-9 min-w-0 flex-1 text-xs"
           />
         </label>
       </header>}
 
       <div className={cn('mb-0 flex min-h-0 flex-1 flex-col overflow-hidden md:flex-row', embedded ? 'rounded-[10px] border border-border bg-transparent' : 'rounded-xl bg-card text-card-foreground', !embedded && 'mx-16 p-2')}>
-      {filePanelOpen && <aside aria-label="知识文件树" className={cn('flex max-h-[38vh] w-full shrink-0 flex-col overflow-hidden bg-sidebar text-sidebar-foreground shadow-none md:max-h-none', embedded ? 'border-r border-sidebar-border md:w-[200px]' : 'md:w-[240px]')}>
+      {filePanelOpen && <aside aria-label="文档文件树" className={cn('flex max-h-[38vh] w-full shrink-0 flex-col overflow-hidden bg-sidebar text-sidebar-foreground shadow-none md:max-h-none', embedded ? 'border-r border-sidebar-border md:w-[200px]' : 'md:w-[240px]')}>
         <div className="ui-module-divider-b flex h-12 shrink-0 items-center justify-center px-2">
           <div className="flex shrink-0 gap-3">
             <Button type="button" variant="ghost" size="iconSm" onClick={() => createEntry('document')} aria-label="新建笔记" title="新建笔记" className="h-8 w-8 text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"><FilePlus2 size={15} /></Button>
@@ -536,13 +536,13 @@ export const PersonalSpace = ({ embedded = false, query: externalQuery }: { embe
             variant="ghost"
             size="iconSm"
             onClick={() => setFilePanelOpen((value) => !value)}
-            aria-label={filePanelOpen ? '收起知识文件树' : '展开知识文件树'}
-            title={filePanelOpen ? '收起知识文件树' : '展开知识文件树'}
+            aria-label={filePanelOpen ? '收起文档文件树' : '展开文档文件树'}
+            title={filePanelOpen ? '收起文档文件树' : '展开文档文件树'}
             className="mr-2 hidden h-8 w-8 shrink-0 p-0 text-muted-foreground hover:text-foreground md:inline-flex"
           >
             {filePanelOpen ? <PanelLeftClose size={15} /> : <PanelLeftOpen size={15} />}
           </Button>
-          <div role="tablist" aria-label="已打开的知识" className="flex min-w-0 flex-1 items-center gap-2 overflow-x-auto">
+          <div role="tablist" aria-label="已打开的文档" className="flex min-w-0 flex-1 items-center gap-2 overflow-x-auto">
           {openEntries.map((entry) => {
             const isActive = activeEntryId === entry.id;
             return <div key={entry.id} className={cn('group relative flex h-8 min-w-[132px] max-w-[220px] items-center rounded-md border-0 transition-colors hover:bg-[var(--surface-hover)] hover:text-[var(--surface-hover-foreground)]', isActive && 'bg-[var(--surface-control)] text-[var(--surface-control-foreground)] hover:bg-[var(--surface-control)] hover:text-[var(--surface-control-foreground)]')}>
@@ -579,7 +579,7 @@ export const PersonalSpace = ({ embedded = false, query: externalQuery }: { embe
         <Card
           ref={contextMenuRef}
           role="menu"
-          aria-label={contextEntry ? `${contextEntry.name} 操作` : '知识文件树操作'}
+          aria-label={contextEntry ? `${contextEntry.name} 操作` : '文档文件树操作'}
           style={{ left: contextMenu.x, top: contextMenu.y }}
           padding="sm"
           className="fixed z-[100] w-52 p-1.5 shadow-lg"

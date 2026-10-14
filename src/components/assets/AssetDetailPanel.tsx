@@ -4,6 +4,7 @@ import {
   Download,
   Pencil,
   Plus,
+  Star,
   Trash2,
   X,
 } from '@/lib/remixIconShim';
@@ -225,6 +226,18 @@ export const AssetDetailPanel = ({
     }
   };
 
+  const toggleFavorite = async () => {
+    if (!detail) return;
+    try {
+      const updated = await assetService.update(detail.id, { favorite: !detail.favorite });
+      setDetail((current) => (current ? { ...current, favorite: updated.favorite } : current));
+      setNotice(updated.favorite ? '已添加至收藏' : '已取消收藏');
+      onChanged();
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : '收藏状态更新失败');
+    }
+  };
+
   return (
     <div
       className="fixed inset-0 z-[100] flex items-center justify-center bg-black/30 backdrop-blur-xl"
@@ -247,6 +260,19 @@ export const AssetDetailPanel = ({
             <span className="truncate text-sm font-semibold text-white" title={title || '未命名资产'}>{title || '未命名资产'}</span>
           </div>
           <div className="flex h-8 items-center gap-1 rounded-lg bg-white/10 text-white/85 backdrop-blur-xl">
+            <Button
+              variant="ghost"
+              size="iconSm"
+              onClick={() => void toggleFavorite()}
+              aria-label={detail.favorite ? '取消收藏' : '添加至收藏'}
+              title={detail.favorite ? '取消收藏' : '添加至收藏'}
+              className={cn(
+                'h-8 w-8 text-white/70 hover:bg-white/15 hover:text-white',
+                detail.favorite && 'bg-white/15 text-amber-300 hover:text-amber-200',
+              )}
+            >
+              <Star size={15} />
+            </Button>
             {detail.previewUrl || typeof detail.userMetadata?.generatedUrl === 'string' ? (
               <a
                 href={String(detail.userMetadata?.generatedUrl || detail.previewUrl)}

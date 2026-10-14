@@ -4,6 +4,7 @@ import {
   invalidateProviderModels,
   migrateProviderStateV6,
   resolveModelConnection,
+  setModelsInCategory,
 } from '../src/lib/providerConnections';
 import type { ProviderConfig } from '../src/types/provider';
 
@@ -112,4 +113,39 @@ test('splits legacy Providers when category connections use different protocols'
     migrated.providers.find((item) => item.id === migrated.activeProviderIds.image)?.protocol,
     'chat-completions',
   );
+});
+
+test('adds fetched models to a category without touching existing ones', () => {
+  const verification = { status: 'healthy' as const, checkedAt: 1, latency: 20 };
+  const next = setModelsInCategory(provider, 'image', ['default-model', 'new-image', 'new-image', ' '], true, verification);
+  assert.deepEqual(next.models.map((model) => [model.id, model.categories]), [
+    ['default-model', ['language', 'image']],
+    ['override-model', ['image']],
+    ['new-image', ['image']],
+  ]);
+  // 已有模型只补类型，保留原来的连接覆盖和验证状态；新模型带上本次验证结果。
+  assert.equal(next.models[0].verification, undefined);
+  assert.equal(next.models[1].apiKeyOverride, 'image-key');
+  assert.deepEqual(next.models[2].verification, verification);
+  assert.equal(next.selectedModels.image, 'override-model');
+
+  const video = setModelsInCategory(provider, 'video', ['clip-b', 'clip-a'], true);
+  assert.deepEqual(video.models.slice(2).map((model) => model.id), ['clip-b', 'clip-a']);
+  assert.deepEqual(video.models[2].verification, { status: 'pending' });
+  assert.equal(video.selectedModels.video, 'clip-b');
+});
+
+test('removing models from a category deletes orphans and moves the default', () => {
+  const shared = setModelsInCategory(provider, 'image', ['default-model', 'extra-image'], true);
+  const next = setModelsInCategory(shared, 'image', ['override-model', 'default-model'], false);
+  assert.deepEqual(next.models.map((model) => [model.id, model.categories]), [
+    ['default-model', ['language']],
+    ['extra-image', ['image']],
+  ]);
+  assert.equal(next.selectedModels.image, 'extra-image');
+  assert.equal(next.selectedModels.language, 'default-model');
+
+  const empty = setModelsInCategory(next, 'image', ['extra-image'], false);
+  assert.equal('image' in empty.selectedModels, false);
+  assert.deepEqual(empty.models.map((model) => model.id), ['default-model']);
 });

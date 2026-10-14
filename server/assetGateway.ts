@@ -6,8 +6,40 @@ import { FilePickerCancelledError, type FilePickerProvider } from './import/File
 import { FingerprintService } from './import/FingerprintService';
 import { randomUUID } from 'node:crypto';
 import { removeStoredGeneratedImage, storeGeneratedImage } from './generatedAssetStorage';
+import { execFile } from 'node:child_process';
+import { constants as fsConstants } from 'node:fs';
 import fs from 'node:fs/promises';
 import path from 'node:path';
+import { promisify } from 'node:util';
+
+const execFileAsync = promisify(execFile);
+
+/** 在访达中选中这个文件。 */
+const revealInFinder = async (filePath: string) => {
+  await execFileAsync('open', ['-R', filePath]);
+};
+
+const statusError = (message: string, status: number) => Object.assign(new Error(message), { status });
+
+/** 文件名里去掉路径分隔符、系统保留字符和开头的点，避免导出时写到别的目录或变成隐藏文件。 */
+const safeFileName = (name: string) =>
+  // 文件名里的控制字符同样要去掉。
+  // eslint-disable-next-line no-control-regex
+  name.replace(/[\\/:*?"<>|\u0000-\u001f]/g, ' ').replace(/\s+/g, ' ').replace(/^[\s.]+/, '').trim().slice(0, 120) || '未命名';
+
+/** 复制到目标目录，同名文件已存在时依次加“ 2”“ 3”，不覆盖。 */
+const copyWithoutOverwrite = async (source: string, directory: string, baseName: string, extension: string) => {
+  for (let index = 1; index < 1000; index += 1) {
+    const target = path.join(directory, `${baseName}${index > 1 ? ` ${index}` : ''}${extension}`);
+    try {
+      await fs.copyFile(source, target, fsConstants.COPYFILE_EXCL);
+      return target;
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== 'EEXIST') throw error;
+    }
+  }
+  throw new Error('目标文件夹里同名文件太多，请换一个文件夹');
+};
 
 const asBoolean = (value: unknown) => {
   if (value === true || value === 'true' || value === '1') return true;
@@ -61,8 +93,24 @@ export const createAssetRouter = (
   getRuntime: () => Promise<LibraryRuntime>,
   picker: FilePickerProvider = new MacOsFilePickerProvider(),
   fingerprints: FingerprintService = new FingerprintService(),
+  reveal: (filePath: string) => Promise<void> = revealInFinder,
 ) => {
   const router = Router();
+
+  /** 资产的原文件；记录不存在或文件已被移走时报 404。 */
+  const primaryFile = async (runtime: LibraryRuntime, assetId: string) => {
+    if (!runtime.assets.get(assetId)) throw statusError('资产不存在', 404);
+    const row = runtime.database
+      .prepare('SELECT absolute_path, extension FROM file_references WHERE asset_id = ? ORDER BY created_at LIMIT 1')
+      .get(assetId) as { absolute_path: string; extension: string } | undefined;
+    if (!row) throw statusError('这个资产没有保存到本地的文件', 404);
+    try {
+      await fs.access(row.absolute_path);
+    } catch {
+      throw statusError('原文件已不在保存位置，可能被移动或删除', 404);
+    }
+    return { filePath: row.absolute_path, extension: row.extension ? `.${row.extension.replace(/^\./, '')}` : path.extname(row.absolute_path) };
+  };
 
   router.get('/', async (request, response, next) => {
     try {
@@ -74,6 +122,9 @@ export const createAssetRouter = (
         unfiled: asBoolean(request.query.unfiled),
         tagIds: stringArray(request.query.tagId),
         favorite: asBoolean(request.query.favorite),
+        origin: ['generated', 'canvas', 'uploaded'].includes(String(request.query.origin))
+          ? (String(request.query.origin) as 'generated' | 'canvas' | 'uploaded')
+          : undefined,
         ratingMin: asOptionalNumber(request.query.ratingMin),
         status: request.query.status ? String(request.query.status) : undefined,
         createdFrom: asOptionalNumber(request.query.createdFrom),
@@ -86,6 +137,7 @@ export const createAssetRouter = (
       });
       response.json({
         ...page,
+        counts: runtime.assets.countByTypes(['image', 'video', 'audio']),
         items: page.items.map((asset) => mapAssetWithPreview(runtime, asset)),
       });
     } catch (error) {
@@ -123,6 +175,7 @@ export const createAssetRouter = (
           sourceUrl: stored?.sourceUrl,
           primaryFolderId:
             typeof request.body.primaryFolderId === 'string' ? request.body.primaryFolderId : null,
+          favorite: asBoolean(request.body.favorite) || false,
           userMetadata,
           fileReference: stored?.reference,
         });
@@ -490,6 +543,40 @@ export const createAssetRouter = (
     }
   });
 
+  router.post('/:assetId/reveal', async (request, response, next) => {
+    try {
+      const { filePath } = await primaryFile(await getRuntime(), request.params.assetId);
+      await reveal(filePath);
+      response.json({ ok: true });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // 目标文件夹由网关弹窗选择，不接受浏览器传来的路径。
+  router.post('/:assetId/export', async (request, response, next) => {
+    try {
+      const runtime = await getRuntime();
+      const { filePath, extension } = await primaryFile(runtime, request.params.assetId);
+      let directory: string | null;
+      try {
+        directory = await picker.pickDirectory();
+      } catch (error) {
+        if (error instanceof FilePickerCancelledError) directory = null;
+        else throw error;
+      }
+      if (!directory) {
+        response.json({ cancelled: true });
+        return;
+      }
+      const title = runtime.assets.get(request.params.assetId)?.title || '';
+      const target = await copyWithoutOverwrite(filePath, directory, safeFileName(title), extension);
+      response.json({ cancelled: false, path: target });
+    } catch (error) {
+      next(error);
+    }
+  });
+
   router.post('/:assetId/restore', async (request, response, next) => {
     try {
       const runtime = await getRuntime();
@@ -507,7 +594,8 @@ export const createAssetRouter = (
       response: { status: (code: number) => { json: (body: unknown) => void } },
       _next: unknown,
     ) => {
-      response.status(400).json({ error: error.message || '资产操作失败' });
+      const status = (error as Error & { status?: number }).status;
+      response.status(typeof status === 'number' ? status : 400).json({ error: error.message || '资产操作失败' });
     },
   );
 

@@ -76,6 +76,7 @@ export interface SearchAssetsInput {
   unfiled?: boolean;
   tagIds?: string[];
   favorite?: boolean;
+  origin?: 'generated' | 'canvas' | 'uploaded';
   ratingMin?: number;
   status?: string;
   createdFrom?: number;
@@ -90,6 +91,12 @@ export interface AssetSearchPage {
   total: number;
   limit: number;
   offset: number;
+}
+
+export interface AssetCounts {
+  all: number;
+  unfiled: number;
+  byType: Record<string, number>;
 }
 
 const parseJson = (value: unknown) => JSON.parse(String(value || '{}')) as Record<string, unknown>;
@@ -146,6 +153,13 @@ const buildSearch = (input: SearchAssetsInput) => {
   if (typeof input.favorite === 'boolean') {
     conditions.push('a.favorite = ?');
     parameters.push(input.favorite ? 1 : 0);
+  }
+  if (input.origin === 'generated') {
+    conditions.push("json_extract(a.user_metadata, '$.source') IN ('image-generation', 'video-generation')");
+  } else if (input.origin === 'canvas') {
+    conditions.push("json_extract(a.user_metadata, '$.source') = 'canvas'");
+  } else if (input.origin === 'uploaded') {
+    conditions.push("COALESCE(json_extract(a.user_metadata, '$.source'), '') NOT IN ('image-generation', 'video-generation', 'canvas', 'case-library')");
   }
   if (input.ratingMin != null) {
     conditions.push('a.rating >= ?');
@@ -263,6 +277,31 @@ export class AssetRepository {
 
   search(input: SearchAssetsInput = {}): AssetRecord[] {
     return this.searchPage(input).items;
+  }
+
+  countByTypes(types: string[]): AssetCounts {
+    const uniqueTypes = [...new Set(types.filter(Boolean))];
+    if (!uniqueTypes.length) return { all: 0, unfiled: 0, byType: {} };
+    const rows = this.database
+      .prepare(
+        `SELECT type, COUNT(*) AS count,
+          SUM(CASE WHEN primary_folder_id IS NULL THEN 1 ELSE 0 END) AS unfiled_count
+        FROM assets
+        WHERE status <> 'deleted' AND type IN (${uniqueTypes.map(() => '?').join(', ')})
+        GROUP BY type`,
+      )
+      .all(...uniqueTypes);
+    const byType = Object.fromEntries(uniqueTypes.map((type) => [type, 0]));
+    let all = 0;
+    let unfiled = 0;
+    rows.forEach((row) => {
+      const type = String(row.type);
+      const count = Number(row.count || 0);
+      byType[type] = count;
+      all += count;
+      unfiled += Number(row.unfiled_count || 0);
+    });
+    return { all, unfiled, byType };
   }
 
   searchPage(input: SearchAssetsInput = {}): AssetSearchPage {

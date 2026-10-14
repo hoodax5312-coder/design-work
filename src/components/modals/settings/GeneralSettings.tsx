@@ -19,7 +19,7 @@ const themeModeOptions = [
   { value: 'system', label: '跟随系统', icon: Monitor },
 ] as const;
 
-const additionalThemeOptions: Array<Exclude<ThemePreset, 'nature'>> = ['brutalist', 'claude'];
+const additionalThemeOptions: Array<Exclude<ThemePreset, 'nature'>> = ['brutalist', 'claude', 'watermelon'];
 
 const ThemeStylePreview = ({ preset }: { preset: Exclude<ThemePreset, 'nature'> }) => {
   const preview = THEME_PRESETS[preset].preview;
@@ -341,7 +341,6 @@ export function GeneralSettings() {
                     </button>
                   );
                 })}
-                <div aria-hidden="true" />
               </div>
             </div>
           </SettingsGroup>

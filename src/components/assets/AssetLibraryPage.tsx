@@ -4,13 +4,15 @@ import {
   BookmarkPlus,
   CheckSquare2,
   ChevronDown,
+  ChevronRight,
   Copy,
   Download,
   FileText,
   Film,
+  Folder,
+  FolderOpen,
   FolderPlus,
   Globe2,
-  Hash,
   Image as ImageIcon,
   Maximize2,
   PanelLeftClose,
@@ -19,7 +21,9 @@ import {
   Plus,
   Presentation,
   Music,
+  Palette,
   Search,
+  Sparkles,
   Star,
   Trash2,
   Upload,
@@ -45,10 +49,13 @@ import {
   AlertDescription,
   AlertTitle,
   Button,
+  Card,
   Input,
   Select,
+  Separator,
   Skeleton,
 } from '../ui';
+import { isCaseVideo } from './caseMedia';
 
 const sortOptions = [
   { id: 'updatedAt', label: '时间', hint: '最新优先' },
@@ -56,7 +63,8 @@ const sortOptions = [
 ];
 
 type AssetSource = 'uploaded' | 'online';
-type AssetTypeFilter = 'image' | 'video' | 'audio' | 'project';
+type AssetTypeFilter = '' | 'image' | 'video' | 'audio' | 'project';
+type AssetOriginFilter = 'all' | 'generated' | 'canvas' | 'uploaded' | 'favorites';
 type CaseItem = {
   id: string;
   sourceId: string;
@@ -68,6 +76,7 @@ type CaseItem = {
   author: string;
   sourceUrl: string;
   imageModel: string;
+  mediaType?: string;
 };
 
 const assetTypeOptions: Array<{ id: AssetTypeFilter; label: string; icon: React.ElementType }> = [
@@ -76,6 +85,13 @@ const assetTypeOptions: Array<{ id: AssetTypeFilter; label: string; icon: React.
   { id: 'audio', label: '音频', icon: Music },
 ];
 const visibleAssetTypes = new Set(['image', 'video', 'audio']);
+const assetOriginOptions: Array<{ id: AssetOriginFilter; label: string; icon: React.ElementType }> = [
+  { id: 'all', label: '全部资产', icon: FolderOpen },
+  { id: 'generated', label: '生成资产', icon: Sparkles },
+  { id: 'canvas', label: '画布资产', icon: Palette },
+  { id: 'uploaded', label: '本地上传', icon: Upload },
+  { id: 'favorites', label: '我的收藏', icon: Star },
+];
 const caseTabs: Array<{ id: string; label: string }> = [
   { id: 'all', label: 'All' },
   { id: 'gpt-image', label: 'GPT Image' },
@@ -112,7 +128,13 @@ export const AssetLibraryPage = ({
   showSearch?: boolean;
   flushLayout?: boolean;
 }) => {
-  const [page, setPage] = useState<AssetPage>({ items: [], total: 0, limit: 60, offset: 0 });
+  const [page, setPage] = useState<AssetPage>({
+    items: [],
+    total: 0,
+    limit: 60,
+    offset: 0,
+    counts: { all: 0, unfiled: 0, byType: {} },
+  });
   const [folders, setFolders] = useState<AssetFolder[]>([]);
   const [tags, setTags] = useState<AssetTag[]>([]);
   const [query, setQuery] = useState('');
@@ -121,10 +143,10 @@ export const AssetLibraryPage = ({
   const [caseTab, setCaseTab] = useState('all');
   const [caseSourceTab, setCaseSourceTab] = useState('all');
   const [caseTag, setCaseTag] = useState('');
-  const [type, setType] = useState<AssetTypeFilter>('image');
+  const [type, setType] = useState<AssetTypeFilter>('');
+  const [origin, setOrigin] = useState<AssetOriginFilter>('all');
   const [folderId, setFolderId] = useState('');
   const [tagIds, setTagIds] = useState<string[]>([]);
-  const [favoritesOnly, setFavoritesOnly] = useState(false);
   const [sort, setSort] = useState('updatedAt');
   const [offset, setOffset] = useState(0);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -137,6 +159,16 @@ export const AssetLibraryPage = ({
   const [tasksOpen, setTasksOpen] = useState(false);
   const [sortOpen, setSortOpen] = useState(false);
   const [filterPanelOpen, setFilterPanelOpen] = useState(true);
+  const [foldersSectionExpanded, setFoldersSectionExpanded] = useState(true);
+  const [expandedFolderIds, setExpandedFolderIds] = useState<Set<string>>(new Set());
+  const [newFolderName, setNewFolderName] = useState<string | null>(null);
+  const [newFolderParentId, setNewFolderParentId] = useState<string | null>(null);
+  const [folderCreating, setFolderCreating] = useState(false);
+  const cancelNewFolderRef = useRef(false);
+  const [editingFolderId, setEditingFolderId] = useState<string | null>(null);
+  const [folderNameDraft, setFolderNameDraft] = useState('');
+  const cancelFolderRenameRef = useRef(false);
+  const [folderContextMenu, setFolderContextMenu] = useState<{ folderId: string; x: number; y: number } | null>(null);
   const [dropZoneOpen, setDropZoneOpen] = useState(false);
   const [draggingFiles, setDraggingFiles] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -146,6 +178,7 @@ export const AssetLibraryPage = ({
   const [caseSources, setCaseSources] = useState<Array<{ id: string; name: string; homepageUrl: string | null; itemCount: number }>>([]);
   const [selectedCase, setSelectedCase] = useState<CaseItem | null>(null);
   const [savedCaseIds, setSavedCaseIds] = useState<Set<string>>(new Set());
+  const [caseAssetIdsByCaseId, setCaseAssetIdsByCaseId] = useState<Record<string, string>>({});
 
   useEffect(() => {
     const sync = () => setGeneratedItems(contentFeed.list());
@@ -156,7 +189,22 @@ export const AssetLibraryPage = ({
 
   useEffect(() => {
     if (source !== 'online') return;
-    const loadCases = () => assetService.cases(debouncedQuery).then((result) => { setCaseItems(result.items); setCaseSources(result.sources); }).catch((caught) => setError(caught instanceof Error ? caught.message : '案例读取失败'));
+    const loadCases = () => Promise.all([
+      assetService.cases(debouncedQuery),
+      assetService.list({ limit: 500 }),
+    ]).then(([result, allAssets]) => {
+      setCaseItems(result.items);
+      setCaseSources(result.sources);
+      const caseAssets = allAssets.items.filter((asset) => asset.userMetadata?.source === 'case-library');
+      setCaseAssetIdsByCaseId(Object.fromEntries(caseAssets.flatMap((asset) => {
+        const caseId = asset.userMetadata?.caseId;
+        return typeof caseId === 'string' ? [[caseId, asset.id] as const] : [];
+      })));
+      setSavedCaseIds(new Set(caseAssets
+        .filter((asset) => asset.favorite)
+        .map((asset) => asset.userMetadata?.caseId)
+        .filter((caseId): caseId is string => typeof caseId === 'string')));
+    }).catch((caught) => setError(caught instanceof Error ? caught.message : '案例读取失败'));
     void loadCases();
     window.addEventListener('design-work:prompt-sources-updated', loadCases);
     return () => window.removeEventListener('design-work:prompt-sources-updated', loadCases);
@@ -170,6 +218,15 @@ export const AssetLibraryPage = ({
     document.addEventListener('keydown', closeOnEscape);
     return () => document.removeEventListener('keydown', closeOnEscape);
   }, [selectedCase]);
+
+  useEffect(() => {
+    if (!folderContextMenu) return;
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setFolderContextMenu(null);
+    };
+    document.addEventListener('keydown', closeOnEscape);
+    return () => document.removeEventListener('keydown', closeOnEscape);
+  }, [folderContextMenu]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -197,15 +254,18 @@ export const AssetLibraryPage = ({
         type: type === 'project' ? '' : type,
         folderId,
         tagIds,
-        favorite: favoritesOnly || undefined,
+        favorite: origin === 'favorites' || undefined,
+        origin: origin === 'generated' || origin === 'canvas' || origin === 'uploaded' ? origin : undefined,
         sort,
         limit: 60,
         offset,
       });
       const generated = generatedItems
         .filter((item) => item.savedToAssets)
+        .filter(() => origin === 'all' || origin === 'generated')
         .filter((item) => visibleAssetTypes.has(item.type))
         .filter((item) => !type || item.type === type)
+        .filter(() => !folderId)
         .filter(() => !tagIds.length)
         .filter((item) => {
           const needle = debouncedQuery.trim().toLowerCase();
@@ -219,20 +279,10 @@ export const AssetLibraryPage = ({
         previewUrl: item.previewUrl, previewStatus: 'remote',
         } satisfies AssetSummary));
       // 生成内容与资产库使用同一张首页卡片：保存后不再追加一张重复的数据库卡片。
-      const generatedAssets = result.items.filter((asset) => {
-        if (!visibleAssetTypes.has(asset.type)) return false;
+      const databaseAssets = result.items.filter((asset) => visibleAssetTypes.has(asset.type));
+      const generatedAssets = databaseAssets.filter((asset) => {
         const metadataSource = asset.userMetadata?.source;
-        return typeof asset.userMetadata?.generatedUrl === 'string'
-          || metadataSource === 'image-generation'
-          || metadataSource === 'video-generation';
-      });
-      const importedAssets = result.items.filter((asset) => {
-        if (!visibleAssetTypes.has(asset.type)) return false;
-        const generatedUrl = asset.userMetadata?.generatedUrl;
-        const metadataSource = asset.userMetadata?.source;
-        return typeof generatedUrl !== 'string'
-          && metadataSource !== 'image-generation'
-          && metadataSource !== 'video-generation';
+        return metadataSource === 'image-generation' || metadataSource === 'video-generation';
       });
       const generatedDatabaseUrls = new Set(
         generatedAssets
@@ -241,9 +291,8 @@ export const AssetLibraryPage = ({
       );
       // 已保存的生成内容以数据库资产为准，让本地预览和文件引用生效；仅保留没有对应数据库记录的旧会话卡片。
       const generatedFallbackItems = generated.filter((item) => !generatedDatabaseUrls.has(item.previewUrl));
-      const generatedDatabaseItems = generatedAssets;
       const sourceItems = source === 'uploaded'
-        ? [...generatedFallbackItems, ...generatedDatabaseItems, ...importedAssets]
+        ? [...generatedFallbackItems, ...databaseAssets]
         : [];
       const combinedItems = sourceItems.sort((a, b) => {
         if (sort === 'title') return a.title.localeCompare(b.title, 'zh-CN');
@@ -261,7 +310,7 @@ export const AssetLibraryPage = ({
     } finally {
       setLoading(false);
     }
-  }, [debouncedQuery, favoritesOnly, folderId, generatedItems, offset, sort, source, tagIds, type]);
+  }, [debouncedQuery, folderId, generatedItems, offset, origin, sort, source, tagIds, type]);
 
   useEffect(() => {
     loadTaxonomy().catch(() => undefined);
@@ -273,21 +322,21 @@ export const AssetLibraryPage = ({
     const navigate = (event: Event) => {
       const destination = (event as CustomEvent<string>).detail;
       if (destination === 'all') {
-        setType('image');
+        setType('');
+        setOrigin('all');
         setFolderId('');
         setTagIds([]);
-        setFavoritesOnly(false);
         setOffset(0);
       } else if (destination.startsWith('folder:')) {
         setFolderId(destination.slice('folder:'.length));
-        setType('image');
+        setType('');
+        setOrigin('uploaded');
         setTagIds([]);
-        setFavoritesOnly(false);
         setOffset(0);
       } else {
         document
           .querySelector<HTMLElement>(
-            destination === 'folders' ? '[aria-label="按文件夹筛选"]' : '[aria-label="按标签筛选"]',
+            destination === 'folders' ? '[data-filter-section="folders"] button' : '[aria-label="按标签筛选"]',
           )
           ?.focus();
       }
@@ -305,7 +354,7 @@ export const AssetLibraryPage = ({
     if (!item.coverUrl) return;
     const anchor = document.createElement('a');
     anchor.href = item.coverUrl;
-    anchor.download = `${item.title || 'case-image'}.jpg`;
+    anchor.download = `${item.title || (isCaseVideo(item) ? 'case-video' : 'case-image')}.${isCaseVideo(item) ? 'mp4' : 'jpg'}`;
     anchor.target = '_blank';
     anchor.rel = 'noreferrer';
     anchor.click();
@@ -314,27 +363,34 @@ export const AssetLibraryPage = ({
   const saveCaseToAssets = async (item: CaseItem) => {
     if (!item.coverUrl || savedCaseIds.has(item.id)) return;
     try {
-      await assetService.create({
-        type: 'image',
-        title: item.title,
-        description: item.prompt || item.description,
-        sourceUrl: item.coverUrl,
-        userMetadata: {
-          source: 'case-library',
-          prompt: item.prompt,
-          model: item.imageModel,
-          generatedUrl: item.coverUrl,
-          caseId: item.id,
-          caseSourceId: item.sourceId,
-          upstreamUrl: item.sourceUrl,
-        },
-      });
+      const existingAssetId = caseAssetIdsByCaseId[item.id];
+      if (existingAssetId) {
+        await assetService.update(existingAssetId, { favorite: true });
+      } else {
+        const created = await assetService.create({
+          type: isCaseVideo(item) ? 'video' : 'image',
+          title: item.title,
+          description: item.prompt || item.description,
+          sourceUrl: item.coverUrl,
+          favorite: true,
+          userMetadata: {
+            source: 'case-library',
+            prompt: item.prompt,
+            model: item.imageModel,
+            generatedUrl: item.coverUrl,
+            caseId: item.id,
+            caseSourceId: item.sourceId,
+            upstreamUrl: item.sourceUrl,
+          },
+        });
+        setCaseAssetIdsByCaseId((current) => ({ ...current, [item.id]: created.id }));
+      }
       setSavedCaseIds((current) => new Set(current).add(item.id));
-      setNotice('已保存到素材');
+      setNotice('已添加至收藏');
       window.setTimeout(() => setNotice(''), 2200);
       refresh();
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : '保存到素材失败');
+      setError(caught instanceof Error ? caught.message : '添加至收藏失败');
     }
   };
 
@@ -430,58 +486,234 @@ export const AssetLibraryPage = ({
     refresh();
   };
 
-  const createTag = async () => {
-    const name = window.prompt('请输入新标签名称');
-    if (!name?.trim()) return;
+  const openFolderCreator = (parentId: string | null) => {
+    setFolderContextMenu(null);
+    setFoldersSectionExpanded(true);
+    setNewFolderParentId(parentId);
+    setNewFolderName('未命名文件夹');
+    cancelNewFolderRef.current = false;
+    if (parentId) setExpandedFolderIds((current) => new Set(current).add(parentId));
+  };
+
+  const createFolder = async (draftName: string, parentId: string | null) => {
+    const name = draftName.trim() || '未命名文件夹';
+    if (folderCreating) return;
+    setFolderCreating(true);
     try {
-      const created = await assetService.createTag(name.trim());
+      const created = await assetService.createFolder(name, parentId);
       await loadTaxonomy();
-      setTagIds([created.id]);
+      setNewFolderName(null);
+      setNewFolderParentId(null);
+      setFolderId(created.id);
+      setType('');
+      setOrigin('uploaded');
+      setTagIds([]);
       setOffset(0);
-      setNotice(`已创建标签「${created.name}」`);
+      setNotice(`已创建文件夹「${created.name}」`);
       window.setTimeout(() => setNotice(''), 1800);
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : '创建标签失败');
+      setError(caught instanceof Error ? caught.message : '创建文件夹失败');
+    } finally {
+      setFolderCreating(false);
     }
   };
 
-  const renameTag = async (tag: AssetTag) => {
-    const name = window.prompt('修改标签名称', tag.name);
-    if (!name?.trim() || name.trim() === tag.name) return;
+  const startRenamingFolder = (folder: AssetFolder) => {
+    setFolderContextMenu(null);
+    setEditingFolderId(folder.id);
+    setFolderNameDraft(folder.name);
+    cancelFolderRenameRef.current = false;
+  };
+
+  const renameFolder = async (folder: AssetFolder, draftName: string) => {
+    const name = draftName.trim();
+    if (!name || name === folder.name) {
+      setEditingFolderId(null);
+      setFolderNameDraft('');
+      return;
+    }
     try {
-      const renamed = await assetService.renameTag(tag.id, name.trim());
+      const renamed = await assetService.renameFolder(folder.id, name);
       await loadTaxonomy();
+      setEditingFolderId(null);
+      setFolderNameDraft('');
       setNotice(`已重命名为「${renamed.name}」`);
       window.setTimeout(() => setNotice(''), 1800);
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : '重命名标签失败');
+      setError(caught instanceof Error ? caught.message : '重命名文件夹失败');
     }
   };
 
-  const deleteTag = async (tag: AssetTag) => {
-    if (!window.confirm(`删除标签「${tag.name}」？\n资产本身不会被删除。`)) return;
+  const deleteFolder = async (folder: AssetFolder) => {
+    if (!window.confirm(`删除文件夹「${folder.name}」？\n子文件夹会一并删除，其中的素材不会被删除，将转为未分类。`)) return;
     try {
-      await assetService.deleteTag(tag.id);
-      if (tagIds.includes(tag.id)) setTagIds([]);
+      const removedFolderIds = new Set([folder.id]);
+      let foundDescendant = true;
+      while (foundDescendant) {
+        foundDescendant = false;
+        folders.forEach((candidate) => {
+          if (candidate.parentId && removedFolderIds.has(candidate.parentId) && !removedFolderIds.has(candidate.id)) {
+            removedFolderIds.add(candidate.id);
+            foundDescendant = true;
+          }
+        });
+      }
+      await assetService.deleteFolder(folder.id);
+      if (removedFolderIds.has(folderId)) {
+        setFolderId('');
+        setType('');
+      }
+      setExpandedFolderIds((current) => {
+        const next = new Set(current);
+        removedFolderIds.forEach((id) => next.delete(id));
+        return next;
+      });
       await loadTaxonomy();
       setOffset(0);
-      setNotice(`已删除标签「${tag.name}」`);
+      setNotice(`已删除文件夹「${folder.name}」`);
       window.setTimeout(() => setNotice(''), 1800);
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : '删除标签失败');
+      setError(caught instanceof Error ? caught.message : '删除文件夹失败');
     }
   };
 
+  const openFolderContextMenu = (event: React.MouseEvent, folder: AssetFolder) => {
+    event.preventDefault();
+    event.stopPropagation();
+    const menuWidth = 208;
+    const menuHeight = 162;
+    setFolderContextMenu({
+      folderId: folder.id,
+      x: Math.max(8, Math.min(event.clientX, window.innerWidth - menuWidth - 8)),
+      y: Math.max(8, Math.min(event.clientY, window.innerHeight - menuHeight - 8)),
+    });
+  };
+
+  const renderNewFolderEditor = (depth: number) => <div
+    className="flex h-8 items-center gap-1 pr-2"
+    style={{ paddingLeft: `${8 + depth * 16}px` }}
+    aria-label="新建文件夹"
+    aria-busy={folderCreating}
+  >
+    <Folder size={24} className="shrink-0 text-sidebar-foreground/70" aria-hidden="true" />
+    <Input
+      autoFocus
+      value={newFolderName || ''}
+      onChange={(event) => setNewFolderName(event.target.value)}
+      onBlur={(event) => {
+        if (cancelNewFolderRef.current) {
+          cancelNewFolderRef.current = false;
+          setNewFolderName(null);
+          setNewFolderParentId(null);
+          return;
+        }
+        void createFolder(event.currentTarget.value, newFolderParentId);
+      }}
+      onKeyDown={(event) => {
+        if (event.key === 'Enter') event.currentTarget.blur();
+        if (event.key === 'Escape') {
+          cancelNewFolderRef.current = true;
+          event.currentTarget.blur();
+        }
+      }}
+      aria-label="命名新文件夹"
+      disabled={folderCreating}
+      inputSize="sm"
+      className="h-7 min-w-0 flex-1 px-2 text-xs"
+    />
+  </div>;
+
+  const renderFolderTree = (parentId: string | null, depth = 0): React.ReactNode => <>
+    {folders
+      .filter((folder) => folder.parentId === parentId)
+      .map((folder) => {
+        const children = folders.filter((candidate) => candidate.parentId === folder.id);
+        const expanded = expandedFolderIds.has(folder.id);
+        const selected = folderId === folder.id;
+        const editing = editingFolderId === folder.id;
+        return (
+          <div key={folder.id} data-folder-tree-entry>
+            {editing ? <div className="flex h-8 items-center gap-1 pr-2" style={{ paddingLeft: `${8 + depth * 16}px` }}>
+              <Folder size={24} className="shrink-0 text-sidebar-foreground/70" aria-hidden="true" />
+              <Input
+                autoFocus
+                value={folderNameDraft}
+                onChange={(event) => setFolderNameDraft(event.target.value)}
+                onBlur={(event) => {
+                  if (cancelFolderRenameRef.current) {
+                    cancelFolderRenameRef.current = false;
+                    setEditingFolderId(null);
+                    setFolderNameDraft('');
+                    return;
+                  }
+                  void renameFolder(folder, event.currentTarget.value);
+                }}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter') event.currentTarget.blur();
+                  if (event.key === 'Escape') {
+                    cancelFolderRenameRef.current = true;
+                    event.currentTarget.blur();
+                  }
+                }}
+                aria-label={`重命名文件夹 ${folder.name}`}
+                inputSize="sm"
+                className="h-7 min-w-0 flex-1 px-2 text-xs"
+              />
+            </div> : <div
+              onContextMenu={(event) => openFolderContextMenu(event, folder)}
+              className={cn(
+                'mt-1 flex h-8 w-full items-center rounded-md pr-2 text-sm font-normal text-sidebar-foreground/70 transition-colors hover:bg-[var(--surface-hover)] hover:text-[var(--surface-hover-foreground)]',
+                selected && 'bg-[var(--surface-control)] text-[var(--surface-control-foreground)] hover:bg-[var(--surface-control)] hover:text-[var(--surface-control-foreground)]',
+              )}
+              style={{ paddingLeft: `${8 + depth * 16}px` }}
+            >
+              <button
+                type="button"
+                onClick={() => {
+                  setFolderId(folder.id);
+                  setType('');
+                  setOrigin('uploaded');
+                  setTagIds([]);
+                  setOffset(0);
+                  setExpandedFolderIds((current) => {
+                    const next = new Set(current);
+                    if (next.has(folder.id)) next.delete(folder.id);
+                    else next.add(folder.id);
+                    return next;
+                  });
+                }}
+                aria-expanded={expanded}
+                aria-pressed={selected}
+                className="flex h-8 min-w-0 flex-1 items-center gap-2 bg-transparent p-0 text-left text-sm font-normal text-inherit outline-none"
+              >
+                <span aria-hidden="true" className="flex h-6 w-8 shrink-0 items-center gap-1 text-sidebar-foreground/70">
+                  {expanded ? <ChevronDown size={20} /> : <ChevronRight size={20} />}
+                  {expanded ? <FolderOpen size={24} /> : <Folder size={24} />}
+                </span>
+                <span className="min-w-0 flex-1 truncate">{folder.name}</span>
+                <span className="shrink-0 text-[11px] tabular-nums opacity-55">{folder.assetCount}</span>
+              </button>
+            </div>}
+            {(children.length > 0 || (newFolderName !== null && newFolderParentId === folder.id)) && expanded && renderFolderTree(folder.id, depth + 1)}
+          </div>
+        );
+      })}
+    {newFolderName !== null && newFolderParentId === parentId && renderNewFolderEditor(depth)}
+  </>;
+
   const selectedCount = selectedIds.size;
-  const activeFilterCount = [type, folderId, tagIds.length ? 'tags' : '', favoritesOnly ? 'favorites' : '', sort === 'updatedAt' ? '' : sort].filter(Boolean).length;
-  const showEmptyImport = source === 'uploaded' && type !== 'project' && !loading && !error && !page.items.length && !activeFilterCount && !debouncedQuery;
-  const showDropZone = source === 'uploaded' && type !== 'project' && (dropZoneOpen || showEmptyImport);
-  const activeTypeLabel = assetTypeOptions.find((option) => option.id === type)?.label || '图片';
+  const contextFolder = folderContextMenu
+    ? folders.find((folder) => folder.id === folderContextMenu.folderId) || null
+    : null;
+  const activeFilterCount = [type, folderId, origin === 'all' ? '' : origin, tagIds.length ? 'tags' : '', sort === 'updatedAt' ? '' : sort].filter(Boolean).length;
+  const showEmptyImport = source === 'uploaded' && origin === 'uploaded' && type !== 'project' && !loading && !error && !page.items.length && !folderId && !tagIds.length && !debouncedQuery;
+  const showDropZone = source === 'uploaded' && origin === 'uploaded' && type !== 'project' && (dropZoneOpen || showEmptyImport);
+  const activeTypeLabel = assetTypeOptions.find((option) => option.id === type)?.label || '全部';
   const activeTagLabel = tagIds.length ? tags.find((tag) => tag.id === tagIds[0])?.name : undefined;
   const activeFolderLabel = folderId ? folders.find((folder) => folder.id === folderId)?.name : undefined;
   const assetViewTitle = source === 'online'
     ? '案例资源'
-    : activeTagLabel || activeFolderLabel || (favoritesOnly ? '收藏' : activeTypeLabel);
+    : activeTagLabel || activeFolderLabel || (origin === 'all' ? activeTypeLabel : assetOriginOptions.find((option) => option.id === origin)?.label || activeTypeLabel);
   const caseTagCounts = useMemo(() => {
     const counts = new Map<string, number>();
     caseItems.forEach((item) => item.tags.forEach((tag) => counts.set(tag, (counts.get(tag) || 0) + 1)));
@@ -531,7 +763,8 @@ export const AssetLibraryPage = ({
                   aria-selected={active}
                   onClick={() => {
                     setSource(id);
-                    setType(type !== 'project' ? type : 'image');
+                    setType(type !== 'project' ? type : '');
+                    setOrigin('all');
                     setFolderId('');
                     setTagIds([]);
                     setCaseTag('');
@@ -583,114 +816,65 @@ export const AssetLibraryPage = ({
               'min-h-0 flex-1 overflow-y-auto px-3 pb-3',
               source === 'online' ? 'pt-2' : 'pt-3',
             )}
-            aria-label="素材标签筛选"
+            aria-label="素材分类筛选"
           >
-            {source === 'uploaded' && <section className="px-0 pb-1" data-filter-section="type">
+            {source === 'uploaded' && <section className="px-0 pb-1" data-filter-section="origin">
               <div className="flex flex-col gap-0.5">
-                {assetTypeOptions
-                  .filter((option) => option.id !== 'project')
-                  .map((option) => {
-                    const Icon = option.icon;
-                    const active = type === option.id;
-                    return (
-                      <Button
-                        key={option.id}
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => {
-                          setType(option.id);
-                          setFolderId('');
-                          setOffset(0);
-                        }}
-                        aria-pressed={active}
-                        className={cn(
-                          'h-8 w-full justify-start gap-2 rounded-md px-2.5 text-sm font-medium text-foreground hover:bg-[var(--surface-hover)] hover:text-[var(--surface-hover-foreground)]',
-                          active && 'bg-[var(--surface-control)] text-[var(--surface-control-foreground)] hover:bg-[var(--surface-control)] hover:text-[var(--surface-control-foreground)]',
-                        )}
-                      >
-                        <Icon size={16} className="shrink-0" />
-                        <span>{option.label}</span>
-                      </Button>
-                    );
-                  })}
+                {assetOriginOptions.map((option) => {
+                  const Icon = option.icon;
+                  const active = origin === option.id && !folderId;
+                  return <Button
+                    key={option.id}
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => {
+                      setOrigin(option.id);
+                      setFolderId('');
+                      setTagIds([]);
+                      setOffset(0);
+                    }}
+                    aria-pressed={active}
+                    className={cn(
+                      'h-8 w-full justify-start gap-2 rounded-md px-2.5 text-sm font-medium text-foreground hover:bg-[var(--surface-hover)] hover:text-[var(--surface-hover-foreground)]',
+                      active && 'bg-[var(--surface-control)] text-[var(--surface-control-foreground)] hover:bg-[var(--surface-control)] hover:text-[var(--surface-control-foreground)]',
+                    )}
+                  >
+                    <Icon size={16} className="shrink-0" />
+                    <span>{option.label}</span>
+                  </Button>;
+                })}
               </div>
             </section>}
-            {source === 'uploaded' && <section className="px-0 py-1" data-filter-section="tags">
-              <div className="flex h-10 items-center gap-2 text-sidebar-foreground/70">
-                <Hash size={12} className="shrink-0" aria-hidden="true" />
-                <span className="text-xs font-medium">标签</span>
+            {source === 'uploaded' && <section className="px-0 py-1" data-filter-section="folders">
+              <div className="group/folder-heading flex h-8 items-center text-sidebar-foreground/70">
+                <button
+                  type="button"
+                  onClick={() => setFoldersSectionExpanded((expanded) => !expanded)}
+                  aria-expanded={foldersSectionExpanded}
+                  className="group/folder-toggle flex h-8 min-w-0 items-center gap-1 rounded-md bg-transparent px-2 text-xs font-medium text-inherit outline-none transition-colors hover:bg-[var(--surface-hover)] hover:text-[var(--surface-hover-foreground)] focus-visible:bg-[var(--surface-hover)] focus-visible:text-[var(--surface-hover-foreground)] focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1"
+                >
+                  <span>文件夹</span>
+                  <span className="pointer-events-none flex shrink-0 opacity-0 transition-opacity group-hover/folder-toggle:opacity-100 group-focus-within/folder-toggle:opacity-100" aria-hidden="true">
+                    {foldersSectionExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+                  </span>
+                </button>
                 <Button
                   type="button"
                   variant="ghost"
                   size="iconSm"
-                  onClick={() => void createTag()}
-                  aria-label="新建标签"
-                  title="新建标签"
-                  className="ml-auto h-8 w-8 text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+                  onClick={() => openFolderCreator(null)}
+                  aria-label="新建文件夹"
+                  title="新建文件夹"
+                  className="pointer-events-none ml-auto h-8 w-8 shrink-0 text-sidebar-foreground/70 opacity-0 transition-opacity hover:bg-sidebar-accent hover:text-sidebar-accent-foreground group-hover/folder-heading:pointer-events-auto group-hover/folder-heading:opacity-100 group-focus-within/folder-heading:pointer-events-auto group-focus-within/folder-heading:opacity-100"
                 >
-                  <Plus size={15} />
+                  <FolderPlus size={15} />
                 </Button>
               </div>
-              <div className="ui-module-divider-l ml-[7px] pl-[9px]">
-                <button
-                  type="button"
-                  onClick={() => { setTagIds([]); setOffset(0); }}
-                  aria-pressed={!tagIds.length}
-                  className={cn(
-                    'flex h-7 w-full items-center rounded-md px-2.5 text-left text-xs font-medium text-foreground transition-colors hover:bg-[var(--surface-hover)] hover:text-[var(--surface-hover-foreground)]',
-                    !tagIds.length && 'bg-[var(--surface-control)] text-[var(--surface-control-foreground)] hover:bg-[var(--surface-control)] hover:text-[var(--surface-control-foreground)]',
-                  )}
-                >
-                  All
-                </button>
-                {tags.map((tag) => {
-                  const selected = tagIds.includes(tag.id);
-                  return (
-                    <div
-                      key={tag.id}
-                      className={cn(
-                        'group/tag mt-0.5 flex h-7 w-full items-center rounded-md transition-colors hover:bg-[var(--surface-hover)] hover:text-[var(--surface-hover-foreground)] focus-within:bg-[var(--surface-hover)] focus-within:text-[var(--surface-hover-foreground)]',
-                        selected && 'bg-[var(--surface-control)] text-[var(--surface-control-foreground)] hover:bg-[var(--surface-control)] hover:text-[var(--surface-control-foreground)] focus-within:bg-[var(--surface-control)] focus-within:text-[var(--surface-control-foreground)]',
-                      )}
-                    >
-                      <button
-                        type="button"
-                        onClick={() => { setTagIds([tag.id]); setOffset(0); }}
-                        aria-pressed={selected}
-                        className="min-w-0 flex-1 truncate px-2.5 text-left text-xs font-medium text-inherit focus-visible:outline-none"
-                      >
-                        {tag.name}
-                      </button>
-                      <span className="mr-0.5 flex shrink-0 items-center transition-opacity">
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="iconSm"
-                          onClick={() => void renameTag(tag)}
-                          aria-label={`编辑标签 ${tag.name}`}
-                          title="编辑标签"
-                          className="h-6 w-6 text-sidebar-foreground/70 opacity-0 transition-opacity group-hover/tag:opacity-100 group-focus-within/tag:opacity-100 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
-                        >
-                          <Pencil size={13} />
-                        </Button>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="iconSm"
-                          onClick={() => void deleteTag(tag)}
-                          aria-label={`删除标签 ${tag.name}`}
-                          title="删除标签"
-                          className="h-6 w-6 text-sidebar-foreground/70 opacity-0 transition-opacity group-hover/tag:opacity-100 group-focus-within/tag:opacity-100 hover:bg-destructive/10 hover:text-destructive"
-                        >
-                          <Trash2 size={13} />
-                        </Button>
-                      </span>
-                    </div>
-                  );
-                })}
-                {!tags.length && <div className="px-3 py-3 text-xs text-muted-foreground">暂无标签，点击右上角添加</div>}
-              </div>
+              {foldersSectionExpanded && <div className="knowledge-file-tree-scroll -mx-1 px-1 pb-1">
+                {renderFolderTree(null)}
+                {!folders.length && newFolderName === null && <div className="px-2 py-3 text-xs text-muted-foreground">暂无文件夹，点击右上角添加</div>}
+              </div>}
             </section>}
             {source === 'online' && <>
               <section className="px-0 pb-1" data-filter-section="case-sources">
@@ -785,12 +969,14 @@ export const AssetLibraryPage = ({
               >
                 <div className="relative aspect-[16/10] overflow-hidden bg-muted">
                   {item.coverUrl ? <>
-                    <img src={item.coverUrl} alt="" className="h-full w-full object-cover" loading="lazy" />
+                    {isCaseVideo(item)
+                      ? <video src={item.coverUrl} muted loop playsInline preload="metadata" className="h-full w-full object-cover" />
+                      : <img src={item.coverUrl} alt="" className="h-full w-full object-cover" loading="lazy" />}
                     <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center bg-black/20 opacity-0 transition-opacity group-hover:pointer-events-auto group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:opacity-100">
                       <div className="pointer-events-none absolute inset-x-0 bottom-0 h-3/4 bg-gradient-to-t from-black/85 via-black/45 to-transparent" aria-hidden="true" />
                       <div className="relative z-10 flex items-center gap-3">
-                        <Button type="button" variant="ghost" size="iconSm" onClick={(event) => { event.stopPropagation(); downloadCaseImage(item); }} aria-label={`下载${item.title}`} title="下载图片" className="h-10 w-10 bg-black/60 p-0 text-white shadow-lg hover:bg-black/85 hover:text-white"><CaseActionIcon kind="download" /></Button>
-                        <Button type="button" variant="ghost" size="iconSm" onClick={(event) => { event.stopPropagation(); void saveCaseToAssets(item); }} disabled={saved} aria-label={saved ? `已保存${item.title}` : `保存${item.title}到素材`} title={saved ? '已保存到素材' : '保存到素材'} className={cn('h-10 w-10 bg-black/60 p-0 text-white shadow-lg hover:bg-black/85 hover:text-white', saved && 'cursor-default bg-white/20 text-white/45 hover:bg-white/20 hover:text-white/45')}><CaseActionIcon kind="save" /></Button>
+                        <Button type="button" variant="ghost" size="iconSm" onClick={(event) => { event.stopPropagation(); downloadCaseImage(item); }} aria-label={`下载${item.title}`} title={isCaseVideo(item) ? '下载视频' : '下载图片'} className="h-10 w-10 bg-black/60 p-0 text-white shadow-lg hover:bg-black/85 hover:text-white"><CaseActionIcon kind="download" /></Button>
+                        <Button type="button" variant="ghost" size="iconSm" onClick={(event) => { event.stopPropagation(); void saveCaseToAssets(item); }} disabled={saved} aria-label={saved ? `${item.title}已收藏` : `添加${item.title}至收藏`} title={saved ? '已收藏' : '添加至收藏'} className={cn('h-10 w-10 bg-black/60 p-0 text-white shadow-lg hover:bg-black/85 hover:text-white', saved && 'cursor-default bg-white/20 text-white/45 hover:bg-white/20 hover:text-white/45')}><CaseActionIcon kind="save" /></Button>
                         <Button type="button" variant="ghost" size="iconSm" onClick={(event) => { event.stopPropagation(); setSelectedCase(item); }} aria-label={`全屏查看${item.title}`} title="全屏查看" className="h-10 w-10 bg-black/60 p-0 text-white shadow-lg hover:bg-black/85 hover:text-white"><CaseActionIcon kind="fullscreen" /></Button>
                       </div>
                     </div>
@@ -831,7 +1017,7 @@ export const AssetLibraryPage = ({
             </Button>}
             {source === 'uploaded' && <h1 className="min-w-0 truncate text-sm font-semibold tracking-[-0.01em]">{assetViewTitle}</h1>}
           </div>
-          <div className="relative flex items-center gap-2">
+          <div className="flex items-center gap-2">
             <Button
               type="button"
               variant="ghost"
@@ -844,43 +1030,63 @@ export const AssetLibraryPage = ({
             >
               <Upload size={16} aria-hidden="true" />
             </Button>
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              onClick={() => setSortOpen((open) => !open)}
-              aria-expanded={sortOpen}
-              aria-controls="asset-sort-menu"
-              className="relative h-8 gap-1 px-2 text-xs font-medium text-muted-foreground before:absolute before:-inset-y-1 before:inset-x-0 before:content-[''] hover:bg-accent hover:text-accent-foreground"
-            >
-              排序
-              <ChevronDown size={13} className={cn('transition-transform', sortOpen && 'rotate-180')} />
-            </Button>
-            {sortOpen && (
-              <div id="asset-sort-menu" className="absolute right-0 top-8 z-30 w-48 rounded-lg border border-border bg-popover p-1.5 text-popover-foreground shadow-lg">
-                {sortOptions.map((option) => (
-                  <Button
-                    key={option.id}
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => {
-                      setSort(option.id);
-                      setOffset(0);
-                      setSortOpen(false);
-                    }}
-                    aria-pressed={sort === option.id}
-                    className={cn(
-                      'h-9 w-full justify-between hover:bg-accent hover:text-accent-foreground',
-                      sort === option.id && 'bg-accent text-accent-foreground shadow-none',
-                    )}
-                  >
-                    <span className="text-xs font-semibold">{option.label}</span>
-                    <span className="text-xs font-medium text-muted-foreground">{option.hint}</span>
-                  </Button>
-                ))}
-              </div>
-            )}
+            <div className="relative">
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={() => setSortOpen((open) => !open)}
+                aria-expanded={sortOpen}
+                aria-controls="asset-sort-menu"
+                className="relative h-8 gap-1 px-2 text-xs font-medium text-muted-foreground before:absolute before:-inset-y-1 before:inset-x-0 before:content-[''] hover:bg-accent hover:text-accent-foreground"
+              >
+                排序
+                <ChevronDown size={13} className={cn('transition-transform', sortOpen && 'rotate-180')} />
+              </Button>
+              {sortOpen && (
+                <div id="asset-sort-menu" className="absolute right-0 top-8 z-30 w-48 rounded-lg border border-border bg-popover p-1.5 text-popover-foreground shadow-lg">
+                  {sortOptions.map((option) => (
+                    <Button
+                      key={option.id}
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => {
+                        setSort(option.id);
+                        setOffset(0);
+                        setSortOpen(false);
+                      }}
+                      aria-pressed={sort === option.id}
+                      className={cn(
+                        'h-9 w-full justify-between hover:bg-accent hover:text-accent-foreground',
+                        sort === option.id && 'bg-accent text-accent-foreground shadow-none',
+                      )}
+                    >
+                      <span className="text-xs font-semibold">{option.label}</span>
+                      <span className="text-xs font-medium text-muted-foreground">{option.hint}</span>
+                    </Button>
+                  ))}
+                </div>
+              )}
+            </div>
+            {source === 'uploaded' && <div className="w-[104px]">
+              <Select
+                value={type}
+                onChange={(event) => {
+                  setType(event.target.value as AssetTypeFilter);
+                  setFolderId('');
+                  setTagIds([]);
+                  setOffset(0);
+                }}
+                options={[
+                  { value: '', label: '全部类型' },
+                  ...assetTypeOptions.map((option) => ({ value: option.id, label: option.label })),
+                ]}
+                aria-label="按文件类型筛选"
+                selectSize="sm"
+                className="border-transparent bg-transparent pl-2 pr-7 font-medium text-muted-foreground hover:bg-accent hover:text-accent-foreground focus-visible:bg-accent"
+              />
+            </div>}
           </div>
         </header>
         {showDropZone && (
@@ -1062,6 +1268,32 @@ export const AssetLibraryPage = ({
         }}
         onChanged={refresh}
       />
+      {folderContextMenu && contextFolder && <>
+        <div
+          className="fixed inset-0 z-[99]"
+          aria-hidden="true"
+          onMouseDown={() => setFolderContextMenu(null)}
+          onContextMenu={(event) => {
+            event.preventDefault();
+            setFolderContextMenu(null);
+          }}
+        />
+        <Card
+          role="menu"
+          aria-label={`${contextFolder.name} 操作`}
+          style={{ left: folderContextMenu.x, top: folderContextMenu.y }}
+          padding="sm"
+          className="fixed z-[100] w-52 p-1.5 shadow-lg"
+          onMouseDown={(event) => event.stopPropagation()}
+          onContextMenu={(event) => event.preventDefault()}
+        >
+          <Button type="button" variant="ghost" size="sm" role="menuitem" onClick={() => openFolderCreator(null)} className="h-9 w-full justify-start gap-2.5 px-2.5 text-left text-xs"><FolderPlus size={15} className="text-muted-foreground" />新建文件夹</Button>
+          <Button type="button" variant="ghost" size="sm" role="menuitem" onClick={() => openFolderCreator(contextFolder.id)} className="h-9 w-full justify-start gap-2.5 px-2.5 text-left text-xs"><FolderPlus size={15} className="text-muted-foreground" />新建子文件夹</Button>
+          <Button type="button" variant="ghost" size="sm" role="menuitem" onClick={() => startRenamingFolder(contextFolder)} className="h-9 w-full justify-start gap-2.5 px-2.5 text-left text-xs"><Pencil size={15} className="text-muted-foreground" />重命名</Button>
+          <Separator className="my-1" />
+          <Button type="button" variant="ghost" size="sm" role="menuitem" onClick={() => { setFolderContextMenu(null); void deleteFolder(contextFolder); }} className="h-9 w-full justify-start gap-2.5 px-2.5 text-left text-xs text-destructive hover:bg-destructive/10 hover:text-destructive"><Trash2 size={15} />删除</Button>
+        </Card>
+      </>}
       {selectedCase && (
         <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/30 backdrop-blur-xl" role="dialog" aria-modal="true" aria-label={`${selectedCase.title}详情`} onClick={() => setSelectedCase(null)}>
           <aside className="flex h-screen w-screen flex-col overflow-hidden bg-black/25 text-white shadow-2xl backdrop-blur-xl" onClick={(event) => event.stopPropagation()}>
@@ -1069,8 +1301,8 @@ export const AssetLibraryPage = ({
               <span className="min-w-0 truncate text-sm font-semibold" title={selectedCase.title}>{selectedCase.title}</span>
               <div className="flex h-8 shrink-0 items-center gap-1 rounded-lg bg-white/10 text-white/85 backdrop-blur-xl">
                 {selectedCase.coverUrl ? <>
-                  <Button type="button" variant="ghost" size="iconSm" onClick={() => downloadCaseImage(selectedCase)} aria-label="下载图片" title="下载图片" className="h-8 w-8 text-white hover:bg-white/10 hover:text-white"><Download size={15} /></Button>
-                  <Button type="button" variant="ghost" size="iconSm" onClick={() => void saveCaseToAssets(selectedCase)} disabled={savedCaseIds.has(selectedCase.id)} aria-label={savedCaseIds.has(selectedCase.id) ? '已保存到素材' : '保存到素材'} title={savedCaseIds.has(selectedCase.id) ? '已保存到素材' : '保存到素材'} className="h-8 w-8 text-white hover:bg-white/10 hover:text-white"><BookmarkPlus size={15} /></Button>
+                  <Button type="button" variant="ghost" size="iconSm" onClick={() => downloadCaseImage(selectedCase)} aria-label={isCaseVideo(selectedCase) ? '下载视频' : '下载图片'} title={isCaseVideo(selectedCase) ? '下载视频' : '下载图片'} className="h-8 w-8 text-white hover:bg-white/10 hover:text-white"><Download size={15} /></Button>
+                  <Button type="button" variant="ghost" size="iconSm" onClick={() => void saveCaseToAssets(selectedCase)} disabled={savedCaseIds.has(selectedCase.id)} aria-label={savedCaseIds.has(selectedCase.id) ? '已收藏' : '添加至收藏'} title={savedCaseIds.has(selectedCase.id) ? '已收藏' : '添加至收藏'} className="h-8 w-8 text-white hover:bg-white/10 hover:text-white"><BookmarkPlus size={15} /></Button>
                 </> : null}
                 <Button type="button" variant="ghost" size="iconSm" onClick={() => setSelectedCase(null)} aria-label="关闭详情" title="关闭详情" className="h-8 w-8 text-white hover:bg-white/10 hover:text-white"><X size={16} /></Button>
               </div>
@@ -1078,7 +1310,9 @@ export const AssetLibraryPage = ({
             <div className="flex min-h-0 flex-1 flex-col items-stretch md:flex-row">
               <div className="relative flex min-h-[280px] min-w-0 flex-1 items-center justify-center overflow-hidden px-4 pb-4">
                 {selectedCase.coverUrl
-                  ? <img src={selectedCase.coverUrl} alt={selectedCase.title} className="block max-h-full max-w-full rounded-md object-contain" />
+                  ? isCaseVideo(selectedCase)
+                    ? <video src={selectedCase.coverUrl} controls playsInline className="max-h-full max-w-full rounded-md object-contain" />
+                    : <img src={selectedCase.coverUrl} alt={selectedCase.title} className="block max-h-full max-w-full rounded-md object-contain" />
                   : <div className="grid h-full w-full place-items-center text-sm text-white/55">暂无封面</div>}
               </div>
               <div className="flex min-h-0 w-full flex-col border-t border-white/10 bg-black/45 text-white backdrop-blur-xl md:mb-4 md:mr-2 md:max-w-[400px] md:rounded-xl md:border md:border-white/10 md:shadow-lg">

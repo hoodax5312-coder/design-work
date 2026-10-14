@@ -30,6 +30,8 @@ interface OverrideFieldProps {
   ariaLabel: string;
   value: string;
   defaultValue: string;
+  /** 默认值不在本地时（例如已保存在网关里的 Key），菜单里显示的替代文字。 */
+  defaultValueLabel?: string;
   inherited: boolean;
   placeholder: string;
   type?: 'text' | 'url' | 'password';
@@ -44,6 +46,7 @@ function OverrideField({
   ariaLabel,
   value,
   defaultValue,
+  defaultValueLabel,
   inherited,
   placeholder,
   type = 'text',
@@ -55,13 +58,13 @@ function OverrideField({
   const isSecret = type === 'password';
   const [sourceMenuOpen, setSourceMenuOpen] = useState(false);
   const sourceMenuRef = useRef<HTMLDivElement>(null);
-  const inheritedValueLabel = isSecret
+  const inheritedValueLabel = defaultValueLabel || (isSecret
     ? defaultValue
       ? defaultValue.length > 8
         ? `${defaultValue.slice(0, 4)}${'•'.repeat(6)}${defaultValue.slice(-4)}`
         : '•'.repeat(defaultValue.length)
       : '未配置通用 Key'
-    : defaultValue || '未配置通用 URL';
+    : defaultValue || '未配置通用 URL');
 
   useEffect(() => {
     if (!sourceMenuOpen) return;
@@ -193,8 +196,19 @@ export function ProviderModelCard({
     }
     const next = { ...model };
     delete next[key];
+    // 改回使用通用 Key 时，网关里保存的模型 Key 一起作废。
+    if (key === 'apiKeyOverride') delete next.apiKeyOverrideHint;
     onChange({ ...next, verification: { status: 'pending' } });
   };
+
+  // 已保存的 Key 只留在本机网关，这里只拿到掩码；自定义 Key 留空表示继续使用已保存的那把。
+  const keyInherited = !hasOverride(model, 'apiKeyOverride') && !model.apiKeyOverrideHint;
+  const savedProviderKey = provider.apiKey ? undefined : provider.apiKeyHint?.masked;
+  const keyPlaceholder = keyInherited
+    ? savedProviderKey ? `已保存 ${savedProviderKey}` : '未配置通用 Key'
+    : model.apiKeyOverrideHint
+      ? `已保存 ${model.apiKeyOverrideHint.masked}，留空继续使用`
+      : '输入当前模型的 API Key';
 
   return (
     <article className="rounded-[var(--radius)] border border-border bg-card p-4" aria-label={`${model.id} 模型配置`}>
@@ -214,10 +228,11 @@ export function ProviderModelCard({
         <OverrideField
           label="API Key"
           ariaLabel={`${model.id} API Key`}
-          value={hasOverride(model, 'apiKeyOverride') ? model.apiKeyOverride || '' : provider.apiKey}
+          value={keyInherited ? provider.apiKey : model.apiKeyOverride || ''}
           defaultValue={provider.apiKey}
-          inherited={!hasOverride(model, 'apiKeyOverride')}
-          placeholder={provider.apiKey ? '输入当前模型的 API Key' : '未配置通用 Key'}
+          defaultValueLabel={savedProviderKey}
+          inherited={keyInherited}
+          placeholder={keyPlaceholder}
           type="password"
           showValue={showKey}
           onShowValueChange={() => setShowKey((visible) => !visible)}

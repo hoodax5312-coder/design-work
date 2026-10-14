@@ -1,80 +1,97 @@
-import { useEffect, useRef } from 'react';
-import { useUIStore } from '../../stores/useUIStore';
-import { useCanvasStore } from '../../stores/useCanvasStore';
-import { useReactFlow } from '@xyflow/react';
-import { Type, Image as ImageIcon, Video, Music, Upload } from '@/lib/remixIconShim';
-import { Button, Card } from '../ui';
+import { type ReactNode } from 'react';
+import { Upload } from '@/lib/remixIconShim';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger, Kbd } from '../ui';
+import type { CanvasAnnotationKind, CanvasNodeKind } from './canvasModel';
+import { ANNOTATION_CATALOG_LIST, NODE_CATALOG_LIST } from './nodeCatalog';
 
-export const CanvasContextMenu = () => {
-  const { contextMenu, hideContextMenu } = useUIStore();
-  const { addNode: addNodeStore } = useCanvasStore();
-  const { screenToFlowPosition } = useReactFlow();
-  const menuRef = useRef<HTMLDivElement>(null);
+export interface ScreenPoint {
+  x: number;
+  y: number;
+}
 
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
-        hideContextMenu();
-      }
-    };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [hideContextMenu]);
-
-  if (!contextMenu) return null;
-
-  const handleAddNode = (type: string) => {
-    const position = screenToFlowPosition({ x: contextMenu.x, y: contextMenu.y });
-    
-    let label = '新节点';
-    switch(type) {
-      case 'text': label = '新文本节点'; break;
-      case 'imageGen': label = '新图像生成节点'; break;
-      case 'video': label = '新视频节点'; break;
-      case 'audio': label = '新音频节点'; break;
-    }
-
-    const newNode = {
-      id: crypto.randomUUID(),
-      type,
-      position,
-      data: { label }, // Initial data
-    };
-
-    addNodeStore(newNode);
-    hideContextMenu();
-  };
-
-  return (
-    <div
-      ref={menuRef}
-      style={{ top: contextMenu.y, left: contextMenu.x }}
-      className="fixed z-50"
+/** 以屏幕坐标为锚点的菜单，用于右键菜单与节点选择器。 */
+export const AnchoredMenu = ({ point, onClose, label, width = 220, onKeyDown, children }: {
+  point: ScreenPoint | null;
+  onClose: () => void;
+  label: string;
+  width?: number;
+  onKeyDown?: (event: React.KeyboardEvent<HTMLDivElement>) => void;
+  children: ReactNode;
+}) => (
+  <DropdownMenu open={Boolean(point)} onOpenChange={(open) => { if (!open) onClose(); }} modal={false}>
+    <DropdownMenuTrigger asChild>
+      <span aria-hidden="true" tabIndex={-1} className="pointer-events-none fixed h-px w-px" style={{ left: point?.x ?? -9999, top: point?.y ?? -9999 }} />
+    </DropdownMenuTrigger>
+    <DropdownMenuContent
+      aria-label={label}
+      align="start"
+      side="bottom"
+      sideOffset={4}
+      style={{ width }}
+      onCloseAutoFocus={(event) => event.preventDefault()}
+      onKeyDown={onKeyDown}
     >
-      <Card padding="sm" className="flex w-48 animate-fade-in flex-col gap-1 p-1 shadow-lg">
-      <div className="px-2 py-1.5 text-xs font-medium uppercase tracking-wider text-muted-foreground">
-        添加节点
-      </div>
-      
-      {[
-        { id: 'text', label: '文本节点', icon: Type, color: 'text-foreground' },
-        { id: 'imageGen', label: '图像生成', icon: ImageIcon, color: 'text-emerald-400' },
-        { id: 'video', label: '视频节点', icon: Video, color: 'text-foreground' },
-        { id: 'audio', label: '音频节点', icon: Music, color: 'text-blue-400' },
-        { id: 'upload', label: '上传媒体', icon: Upload, color: 'text-muted-foreground' },
-      ].map((item) => (
-        <Button
-          key={item.id}
-          variant="ghost"
-          size="sm"
-          onClick={() => handleAddNode(item.id)}
-          className="w-full justify-start gap-3 text-sm"
-        >
-          <item.icon size={16} className={item.color} />
-          {item.label}
-        </Button>
-      ))}
-      </Card>
-    </div>
-  );
-};
+      {children}
+    </DropdownMenuContent>
+  </DropdownMenu>
+);
+
+/** 新建节点的选择器：空白处双击、右键、拖出连线后松开或点击节点两侧的 ⊕ 时出现。 */
+export const NodePicker = ({ point, title, onPick, onPickAnnotation, onUpload, onClose }: {
+  point: ScreenPoint | null;
+  title: string;
+  onPick: (kind: CanvasNodeKind) => void;
+  /** 不传时不显示便签与分组（例如从连线拖出时，标注节点不能连线）。 */
+  onPickAnnotation?: (kind: CanvasAnnotationKind) => void;
+  onUpload?: () => void;
+  onClose: () => void;
+}) => (
+  <AnchoredMenu
+    point={point}
+    onClose={onClose}
+    label={title}
+    width={248}
+    onKeyDown={(event) => {
+      if (event.metaKey || event.ctrlKey || event.altKey) return;
+      const key = event.key.toLowerCase();
+      const match = NODE_CATALOG_LIST.find((item) => item.shortcut.toLowerCase() === key);
+      const annotation = onPickAnnotation && ANNOTATION_CATALOG_LIST.find((item) => item.shortcut?.toLowerCase() === key);
+      if (!match && !annotation) return;
+      event.preventDefault();
+      if (match) onPick(match.kind);
+      else if (annotation) onPickAnnotation?.(annotation.kind);
+      onClose();
+    }}
+  >
+    <DropdownMenuLabel>{title}</DropdownMenuLabel>
+    {NODE_CATALOG_LIST.map((item) => (
+      <DropdownMenuItem key={item.kind} onSelect={() => onPick(item.kind)} className="h-auto py-1.5">
+        <span className="flex items-center gap-2.5">
+          <span className="grid h-8 w-8 shrink-0 place-items-center rounded-md bg-muted text-foreground"><item.icon size={15} /></span>
+          <span className="min-w-0 flex-1">
+            <span className="block text-xs font-medium text-foreground">{item.label}</span>
+            <span className="block truncate text-[11px] text-muted-foreground">{item.hint}</span>
+          </span>
+          <Kbd>{item.shortcut}</Kbd>
+        </span>
+      </DropdownMenuItem>
+    ))}
+    {onPickAnnotation && (
+      <>
+        <DropdownMenuSeparator />
+        <DropdownMenuLabel>标注</DropdownMenuLabel>
+        {ANNOTATION_CATALOG_LIST.map((item) => (
+          <DropdownMenuItem key={item.kind} icon={item.icon} shortcut={item.shortcut} onSelect={() => onPickAnnotation(item.kind)}>
+            {item.label}
+          </DropdownMenuItem>
+        ))}
+      </>
+    )}
+    {onUpload && (
+      <>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem icon={Upload} onSelect={onUpload}>上传图片或视频</DropdownMenuItem>
+      </>
+    )}
+  </AnchoredMenu>
+);

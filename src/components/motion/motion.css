@@ -1,0 +1,194 @@
+/*
+ * 统一动效库的环境动效：光束、流光、生成中光幕。
+ * 进出场与布局过渡由 framer-motion 负责，时长与 tokens.ts 保持一致。
+ * 彩色只用于 AI 正在工作的瞬时状态，常驻界面保持中性。
+ */
+@property --motion-beam-angle {
+  syntax: '<angle>';
+  inherits: false;
+  initial-value: 0deg;
+}
+
+:root {
+  --motion-fast: 120ms;
+  --motion-base: 180ms;
+  --motion-slow: 280ms;
+  --motion-ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --motion-aurora-1: #ff9a3c;
+  --motion-aurora-2: #ff4f9a;
+  --motion-aurora-3: #8b6cff;
+  --motion-aurora-4: #3fa9ff;
+}
+
+/* ---------- Border beam ---------- */
+.motion-beam {
+  --beam-size: 1.5px;
+  --beam-duration: 3.2s;
+  --beam-offset: 1px;
+  position: absolute;
+  inset: calc(var(--beam-offset) * -1);
+  border-radius: inherit;
+  pointer-events: none;
+}
+
+.motion-beam[data-tone='aurora'] {
+  --beam-1: var(--motion-aurora-1);
+  --beam-2: var(--motion-aurora-2);
+  --beam-3: var(--motion-aurora-3);
+  --beam-4: var(--motion-aurora-4);
+}
+
+.motion-beam[data-tone='neutral'] {
+  --beam-1: color-mix(in srgb, var(--foreground) 8%, transparent);
+  --beam-2: color-mix(in srgb, var(--foreground) 40%, transparent);
+  --beam-3: color-mix(in srgb, var(--foreground) 75%, transparent);
+  --beam-4: var(--foreground);
+}
+
+.motion-beam::before,
+.motion-beam::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: var(--beam-size);
+  background: conic-gradient(
+    from var(--motion-beam-angle),
+    transparent 0 52%,
+    var(--beam-1) 66%,
+    var(--beam-2) 78%,
+    var(--beam-3) 89%,
+    var(--beam-4) 97%,
+    transparent 100%
+  );
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0);
+  animation: motion-beam-spin var(--beam-duration) linear infinite;
+}
+
+.motion-beam::after {
+  inset: -3px;
+  padding: 6px;
+  filter: blur(10px);
+  opacity: 0;
+}
+
+.motion-beam[data-glow]::after {
+  opacity: 0.6;
+}
+
+@keyframes motion-beam-spin {
+  to {
+    --motion-beam-angle: 360deg;
+  }
+}
+
+/* ---------- Shimmer text ---------- */
+.motion-shimmer {
+  --shimmer-base: color-mix(in srgb, currentColor 50%, transparent);
+  background-image: linear-gradient(100deg, var(--shimmer-base) 35%, currentColor 50%, var(--shimmer-base) 65%);
+  background-size: 220% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: motion-shimmer 1.7s linear infinite;
+}
+
+@keyframes motion-shimmer {
+  from {
+    background-position: 120% 0;
+  }
+  to {
+    background-position: -100% 0;
+  }
+}
+
+/* ---------- Aurora veil (generating placeholder) ---------- */
+.motion-aurora-veil {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  border-radius: inherit;
+  pointer-events: none;
+}
+
+.motion-aurora-veil::before {
+  content: '';
+  position: absolute;
+  inset: -40%;
+  background:
+    radial-gradient(40% 40% at 30% 30%, color-mix(in srgb, var(--motion-aurora-3) 60%, transparent), transparent 70%),
+    radial-gradient(35% 35% at 72% 38%, color-mix(in srgb, var(--motion-aurora-2) 48%, transparent), transparent 70%),
+    radial-gradient(45% 45% at 52% 76%, color-mix(in srgb, var(--motion-aurora-4) 50%, transparent), transparent 70%),
+    radial-gradient(30% 30% at 20% 80%, color-mix(in srgb, var(--motion-aurora-1) 42%, transparent), transparent 70%);
+  filter: blur(26px);
+  opacity: 0.5;
+  animation: motion-aurora-drift 7s ease-in-out infinite alternate;
+}
+
+.motion-aurora-veil::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image: linear-gradient(105deg, transparent 42%, color-mix(in srgb, var(--foreground) 10%, transparent) 50%, transparent 58%);
+  background-size: 260% 100%;
+  animation: motion-sheen 2.6s linear infinite;
+}
+
+@keyframes motion-aurora-drift {
+  0% {
+    transform: rotate(0deg) scale(1) translate(0, 0);
+  }
+  50% {
+    transform: rotate(22deg) scale(1.1) translate(4%, -3%);
+  }
+  100% {
+    transform: rotate(-16deg) scale(1.05) translate(-4%, 3%);
+  }
+}
+
+@keyframes motion-sheen {
+  from {
+    background-position: 130% 0;
+  }
+  to {
+    background-position: -130% 0;
+  }
+}
+
+/* ---------- Small CSS-only entrances (tooltips) ---------- */
+.motion-pop-in {
+  animation: motion-pop-in var(--motion-fast) var(--motion-ease-out);
+}
+
+@keyframes motion-pop-in {
+  from {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .motion-beam::before,
+  .motion-beam::after,
+  .motion-shimmer,
+  .motion-aurora-veil::before,
+  .motion-aurora-veil::after,
+  .motion-pop-in {
+    animation: none;
+  }
+
+  .motion-beam::before,
+  .motion-beam::after {
+    --motion-beam-angle: 210deg;
+  }
+
+  .motion-shimmer {
+    background-position: 50% 0;
+  }
+}

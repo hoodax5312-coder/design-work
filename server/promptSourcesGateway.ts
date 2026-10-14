@@ -126,6 +126,9 @@ const normalizeItems = (value: unknown, sourceId: string, sourceUrl: string) => 
         author: typeof object.author === 'string' ? object.author : '',
         sourceUrl: typeof object.sourceUrl === 'string' ? object.sourceUrl : sourceUrl,
         imageModel: typeof object.imageModel === 'string' ? object.imageModel : '',
+        mediaType: typeof object.mediaType === 'string'
+          ? object.mediaType
+          : typeof object.type === 'string' ? object.type : undefined,
       },
     ];
   });

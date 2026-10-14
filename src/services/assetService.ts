@@ -28,6 +28,16 @@ const normalizeAssetPage = (page: Partial<AssetPage> | null | undefined): AssetP
   total: Number.isFinite(page?.total) ? Number(page?.total) : 0,
   limit: Number.isFinite(page?.limit) ? Number(page?.limit) : 0,
   offset: Number.isFinite(page?.offset) ? Number(page?.offset) : 0,
+  counts: {
+    all: Number.isFinite(page?.counts?.all) ? Number(page?.counts?.all) : 0,
+    unfiled: Number.isFinite(page?.counts?.unfiled) ? Number(page?.counts?.unfiled) : 0,
+    byType: Object.fromEntries(
+      Object.entries(page?.counts?.byType || {}).map(([type, count]) => [
+        type,
+        Number.isFinite(count) ? Number(count) : 0,
+      ]),
+    ),
+  },
 });
 
 const normalizeTag = (tag: Record<string, unknown>): AssetTag => ({
@@ -45,9 +55,11 @@ export interface AssetQuery {
   query?: string;
   type?: string;
   folderId?: string;
+  unfiled?: boolean;
   tagId?: string;
   tagIds?: string[];
   favorite?: boolean;
+  origin?: 'generated' | 'canvas' | 'uploaded';
   status?: string;
   sort?: string;
   limit?: number;
@@ -55,13 +67,14 @@ export interface AssetQuery {
 }
 
 export const assetService = {
-  cases: (query = '') => request<{ items: Array<{ id: string; sourceId: string; title: string; prompt: string; description: string; coverUrl: string | null; tags: string[]; author: string; sourceUrl: string; imageModel: string }>; total: number; sources: Array<{ id: string; name: string; homepageUrl: string | null; itemCount: number }> }>(`/api/cases?query=${encodeURIComponent(query)}`),
+  cases: (query = '') => request<{ items: Array<{ id: string; sourceId: string; title: string; prompt: string; description: string; coverUrl: string | null; tags: string[]; author: string; sourceUrl: string; imageModel: string; mediaType?: string }>; total: number; sources: Array<{ id: string; name: string; homepageUrl: string | null; itemCount: number }> }>(`/api/cases?query=${encodeURIComponent(query)}`),
   create: (input: {
     type: string;
     title: string;
     description?: string;
     primaryFolderId?: string | null;
     sourceUrl?: string;
+    favorite?: boolean;
     userMetadata?: Record<string, unknown>;
   }) => request<AssetSummary>('/api/assets', json(input)),
   list: async (query: AssetQuery = {}) => {
@@ -92,11 +105,27 @@ export const assetService = {
     if (!response.ok) throw new Error('删除资产失败');
   },
   restore: (id: string) => request<AssetDetail>(`/api/assets/${id}/restore`, { method: 'POST' }),
+  /** 在访达中显示原文件。 */
+  reveal: (id: string) => request<{ ok: true }>(`/api/assets/${id}/reveal`, { method: 'POST' }),
+  /** 网关弹窗选择文件夹后复制原文件；取消时 cancelled 为 true。 */
+  exportFile: (id: string) =>
+    request<{ cancelled: boolean; path?: string }>(`/api/assets/${id}/export`, { method: 'POST' }),
   folders: async () => {
     const result = await request<{ items?: AssetFolder[] }>('/api/assets/folders');
     return Array.isArray(result.items) ? result.items : [];
   },
-  createFolder: (name: string) => request<AssetFolder>('/api/assets/folders', json({ name })),
+  createFolder: (name: string, parentId: string | null = null) =>
+    request<AssetFolder>('/api/assets/folders', json({ name, parentId })),
+  renameFolder: (id: string, name: string) =>
+    request<AssetFolder>(`/api/assets/folders/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name }),
+    }),
+  deleteFolder: async (id: string) => {
+    const response = await fetch(`/api/assets/folders/${id}`, { method: 'DELETE' });
+    if (!response.ok) throw new Error('删除文件夹失败');
+  },
   tags: async () => {
     const result = await request<{ items?: Array<Record<string, unknown>> }>('/api/assets/tags');
     return (Array.isArray(result.items) ? result.items : []).map(normalizeTag);

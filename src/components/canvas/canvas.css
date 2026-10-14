@@ -1,0 +1,629 @@
+/*
+ * 画布模块样式。所有规则都挂在 .lizuo-canvas 下，不影响其他模块。
+ * 常驻界面保持中性；彩色只在节点生成中出现（光束、流动连线）。
+ */
+.lizuo-canvas {
+  /* 与其他模块面板同为白底，外层灰色只留给导航与工作区边距。 */
+  --canvas-bg: var(--module-workspace-bg, var(--background));
+  --canvas-dot: color-mix(in srgb, transparent, var(--foreground) 16%);
+  --canvas-edge: color-mix(in srgb, transparent, var(--foreground) 26%);
+  --canvas-edge-active: color-mix(in srgb, transparent, var(--foreground) 72%);
+  --canvas-card: var(--card);
+  --canvas-card-border: color-mix(in srgb, transparent, var(--foreground) 9%);
+  --canvas-chrome: color-mix(in srgb, var(--card) 90%, transparent);
+  --canvas-chrome-border: color-mix(in srgb, transparent, var(--foreground) 8%);
+  --canvas-shadow: 0 1px 2px rgb(0 0 0 / 0.04), 0 8px 24px rgb(0 0 0 / 0.07);
+  --canvas-shadow-lg: 0 2px 6px rgb(0 0 0 / 0.05), 0 18px 44px rgb(0 0 0 / 0.12);
+  --xy-selection-background-color: color-mix(in srgb, transparent, var(--foreground) 5%);
+  --xy-selection-border: 1px solid color-mix(in srgb, transparent, var(--foreground) 32%);
+  --xy-edge-stroke: var(--canvas-edge);
+  --xy-connectionline-stroke: var(--canvas-edge-active);
+  background: var(--canvas-bg);
+  /* 画布本身就是工作区里唯一的一层面板：白底、描边、圆角都跟随主题的面板变量。 */
+  border: var(--surface-panel-border-width, 1px) solid var(--surface-panel-border, var(--border));
+  border-radius: var(--surface-panel-radius, var(--radius));
+  font-family: var(--font-pingfang);
+}
+
+/* 浮动侧栏样式下工作区外壳已有描边，画布不再重复一道。 */
+.ui-app-shell:not(.ui-app-shell-embedded) .lizuo-canvas {
+  border: 0;
+}
+
+.dark .lizuo-canvas,
+.lizuo-canvas:where(.dark *) {
+  --canvas-shadow: 0 1px 2px rgb(0 0 0 / 0.3), 0 10px 28px rgb(0 0 0 / 0.32);
+  --canvas-shadow-lg: 0 2px 8px rgb(0 0 0 / 0.35), 0 20px 48px rgb(0 0 0 / 0.45);
+}
+
+.lizuo-canvas .react-flow {
+  --xy-background-color: transparent;
+}
+
+.lizuo-canvas .react-flow__pane {
+  cursor: default;
+}
+
+.lizuo-canvas[data-tool='pan'] .react-flow__pane,
+.lizuo-canvas[data-space-pan] .react-flow__pane {
+  cursor: grab;
+}
+
+.lizuo-canvas .react-flow__pane.dragging {
+  cursor: grabbing;
+}
+
+.lizuo-canvas .react-flow__attribution,
+.lizuo-canvas .react-flow__controls {
+  display: none;
+}
+
+/* ---------- 浮动控件 ---------- */
+.canvas-chrome {
+  background: var(--canvas-chrome);
+  border: 1px solid var(--canvas-chrome-border);
+  box-shadow: var(--canvas-shadow);
+  backdrop-filter: blur(18px) saturate(140%);
+  -webkit-backdrop-filter: blur(18px) saturate(140%);
+}
+
+.canvas-icon-button {
+  display: inline-grid;
+  place-items: center;
+  height: 32px;
+  width: 32px;
+  flex-shrink: 0;
+  border-radius: calc(var(--radius) - 2px);
+  color: var(--muted-foreground);
+  transition: background-color var(--motion-fast) var(--motion-ease-out), color var(--motion-fast) var(--motion-ease-out);
+}
+
+.canvas-icon-button:hover {
+  background: var(--accent);
+  color: var(--accent-foreground);
+}
+
+.canvas-icon-button:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 1px;
+}
+
+.canvas-icon-button[data-active] {
+  background: var(--foreground);
+  color: var(--background);
+}
+
+.canvas-icon-button:disabled {
+  pointer-events: none;
+  opacity: 0.4;
+}
+
+/* ---------- 节点 ---------- */
+.lizuo-canvas .react-flow__node {
+  font-family: inherit;
+}
+
+.canvas-node-card {
+  position: relative;
+  border-radius: calc(var(--radius) + 4px);
+  background: var(--canvas-card);
+  border: 1px solid var(--canvas-card-border);
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.04);
+  transition: box-shadow var(--motion-base) var(--motion-ease-out), border-color var(--motion-base) var(--motion-ease-out);
+}
+
+.react-flow__node:hover .canvas-node-card {
+  border-color: color-mix(in srgb, transparent, var(--foreground) 18%);
+}
+
+.react-flow__node.selected .canvas-node-card {
+  border-color: var(--foreground);
+  box-shadow: 0 0 0 1px var(--foreground), var(--canvas-shadow);
+}
+
+.canvas-node-label {
+  position: absolute;
+  bottom: 100%;
+  left: 2px;
+  right: 2px;
+  display: flex;
+  height: 26px;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--muted-foreground);
+  transition: color var(--motion-fast) var(--motion-ease-out);
+}
+
+.react-flow__node.selected .canvas-node-label {
+  color: var(--foreground);
+}
+
+/* ---------- 连接点：悬停或选中时出现的 “+” ---------- */
+/* 连接点本身贴在卡片边缘（连线从这里出入），可见的 “+” 气泡向外偏移。 */
+.lizuo-canvas .canvas-handle {
+  height: 2px;
+  width: 2px;
+  min-width: 0;
+  min-height: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+
+.lizuo-canvas .canvas-handle.react-flow__handle-left {
+  left: 0;
+  transform: translate(-50%, -50%);
+}
+
+.lizuo-canvas .canvas-handle.react-flow__handle-right {
+  right: 0;
+  left: auto;
+  transform: translate(50%, -50%);
+}
+
+.lizuo-canvas .canvas-handle-bubble {
+  position: absolute;
+  top: 50%;
+  display: grid;
+  place-items: center;
+  height: 26px;
+  width: 26px;
+  border-radius: 999px;
+  border: 1px solid var(--canvas-chrome-border);
+  background: var(--canvas-card);
+  color: var(--muted-foreground);
+  box-shadow: var(--canvas-shadow);
+  opacity: 0;
+  cursor: crosshair;
+  transform: translate(0, -50%) scale(0.7);
+  transition: opacity var(--motion-base) var(--motion-ease-out), transform var(--motion-base) var(--motion-ease-out), background-color var(--motion-fast), color var(--motion-fast);
+}
+
+.lizuo-canvas .react-flow__handle-left .canvas-handle-bubble {
+  right: 14px;
+}
+
+.lizuo-canvas .react-flow__handle-right .canvas-handle-bubble {
+  left: 14px;
+}
+
+.lizuo-canvas .canvas-handle-bubble > svg {
+  pointer-events: none;
+}
+
+/* 扩大命中区域，覆盖卡片与 “+” 之间的空隙，鼠标移过去时不会丢失悬停。 */
+.lizuo-canvas .canvas-handle-bubble::before {
+  content: '';
+  position: absolute;
+  inset: -10px -16px;
+}
+
+.lizuo-canvas .react-flow__node:hover .canvas-handle-bubble,
+.lizuo-canvas .react-flow__node.selected .canvas-handle-bubble,
+.lizuo-canvas[data-connecting] .canvas-handle-bubble {
+  opacity: 1;
+  transform: translate(0, -50%) scale(1);
+}
+
+.lizuo-canvas .canvas-handle-bubble:hover,
+.lizuo-canvas .canvas-handle.connectingto .canvas-handle-bubble {
+  background: var(--foreground);
+  color: var(--background);
+  border-color: var(--foreground);
+}
+
+.lizuo-canvas .canvas-handle.connectingto:not(.valid) .canvas-handle-bubble {
+  background: var(--destructive);
+  border-color: var(--destructive);
+  color: var(--destructive-foreground);
+}
+
+/* ---------- 缩放控件 ---------- */
+.lizuo-canvas .canvas-resize-handle.react-flow__resize-control.handle {
+  height: 10px;
+  width: 10px;
+  border-radius: 3px;
+  border: 1.5px solid var(--foreground);
+  background: var(--canvas-card);
+  opacity: 0;
+  transition: opacity var(--motion-fast);
+}
+
+.lizuo-canvas .react-flow__node.selected .canvas-resize-handle.react-flow__resize-control.handle {
+  opacity: 1;
+}
+
+.lizuo-canvas .canvas-resize-line.react-flow__resize-control.line {
+  border-color: transparent;
+}
+
+/* ---------- 连线 ---------- */
+.canvas-edge-path {
+  fill: none;
+  stroke: var(--canvas-edge);
+  stroke-width: 1.5;
+  transition: stroke var(--motion-base) var(--motion-ease-out);
+}
+
+.react-flow__edge:hover .canvas-edge-path,
+.react-flow__edge.selected .canvas-edge-path,
+.canvas-edge-path[data-highlight] {
+  stroke: var(--canvas-edge-active);
+}
+
+.canvas-edge-path[data-running] {
+  stroke: var(--motion-aurora-3);
+  stroke-dasharray: 5 7;
+  animation: canvas-edge-flow 0.7s linear infinite;
+}
+
+@keyframes canvas-edge-flow {
+  to {
+    stroke-dashoffset: -12;
+  }
+}
+
+.lizuo-canvas .react-flow__connection-path {
+  stroke: var(--canvas-edge-active);
+  stroke-width: 1.5;
+  stroke-dasharray: 4 5;
+}
+
+/* ---------- 小地图 ---------- */
+.lizuo-canvas .react-flow__minimap {
+  margin: 0;
+  overflow: hidden;
+  border-radius: calc(var(--radius) + 4px);
+  background: var(--canvas-chrome);
+  border: 1px solid var(--canvas-chrome-border);
+  box-shadow: var(--canvas-shadow);
+  backdrop-filter: blur(18px);
+}
+
+/* ---------- 生成中的骨架 ---------- */
+.canvas-skeleton-line {
+  height: 8px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, color-mix(in srgb, transparent, var(--foreground) 6%) 0%, color-mix(in srgb, transparent, var(--foreground) 14%) 50%, color-mix(in srgb, transparent, var(--foreground) 6%) 100%);
+  background-size: 200% 100%;
+  animation: canvas-skeleton 1.4s var(--motion-ease-out) infinite;
+}
+
+@keyframes canvas-skeleton {
+  from {
+    background-position: 100% 0;
+  }
+  to {
+    background-position: -100% 0;
+  }
+}
+
+.canvas-prompt-field {
+  field-sizing: content;
+}
+
+/* 输入框外层容器已用 focus-within 表示焦点，这里不再叠加全局 focus 轮廓。 */
+.canvas-prompt-field:focus-visible {
+  outline: none;
+}
+
+.lizuo-canvas .canvas-prompt-panel:focus-within {
+  border-color: color-mix(in srgb, var(--canvas-chrome-border), var(--foreground) 32%);
+}
+
+/* ---------- 生成结果：切换历史结果、新画面淡入 ---------- */
+/* 叠在画面上，用固定的深色底保证在任意画面上都看得清。 */
+.canvas-result-switcher {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 2;
+  display: flex;
+  height: 26px;
+  align-items: center;
+  gap: 1px;
+  padding: 0 3px;
+  border-radius: 999px;
+  background: rgb(0 0 0 / 0.55);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 500;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  opacity: 0;
+  transform: translateY(-2px);
+  transition: opacity var(--motion-fast) var(--motion-ease-out), transform var(--motion-fast) var(--motion-ease-out);
+}
+
+.react-flow__node:hover .canvas-result-switcher,
+.react-flow__node.selected .canvas-result-switcher,
+.canvas-result-switcher.is-open,
+.canvas-result-switcher:focus-within {
+  opacity: 1;
+  transform: none;
+}
+
+.canvas-result-switcher button {
+  display: inline-grid;
+  height: 20px;
+  width: 20px;
+  place-items: center;
+  border-radius: 999px;
+  color: inherit;
+  transition: background-color var(--motion-fast) var(--motion-ease-out);
+}
+
+.canvas-result-switcher button:hover {
+  background: rgb(255 255 255 / 0.18);
+}
+
+.canvas-result-switcher button:focus-visible {
+  outline: 2px solid #fff;
+  outline-offset: 0;
+}
+
+.canvas-result-switcher button:disabled {
+  pointer-events: none;
+  opacity: 0.4;
+}
+
+/* 只在开始时淡入（backwards）：结束后让生成中的半透明、模糊类名继续生效。 */
+.canvas-media-enter {
+  animation: canvas-media-enter var(--motion-base) var(--motion-ease-out) backwards;
+}
+
+@keyframes canvas-media-enter {
+  from {
+    opacity: 0;
+    transform: scale(1.015);
+  }
+}
+
+/* ---------- 便签 ---------- */
+/* 便签颜色是用户内容的一部分，保持低饱和；小地图也读取这些变量。 */
+.lizuo-canvas {
+  --canvas-note-neutral-fill: #f4f4f5;
+  --canvas-note-neutral-text: #3f3f46;
+  --canvas-note-neutral-border: #e4e4e7;
+  --canvas-note-amber-fill: #fdf3d3;
+  --canvas-note-amber-text: #5c4813;
+  --canvas-note-amber-border: #f1df9f;
+  --canvas-note-sky-fill: #e4f0fb;
+  --canvas-note-sky-text: #1f4466;
+  --canvas-note-sky-border: #c5ddf3;
+  --canvas-note-mint-fill: #e3f4ea;
+  --canvas-note-mint-text: #1f5236;
+  --canvas-note-mint-border: #c1e4cf;
+  --canvas-note-rose-fill: #fbe7eb;
+  --canvas-note-rose-text: #6b2433;
+  --canvas-note-rose-border: #f2c8d1;
+}
+
+.dark .lizuo-canvas,
+.lizuo-canvas:where(.dark *) {
+  --canvas-note-neutral-fill: #2a2a2e;
+  --canvas-note-neutral-text: #e4e4e7;
+  --canvas-note-neutral-border: #3a3a40;
+  --canvas-note-amber-fill: #37301f;
+  --canvas-note-amber-text: #f3e2b3;
+  --canvas-note-amber-border: #54482a;
+  --canvas-note-sky-fill: #1f2d3b;
+  --canvas-note-sky-text: #cfe3f7;
+  --canvas-note-sky-border: #2f465c;
+  --canvas-note-mint-fill: #1f3229;
+  --canvas-note-mint-text: #cdeedb;
+  --canvas-note-mint-border: #2f4c3d;
+  --canvas-note-rose-fill: #382328;
+  --canvas-note-rose-text: #f6d3da;
+  --canvas-note-rose-border: #55343e;
+}
+
+.canvas-note[data-tint='neutral'],
+.canvas-note-swatch[data-tint='neutral'] {
+  --note-fill: var(--canvas-note-neutral-fill);
+  --note-text: var(--canvas-note-neutral-text);
+  --note-border: var(--canvas-note-neutral-border);
+}
+
+.canvas-note[data-tint='amber'],
+.canvas-note-swatch[data-tint='amber'] {
+  --note-fill: var(--canvas-note-amber-fill);
+  --note-text: var(--canvas-note-amber-text);
+  --note-border: var(--canvas-note-amber-border);
+}
+
+.canvas-note[data-tint='sky'],
+.canvas-note-swatch[data-tint='sky'] {
+  --note-fill: var(--canvas-note-sky-fill);
+  --note-text: var(--canvas-note-sky-text);
+  --note-border: var(--canvas-note-sky-border);
+}
+
+.canvas-note[data-tint='mint'],
+.canvas-note-swatch[data-tint='mint'] {
+  --note-fill: var(--canvas-note-mint-fill);
+  --note-text: var(--canvas-note-mint-text);
+  --note-border: var(--canvas-note-mint-border);
+}
+
+.canvas-note[data-tint='rose'],
+.canvas-note-swatch[data-tint='rose'] {
+  --note-fill: var(--canvas-note-rose-fill);
+  --note-text: var(--canvas-note-rose-text);
+  --note-border: var(--canvas-note-rose-border);
+}
+
+.canvas-note {
+  position: relative;
+  display: flex;
+  height: 100%;
+  width: 100%;
+  border-radius: calc(var(--radius) + 2px);
+  background: var(--note-fill, var(--canvas-note-amber-fill));
+  border: 1px solid var(--note-border, var(--canvas-note-amber-border));
+  color: var(--note-text, var(--canvas-note-amber-text));
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.04), 0 6px 16px rgb(0 0 0 / 0.05);
+  transition: box-shadow var(--motion-base) var(--motion-ease-out), border-color var(--motion-base) var(--motion-ease-out);
+}
+
+.react-flow__node.selected .canvas-note {
+  border-color: var(--foreground);
+  box-shadow: 0 0 0 1px var(--foreground), var(--canvas-shadow);
+}
+
+.canvas-note[data-editing] {
+  cursor: text;
+}
+
+.canvas-note-text {
+  min-height: 0;
+  width: 100%;
+  flex: 1;
+  overflow: hidden;
+  padding: 12px 14px;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: 13px;
+  line-height: 20px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  resize: none;
+  outline: none;
+}
+
+textarea.canvas-note-text {
+  overflow-y: auto;
+}
+
+.canvas-note-text::placeholder,
+.canvas-note-placeholder {
+  color: inherit;
+  opacity: 0.5;
+}
+
+.canvas-note-lock {
+  position: absolute;
+  right: 8px;
+  bottom: 8px;
+  display: flex;
+  opacity: 0.6;
+}
+
+.canvas-note-swatch {
+  display: inline-grid;
+  height: 32px;
+  width: 26px;
+  place-items: center;
+  border-radius: calc(var(--radius) - 2px);
+  transition: background-color var(--motion-fast) var(--motion-ease-out);
+}
+
+.canvas-note-swatch::before {
+  content: '';
+  height: 16px;
+  width: 16px;
+  border-radius: 999px;
+  background: var(--note-fill);
+  border: 1px solid color-mix(in srgb, var(--note-border), var(--foreground) 12%);
+  transition: box-shadow var(--motion-fast) var(--motion-ease-out);
+}
+
+.canvas-note-swatch:hover {
+  background: var(--accent);
+}
+
+.canvas-note-swatch:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 1px;
+}
+
+.canvas-note-swatch[data-active]::before {
+  box-shadow: 0 0 0 2px var(--card), 0 0 0 3.5px var(--foreground);
+}
+
+/* ---------- 分组 ---------- */
+/* 类型名 group 会套上 xyflow 内置分组节点的样式（内边距、描边、底色、阴影），这里全部清掉。 */
+.lizuo-canvas .react-flow__node-group {
+  --xy-node-boxshadow-hover: none;
+  --xy-node-boxshadow-selected: none;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+}
+
+.canvas-group {
+  position: relative;
+  height: 100%;
+  width: 100%;
+  border-radius: calc(var(--radius) + 6px);
+  background: color-mix(in srgb, transparent, var(--foreground) 3.5%);
+  border: 1px dashed color-mix(in srgb, transparent, var(--foreground) 20%);
+  transition: background-color var(--motion-base) var(--motion-ease-out), border-color var(--motion-base) var(--motion-ease-out);
+}
+
+.react-flow__node:hover .canvas-group {
+  border-color: color-mix(in srgb, transparent, var(--foreground) 32%);
+}
+
+.canvas-group[data-selected] {
+  border-style: solid;
+  border-color: var(--foreground);
+  background: color-mix(in srgb, transparent, var(--foreground) 5%);
+}
+
+/* 标题放在框内左上角，选中时的工具条在框外，两者不互相遮挡。 */
+.canvas-group-title {
+  position: absolute;
+  top: 10px;
+  left: 12px;
+  right: 12px;
+  display: flex;
+  height: 20px;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 16px;
+  color: var(--muted-foreground);
+  transition: color var(--motion-fast) var(--motion-ease-out);
+}
+
+.canvas-group[data-selected] .canvas-group-title {
+  color: var(--foreground);
+}
+
+.canvas-group-title [data-empty] {
+  font-weight: 400;
+  color: var(--muted-foreground);
+}
+
+.canvas-group-count {
+  flex-shrink: 0;
+  font-size: 11px;
+  font-weight: 400;
+  font-variant-numeric: tabular-nums;
+  color: var(--muted-foreground);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .canvas-edge-path[data-running],
+  .canvas-skeleton-line,
+  .canvas-media-enter {
+    animation: none;
+  }
+
+  .canvas-result-switcher {
+    transition: none;
+  }
+
+  .lizuo-canvas .canvas-handle-bubble {
+    transition: none;
+  }
+}

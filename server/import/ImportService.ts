@@ -247,7 +247,7 @@ export class ImportService {
               description,
               item.decision === 'keep_separate' ? null : hash,
               folderId,
-              JSON.stringify(item.userOverrides),
+              JSON.stringify({ ...item.userOverrides, source: 'local-upload' }),
               now,
               now,
               now,

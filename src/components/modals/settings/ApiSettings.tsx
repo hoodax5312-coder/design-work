@@ -1,16 +1,20 @@
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { Check, ChevronDown, Eye, EyeOff, Pencil, Plus, Power, Server, Trash2, Wifi } from '@/lib/remixIconShim';
+import { Check, ChevronDown, Download, Eye, EyeOff, Pencil, Plus, Power, Server, Trash2, Wifi } from '@/lib/remixIconShim';
 import {
   getConfiguredModels,
   getSelectedModel,
   invalidateProviderModels,
+  isProviderSaved,
   markModelsPending,
   migrateProviderStateV6,
+  modelKeyHintUsable,
+  providerKeyHintUsable,
+  setModelsInCategory,
 } from '../../../lib/providerConnections';
 import { normalizeProviderBaseUrl } from '../../../lib/providerConfig';
 import { cn } from '../../../lib/utils';
-import { testProviderModel } from '../../../services/providerService';
+import { listProviderModels, testProviderModel } from '../../../services/providerService';
 import {
   providerDefaults,
   useProviderStore,
@@ -19,14 +23,18 @@ import {
   type ProviderModel,
   type ProviderProtocol,
 } from '../../../stores/useProviderStore';
+import type { ProviderModelInfo } from '../../../types/provider';
 import { Badge, Button, Card, Input, Select } from '../../ui';
 import { ProviderModelCard } from './ProviderModelCard';
+import { ProviderModelPicker } from './ProviderModelPicker';
 
 const categories: Array<{ id: ModelCategory; label: string }> = [
   { id: 'language', label: '文本' },
   { id: 'image', label: '生图' },
   { id: 'video', label: '视频' },
 ];
+
+const categoryLabels = Object.fromEntries(categories.map(({ id, label }) => [id, label])) as Record<ModelCategory, string>;
 
 const statusLabels = {
   pending: '待重新验证',
@@ -53,15 +61,28 @@ const providerHost = (baseUrl: string) => {
   }
 };
 
-const isProviderSaved = (provider: ProviderConfig | undefined) => Boolean(
-  provider?.savedAt || provider?.apiKey.trim() || provider?.models.length,
-);
-
 const isUnsupportedModelListError = (message: string) =>
   /模型列表|models|not found|unsupported|\b404\b|\b405\b/i.test(message);
 
 const hasOverride = (model: ProviderModel, key: 'baseUrlOverride' | 'apiKeyOverride') =>
   Object.prototype.hasOwnProperty.call(model, key);
+
+const keyHostChanged = (modelId?: string) => modelId
+  ? `模型 ${modelId} 的 Base URL 域名（host）与保存时不同，已保存的 API Key 不会发送到新地址，请重新填写这个模型的 API Key`
+  : 'Base URL 的域名（host）与保存时不同，已保存的 API Key 不会发送到新地址，请重新填写通用 API Key';
+
+/** Key 留空时沿用网关里已保存的 Key，前提是要发往的地址没有超出保存时的范围。 */
+const providerKeyError = (provider: ProviderConfig) => {
+  if (provider.apiKey.trim()) return '';
+  if (!provider.apiKeyHint) return '请填写通用 API Key';
+  return providerKeyHintUsable(provider) ? '' : keyHostChanged();
+};
+
+const modelKeyError = (provider: ProviderConfig, model: ProviderModel) => {
+  if (model.apiKeyOverride?.trim()) return '';
+  if (model.apiKeyOverrideHint) return modelKeyHintUsable(provider, model) ? '' : keyHostChanged(model.id);
+  return hasOverride(model, 'apiKeyOverride') ? `模型 ${model.id} 已选择自定义 Key，请填写完整` : '';
+};
 
 const normalizeProvider = (provider: ProviderConfig): ProviderConfig => ({
   ...provider,
@@ -84,7 +105,8 @@ const normalizeProvider = (provider: ProviderConfig): ProviderConfig => ({
 const validateProvider = (provider: ProviderConfig) => {
   if (!provider.name.trim()) return '请填写厂商名称';
   if (!provider.baseUrl.trim()) return '请填写通用 Base URL';
-  if (!provider.apiKey.trim()) return '请填写通用 API Key';
+  const providerKey = providerKeyError(provider);
+  if (providerKey) return providerKey;
   if (!provider.models.length) return '请至少添加一个模型';
   const seen = new Set<string>();
   for (const model of provider.models) {
@@ -95,9 +117,8 @@ const validateProvider = (provider: ProviderConfig) => {
     if (hasOverride(model, 'baseUrlOverride') && !model.baseUrlOverride?.trim()) {
       return `模型 ${model.id} 已选择自定义 URL，请填写完整`;
     }
-    if (hasOverride(model, 'apiKeyOverride') && !model.apiKeyOverride?.trim()) {
-      return `模型 ${model.id} 已选择自定义 Key，请填写完整`;
-    }
+    const modelKey = modelKeyError(provider, model);
+    if (modelKey) return modelKey;
   }
   return '';
 };
@@ -106,21 +127,47 @@ interface ApiSettingsProps {
   onEditingChange?: (editing: boolean) => void;
 }
 
-export function ApiSettings({ onEditingChange }: ApiSettingsProps) {
+export function ApiSettings(props: ApiSettingsProps) {
+  const status = useProviderStore((state) => state.status);
+  const error = useProviderStore((state) => state.error);
+  const load = useProviderStore((state) => state.load);
+
+  // App 启动时已经开始读取，这里只是兜底；读取完成前不渲染列表，不会误显示“尚未添加”。
+  useEffect(() => {
+    if (status === 'idle') void load();
+  }, [status, load]);
+
+  if (status === 'ready') return <ApiSettingsContent {...props} />;
+  if (status === 'error') {
+    return (
+      <div role="alert" className="flex min-h-56 flex-col items-center justify-center text-center">
+        <p className="text-sm font-semibold">API 配置没有读取成功</p>
+        <p className="mt-1 max-w-md text-xs leading-5 text-red-600 dark:text-red-300">{error}</p>
+        <Button type="button" onClick={() => void load()} variant="ghost" size="sm" className="mt-4 h-8">重新读取</Button>
+      </div>
+    );
+  }
+  return <p role="status" className="flex min-h-56 items-center justify-center text-xs text-muted-foreground">正在读取 API 配置…</p>;
+}
+
+function ApiSettingsContent({ onEditingChange }: ApiSettingsProps) {
   const {
     providers,
     activeProviderIds,
-    upsertProvider,
-    replaceProviders,
+    syncError,
+    clearSyncError,
+    saveProvider: saveProviderConfig,
+    importProviders: importProviderConfig,
+    exportProviders: exportProviderConfig,
     setActiveProvider,
     removeProvider,
   } = useProviderStore();
   const importInputRef = useRef<HTMLInputElement>(null);
   const headerActionsTarget =
     typeof document === 'undefined' ? null : document.getElementById('settings-header-actions');
-  const initialProvider = providers.find(isProviderSaved) || providers[0];
   const [draft, setDraft] = useState<ProviderConfig | null>(() =>
-    isProviderSaved(initialProvider) ? null : initialProvider || makeProvider());
+    providers.some(isProviderSaved) ? null : providers[0] || makeProvider());
+  const [saving, setSaving] = useState(false);
   const [testingTarget, setTestingTarget] = useState('');
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [expandedProviderIds, setExpandedProviderIds] = useState<Set<string>>(() => new Set());
@@ -141,16 +188,26 @@ export function ApiSettings({ onEditingChange }: ApiSettingsProps) {
     setMessage(null);
   };
 
-  const saveProvider = () => {
-    if (!draft) return;
+  const saveProvider = async () => {
+    if (!draft || saving) return;
     const error = validateProvider(draft);
     if (error) {
       setMessage({ type: 'error', text: error });
       return;
     }
     const provider = normalizeProvider(draft);
-    upsertProvider(provider);
-    if (!savedProviders.length) {
+    const firstProvider = !savedProviders.length;
+    setSaving(true);
+    setMessage(null);
+    try {
+      await saveProviderConfig(provider);
+    } catch (saveError) {
+      setMessage({ type: 'error', text: saveError instanceof Error ? saveError.message : '保存失败' });
+      return;
+    } finally {
+      setSaving(false);
+    }
+    if (firstProvider) {
       categories.forEach(({ id }) => {
         if (getConfiguredModels(provider, id).length) setActiveProvider(id, provider.id);
       });
@@ -159,28 +216,12 @@ export function ApiSettings({ onEditingChange }: ApiSettingsProps) {
     setMessage({ type: 'success', text: `${provider.name} 已保存，模型默认继承通用连接` });
   };
 
-  const testCommonConnection = async (provider: ProviderConfig, activeCategory: ModelCategory) => {
-    const model = getConfiguredModels(provider, activeCategory)[0] || provider.models[0];
-    const category = model?.categories[0];
-    if (!model || !category) {
-      setMessage({ type: 'error', text: '请先添加一个模型再测试通用连接' });
-      return;
-    }
-    if (!provider.baseUrl.trim() || !provider.apiKey.trim()) {
-      setMessage({ type: 'error', text: '请先填写通用 Base URL 和 API Key' });
-      return;
-    }
-    const commonModel = { ...model };
-    delete commonModel.baseUrlOverride;
-    delete commonModel.apiKeyOverride;
-    const testProvider = {
-      ...provider,
-      models: provider.models.map((item) => item.id === model.id ? commonModel : item),
-    };
+  // 通用连接只读取模型列表，不需要先添加模型。
+  const testCommonConnection = async (provider: ProviderConfig) => {
     setTestingTarget('common');
     setMessage(null);
     try {
-      const result = await testProviderModel(testProvider, category, model.id);
+      const result = await listProviderModels(provider);
       setMessage({ type: 'success', text: `通用连接验证通过，发现 ${result.models.length} 个模型，未发起生成` });
     } catch (error) {
       setMessage({ type: 'error', text: error instanceof Error ? error.message : '连接失败' });
@@ -192,9 +233,13 @@ export function ApiSettings({ onEditingChange }: ApiSettingsProps) {
   const testModel = async (provider: ProviderConfig, category: ModelCategory, modelId: string) => {
     const model = provider.models.find((item) => item.id === modelId);
     if (!model) return;
-    if ((hasOverride(model, 'baseUrlOverride') && !model.baseUrlOverride?.trim())
-      || (hasOverride(model, 'apiKeyOverride') && !model.apiKeyOverride?.trim())) {
+    if (hasOverride(model, 'baseUrlOverride') && !model.baseUrlOverride?.trim()) {
       setMessage({ type: 'error', text: `请先完整填写模型 ${modelId} 的自定义连接` });
+      return;
+    }
+    const keyError = modelKeyError(provider, model);
+    if (keyError) {
+      setMessage({ type: 'error', text: keyError });
       return;
     }
     setTestingTarget(modelId);
@@ -264,22 +309,21 @@ export function ApiSettings({ onEditingChange }: ApiSettingsProps) {
     setMessage({ type: 'success', text: `${provider.name} 已启用` });
   };
 
-  const exportProviders = () => {
-    const payload = {
-      format: 'design-work-provider-config',
-      version: 3,
-      exportedAt: new Date().toISOString(),
-      activeProviderIds,
-      providers,
-    };
-    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `design-work-providers-${new Date().toISOString().slice(0, 10)}.json`;
-    link.click();
-    URL.revokeObjectURL(url);
-    setMessage({ type: 'success', text: 'API 配置已导出（包含 API Key，请妥善保管）' });
+  // 浏览器里没有完整的 Key，导出文件由网关生成。
+  const exportProviders = async () => {
+    try {
+      const payload = await exportProviderConfig();
+      const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `design-work-providers-${new Date().toISOString().slice(0, 10)}.json`;
+      link.click();
+      URL.revokeObjectURL(url);
+      setMessage({ type: 'success', text: 'API 配置已导出（包含 API Key，请妥善保管）' });
+    } catch (error) {
+      setMessage({ type: 'error', text: error instanceof Error ? error.message : '导出失败' });
+    }
   };
 
   const importProviders = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -294,11 +338,11 @@ export function ApiSettings({ onEditingChange }: ApiSettingsProps) {
       const migrated = migrateProviderStateV6(parsed);
       if (!migrated.providers.length) throw new Error('文件中没有可导入的 API 配置');
       const imported = migrated.providers.map(markModelsPending);
-      const importedIds = new Set(imported.map((provider) => provider.id));
-      replaceProviders({
-        providers: [...providers.filter((provider) => !importedIds.has(provider.id)), ...imported],
-        activeProviderIds: { ...activeProviderIds, ...migrated.activeProviderIds },
-      });
+      // 同 ID 的厂商换成文件里的版本，文件里的默认厂商覆盖现有设置。
+      await importProviderConfig(
+        { providers: imported, activeProviderIds: migrated.activeProviderIds },
+        'replace-matching',
+      );
       setMessage({ type: 'success', text: `已导入 ${imported.length} 个厂商，所有模型均待重新验证` });
     } catch (error) {
       setMessage({ type: 'error', text: error instanceof Error ? error.message : '导入失败' });
@@ -318,22 +362,29 @@ export function ApiSettings({ onEditingChange }: ApiSettingsProps) {
           <div className="flex shrink-0 flex-wrap justify-end gap-2">
             <input ref={importInputRef} type="file" accept="application/json,.json" onChange={(event) => void importProviders(event)} className="sr-only" />
             <Button type="button" onClick={() => importInputRef.current?.click()} variant="ghost" size="sm" className="h-8">导入数据</Button>
-            <Button type="button" onClick={exportProviders} variant="ghost" size="sm" disabled={!providers.length} className="h-8">导出数据</Button>
+            <Button type="button" onClick={() => void exportProviders()} variant="ghost" size="sm" disabled={!providers.length} className="h-8">导出数据</Button>
             <Button type="button" onClick={() => { setDraft(makeProvider()); setMessage(null); }} variant="ghost" size="sm" className="h-8 gap-1.5"><Plus aria-hidden="true" size={15} /> 添加厂商</Button>
           </div>,
           headerActionsTarget,
         )}
 
       <div className="space-y-5">
+        {syncError && (
+          <div role="alert" className="flex items-start justify-between gap-3 text-xs leading-5 text-red-600 dark:text-red-300">
+            <p className="min-w-0">{syncError}</p>
+            <Button type="button" variant="ghost" size="sm" onClick={clearSyncError} className="h-7 shrink-0 px-2 text-xs">知道了</Button>
+          </div>
+        )}
         {draft ? (
           <ProviderEditor
             draft={draft}
             setDraft={setDraft}
+            saving={saving}
             testingTarget={testingTarget}
             message={message}
-            onTestCommon={(category) => void testCommonConnection(draft, category)}
+            onTestCommon={() => void testCommonConnection(draft)}
             onTestModel={(category, modelId) => void testModel(draft, category, modelId)}
-            onSave={saveProvider}
+            onSave={() => void saveProvider()}
             onCancel={() => { setDraft(null); setMessage(null); }}
           />
         ) : savedProviders.length ? (
@@ -409,23 +460,49 @@ export function ApiSettings({ onEditingChange }: ApiSettingsProps) {
 interface ProviderEditorProps {
   draft: ProviderConfig;
   setDraft: (provider: ProviderConfig) => void;
+  saving: boolean;
   testingTarget: string;
   message: { type: 'success' | 'error'; text: string } | null;
-  onTestCommon: (category: ModelCategory) => void;
+  onTestCommon: () => void;
   onTestModel: (category: ModelCategory, modelId: string) => void;
   onSave: () => void;
   onCancel: () => void;
 }
 
-function ProviderEditor({ draft, setDraft, testingTarget, message, onTestCommon, onTestModel, onSave, onCancel }: ProviderEditorProps) {
+interface FetchedModels {
+  models: ProviderModelInfo[];
+  checkedAt: number;
+  latency: number;
+}
+
+function ProviderEditor({ draft, setDraft, saving, testingTarget, message, onTestCommon, onTestModel, onSave, onCancel }: ProviderEditorProps) {
   const [activeCategory, setActiveCategory] = useState<ModelCategory>('language');
   const [newModelId, setNewModelId] = useState('');
   const [showKey, setShowKey] = useState(false);
+  const [fetched, setFetched] = useState<FetchedModels | null>(null);
+  const [fetching, setFetching] = useState(false);
+  const [fetchError, setFetchError] = useState('');
+  // 连接信息变化后，进行中的获取结果作废。
+  const fetchSeq = useRef(0);
   const models = getConfiguredModels(draft, activeCategory);
+  // 已保存的 Key 只留在本机网关，这里只显示掩码；留空表示继续使用。
+  const keyPlaceholder = !draft.apiKeyHint
+    ? '输入通用 API Key'
+    : providerKeyHintUsable(draft)
+      ? `已保存 ${draft.apiKeyHint.masked}，留空继续使用`
+      : 'Base URL 域名已变化，请重新填写通用 API Key';
+
+  const resetFetched = () => {
+    fetchSeq.current += 1;
+    setFetched(null);
+    setFetching(false);
+    setFetchError('');
+  };
 
   const changeProtocol = (protocol: ProviderProtocol) => {
     const previousDefault = providerDefaults[draft.protocol].baseUrl;
     const invalidated = invalidateProviderModels(draft, 'protocol');
+    resetFetched();
     setDraft({
       ...invalidated,
       protocol,
@@ -437,7 +514,42 @@ function ProviderEditor({ draft, setDraft, testingTarget, message, onTestCommon,
 
   const changeDefault = (field: 'baseUrl' | 'apiKey', value: string) => {
     const invalidated = invalidateProviderModels(draft, field);
+    resetFetched();
     setDraft({ ...invalidated, [field]: value });
+  };
+
+  const fetchModels = async () => {
+    const seq = ++fetchSeq.current;
+    setFetching(true);
+    setFetchError('');
+    try {
+      const result = await listProviderModels(draft);
+      if (seq !== fetchSeq.current) return;
+      if (!result.models.length) {
+        setFetched(null);
+        setFetchError('上游返回的模型列表为空，请手动添加模型');
+        return;
+      }
+      setFetched({ models: result.models, checkedAt: Date.now(), latency: result.latency });
+    } catch (error) {
+      if (seq !== fetchSeq.current) return;
+      const text = error instanceof Error ? error.message : '获取模型失败';
+      setFetchError(/\b40[45]\b/.test(text)
+        ? `${text.replace(/[。.]$/, '')}。该上游可能不提供模型列表接口，请手动添加模型`
+        : text);
+    } finally {
+      if (seq === fetchSeq.current) setFetching(false);
+    }
+  };
+
+  // 出现在上游模型列表里的模型，与单个模型测试的判定相同，直接记为已验证。
+  const toggleFetchedModels = (ids: string[], included: boolean) => {
+    if (!fetched) return;
+    setDraft(setModelsInCategory(draft, activeCategory, ids, included, {
+      status: 'healthy',
+      checkedAt: fetched.checkedAt,
+      latency: fetched.latency,
+    }));
   };
 
   const addModel = () => {
@@ -497,7 +609,7 @@ function ProviderEditor({ draft, setDraft, testingTarget, message, onTestCommon,
         </div>
         <div className="flex shrink-0 items-center gap-2">
           <Button type="button" variant="ghost" size="sm" onClick={onCancel}>取消</Button>
-          <Button type="button" variant="primary" size="sm" onClick={onSave} className="bg-foreground text-background hover:bg-foreground/85"><Check aria-hidden="true" size={14} /> 保存厂商</Button>
+          <Button type="button" variant="primary" size="sm" onClick={onSave} loading={saving} className="bg-foreground text-background hover:bg-foreground/85">{!saving && <Check aria-hidden="true" size={14} />} {saving ? '正在保存' : '保存厂商'}</Button>
         </div>
       </header>
 
@@ -510,14 +622,18 @@ function ProviderEditor({ draft, setDraft, testingTarget, message, onTestCommon,
         <label className="block space-y-2">
           <span className="text-xs font-medium">通用 API Key</span>
           <span className="relative block">
-            <Input type={showKey ? 'text' : 'password'} value={draft.apiKey} onChange={(event) => changeDefault('apiKey', event.target.value)} placeholder="输入通用 API Key" className="pr-10 text-xs" />
+            <Input type={showKey ? 'text' : 'password'} value={draft.apiKey} onChange={(event) => changeDefault('apiKey', event.target.value)} placeholder={keyPlaceholder} className="pr-10 text-xs" />
             <Button type="button" variant="ghost" size="iconSm" onClick={() => setShowKey((visible) => !visible)} aria-label={showKey ? '隐藏通用 API Key' : '显示通用 API Key'} title={showKey ? '隐藏通用 API Key' : '显示通用 API Key'} className="absolute right-1 top-1/2 -translate-y-1/2">{showKey ? <EyeOff aria-hidden="true" size={15} /> : <Eye aria-hidden="true" size={15} />}</Button>
           </span>
         </label>
-        <div className="flex items-center justify-between gap-3 border-t border-border pt-3">
-          <p className="text-xs text-muted-foreground">通用测试只验证鉴权、Base URL 和模型列表。</p>
-          <Button type="button" variant="secondary" size="sm" onClick={() => onTestCommon(activeCategory)} loading={testingTarget === 'common'} className="shrink-0">{testingTarget !== 'common' && <Wifi aria-hidden="true" size={14} />} {testingTarget === 'common' ? '正在测试' : '测试通用连接'}</Button>
+        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border pt-3">
+          <p className="text-xs text-muted-foreground">获取模型和通用测试都只读取模型列表，不发起生成。</p>
+          <div className="flex shrink-0 items-center gap-2">
+            <Button type="button" variant="secondary" size="sm" onClick={() => void fetchModels()} loading={fetching}>{!fetching && <Download aria-hidden="true" size={14} />} {fetching ? '正在获取' : fetched ? '重新获取' : '获取模型'}</Button>
+            <Button type="button" variant="secondary" size="sm" onClick={onTestCommon} loading={testingTarget === 'common'}>{testingTarget !== 'common' && <Wifi aria-hidden="true" size={14} />} {testingTarget === 'common' ? '正在测试' : '测试通用连接'}</Button>
+          </div>
         </div>
+        {fetchError && <p role="alert" className="text-xs text-red-600">{fetchError}</p>}
       </section>
 
       <div className="mt-2 flex gap-1 border-b border-border" role="tablist" aria-label="模型类型">
@@ -529,6 +645,16 @@ function ProviderEditor({ draft, setDraft, testingTarget, message, onTestCommon,
       </div>
 
       <div className="mt-4" role="tabpanel">
+        {fetched && (
+          <ProviderModelPicker
+            models={fetched.models}
+            provider={draft}
+            category={activeCategory}
+            categoryLabels={categoryLabels}
+            onToggle={toggleFetchedModels}
+            onClose={() => setFetched(null)}
+          />
+        )}
         <div className="space-y-3">
           {models.map((model, index) => (
             <ProviderModelCard

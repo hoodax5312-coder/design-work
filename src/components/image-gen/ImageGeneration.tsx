@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, type MouseEvent as ReactMouseEvent } from 'react';
 import {
   AudioLines,
   BookmarkPlus,
@@ -7,7 +7,6 @@ import {
   Copy,
   Download,
   Loader2,
-  Maximize2,
   Pencil,
   Plus,
   Sparkles,
@@ -15,6 +14,7 @@ import {
   Video,
   X,
 } from '@/lib/remixIconShim';
+import { connectionHasKey } from '../../lib/providerConnections';
 import { generateProviderImage, generateProviderVideo } from '../../services/providerService';
 import {
   getConfiguredModels,
@@ -33,6 +33,12 @@ import {
   Input,
   Textarea,
 } from '../ui';
+import {
+  normalizeGenerationHistory,
+  type GenerationHistoryCache,
+  type GenerationRecord,
+} from './generationHistory';
+import { GeneratedImageMenu, type GeneratedImageMenuTarget } from './GeneratedImageMenu';
 
 const RESOLUTION_OPTIONS = ['1k', '2k', '4k'] as const;
 const QUALITY_OPTIONS = ['低', '中', '高'] as const;
@@ -71,24 +77,6 @@ interface ReferenceImage {
   id: string;
   file: File;
   url: string;
-}
-
-interface GenerationRecord {
-  id: string;
-  prompt: string;
-  createdAt: string;
-  model: string;
-  ratio: string;
-  resolution: string;
-  quality: string;
-  duration?: number;
-  outputs: string[];
-  mode?: 'image' | 'video';
-}
-
-interface GenerationHistoryCache {
-  image: GenerationRecord[];
-  video: GenerationRecord[];
 }
 
 const feedHistory = (): GenerationHistoryCache => {
@@ -152,78 +140,58 @@ const formatGenerationParameters = (record: GenerationRecord) => (
     : [record.ratio, record.quality, record.resolution].join('·')
 );
 
-const ActionIcon = ({ kind }: { kind: 'download' | 'save' | 'fullscreen' }) => {
-  const Icon = kind === 'download' ? Download : kind === 'save' ? BookmarkPlus : Maximize2;
-  // Remix icons share a 24px viewBox, but their paths have different optical bounds.
-  const opticalScale = kind === 'save' ? 'scale-[1.15]' : kind === 'fullscreen' ? 'scale-[0.95]' : 'scale-[1.05]';
-  return (
-    <span className="grid h-6 w-6 shrink-0 place-items-center">
-      <Icon size={20} className={opticalScale} aria-hidden="true" />
-    </span>
-  );
-};
+/** Images follow Eagle: click selects, double-click opens fullscreen, right-click opens the action menu. */
+interface ImageInteractions {
+  onClick: () => void;
+  onDoubleClick: () => void;
+  onContextMenu: (event: ReactMouseEvent<HTMLElement>) => void;
+}
 
-const ImageActionOverlay = ({
-  onDownload,
-  onSave,
-  saved = false,
-  onFullscreen,
-}: {
-  onDownload: () => void;
-  onSave?: () => void;
-  saved?: boolean;
-  onFullscreen: () => void;
-}) => (
-  <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center bg-black/20 opacity-0 transition-opacity group-hover:pointer-events-auto group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:opacity-100">
-    <div className="pointer-events-none absolute inset-x-0 bottom-0 z-0 h-3/4 bg-gradient-to-t from-black/85 via-black/45 to-transparent" aria-hidden="true" />
-    <div className="relative z-10 flex items-center gap-3">
-      <Button type="button" variant="ghost" size="iconSm" onClick={onDownload} aria-label="下载图片" title="下载图片" className="h-10 w-10 bg-black/60 p-0 text-white shadow-lg hover:bg-black/85 hover:text-white"><ActionIcon kind="download" /></Button>
-      {onSave && <>
-        <Button type="button" variant="ghost" size="iconSm" onClick={onSave} disabled={saved} aria-label={saved ? '已存入资产' : '保存至资产'} title={saved ? '已存入资产' : '保存至资产'} className={cn('h-10 w-10 bg-black/60 p-0 text-white shadow-lg hover:bg-black/85 hover:text-white', saved && 'cursor-default bg-white/20 text-white/45 hover:bg-white/20 hover:text-white/45')}><ActionIcon kind="save" /></Button>
-      </>}
-      <Button type="button" variant="ghost" size="iconSm" onClick={onFullscreen} aria-label="全屏预览" title="全屏预览" className="h-10 w-10 bg-black/60 p-0 text-white shadow-lg hover:bg-black/85 hover:text-white"><ActionIcon kind="fullscreen" /></Button>
-    </div>
+const imageBadgeClassName = 'inline-flex h-5 items-center rounded bg-black/55 px-1.5 text-[11px] font-medium leading-none text-white backdrop-blur-sm';
+
+// Status sits together in the top-left: "已收藏" always, and the tile index ("1/4") on hover.
+// Saved comes first so the index appearing on hover never shifts it.
+const ImageBadges = ({ saved, index }: { saved?: boolean; index?: string }) => (saved || index) ? (
+  <div className="pointer-events-none absolute left-2 top-2 z-20 flex items-center gap-1">
+    {saved && <span className={imageBadgeClassName}>已收藏</span>}
+    {index && <span className={cn(imageBadgeClassName, 'hidden group-hover:inline-flex group-focus-within:inline-flex')}>{index}</span>}
   </div>
-);
-
-const SavedAssetBadge = ({ saved }: { saved?: boolean }) => saved ? (
-  <span className="pointer-events-none absolute right-2 top-2 z-20 rounded-md bg-[var(--neutral-surface-subtle)] px-2 py-1 text-[11px] font-semibold leading-none text-[var(--neutral-foreground)] shadow-sm">
-    已存入资产
-  </span>
 ) : null;
 
 const GeneratedImagePreview = ({
   src,
   alt,
-  onDownload,
-  onSave,
   saved,
-  onFullscreen,
+  selected,
+  interactions,
 }: {
   src: string;
   alt: string;
-  onDownload: () => void;
-  onSave: () => void;
   saved?: boolean;
-  onFullscreen: () => void;
+  selected?: boolean;
+  interactions: ImageInteractions;
 }) => {
   const [imageRatio, setImageRatio] = useState<number | null>(null);
 
   return (
     <div
+      {...interactions}
       className={cn(
-        'group relative mx-2 flex max-h-[680px] min-h-[240px] items-center justify-center overflow-hidden rounded-lg bg-[#0b0b0b]',
+        'group relative mx-2 flex max-h-[680px] min-h-[240px] cursor-default items-center justify-center overflow-hidden rounded-lg bg-[#0b0b0b] transition-shadow',
+        selected && 'ring-2 ring-inset ring-foreground',
       )}
       style={{ aspectRatio: imageRatio || 4 / 3 }}
     >
-      <img
-        src={src}
-        alt={alt}
-        onLoad={(event) => setImageRatio(Math.max(4 / 3, event.currentTarget.naturalWidth / event.currentTarget.naturalHeight))}
-        className="h-auto max-h-full max-w-full object-contain"
-      />
-      <SavedAssetBadge saved={saved} />
-      <ImageActionOverlay onDownload={onDownload} onSave={onSave} saved={saved} onFullscreen={onFullscreen} />
+      <button type="button" aria-label="选择图片（双击全屏，右键更多操作）" aria-pressed={selected} className="flex max-h-full min-w-0 max-w-full items-center justify-center self-stretch focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring">
+        <img
+          src={src}
+          alt={alt}
+          draggable={false}
+          onLoad={(event) => setImageRatio(Math.max(4 / 3, event.currentTarget.naturalWidth / event.currentTarget.naturalHeight))}
+          className="h-auto max-h-full max-w-full object-contain"
+        />
+      </button>
+      <ImageBadges saved={saved} />
     </div>
   );
 };
@@ -259,6 +227,7 @@ export const ImageGeneration = () => {
   const [referenceAudio, setReferenceAudio] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState('');
   const [fullscreenImage, setFullscreenImage] = useState<string | null>(null);
+  const [imageMenu, setImageMenu] = useState<GeneratedImageMenuTarget | null>(null);
   const [history, setHistory] = useState<GenerationRecord[]>([]);
   const historyCacheRef = useRef<GenerationHistoryCache>({ image: [], video: [] });
   const historyLoadedRef = useRef(false);
@@ -267,9 +236,8 @@ export const ImageGeneration = () => {
   const [assetNotice, setAssetNotice] = useState('');
   const [copiedPromptId, setCopiedPromptId] = useState<string | null>(null);
   const [outputRatios, setOutputRatios] = useState<Record<string, number>>({});
-  const [savedAssetUrls, setSavedAssetUrls] = useState<Set<string>>(
-    () => new Set(contentFeed.list().filter((item) => item.savedToAssets).map((item) => item.previewUrl)),
-  );
+  const [savedAssetUrls, setSavedAssetUrls] = useState<Set<string>>(new Set());
+  const [assetIdsByUrl, setAssetIdsByUrl] = useState<Record<string, string>>({});
   const [draggingReference, setDraggingReference] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const videoInputRef = useRef<HTMLInputElement>(null);
@@ -312,10 +280,20 @@ export const ImageGeneration = () => {
     }
   }, [generationMode, ratio]);
   useEffect(() => {
-    const syncSavedAssets = () => setSavedAssetUrls(new Set(contentFeed.list().filter((item) => item.savedToAssets).map((item) => item.previewUrl)));
-    syncSavedAssets();
-    window.addEventListener('design-work:content-feed-updated', syncSavedAssets);
-    return () => window.removeEventListener('design-work:content-feed-updated', syncSavedAssets);
+    let active = true;
+    assetService.list({ origin: 'generated', limit: 500 }).then((result) => {
+      if (!active) return;
+      const entries = result.items.flatMap((asset) => {
+        const url = asset.userMetadata?.generatedUrl;
+        return typeof url === 'string' ? [[url, asset.id] as const] : [];
+      });
+      setAssetIdsByUrl(Object.fromEntries(entries));
+      setSavedAssetUrls(new Set(result.items.flatMap((asset) => {
+        const url = asset.userMetadata?.generatedUrl;
+        return asset.favorite && typeof url === 'string' ? [url] : [];
+      })));
+    }).catch(() => undefined);
+    return () => { active = false; };
   }, []);
   useEffect(() => {
     if (!modelPanelOpen) return;
@@ -392,10 +370,10 @@ export const ImageGeneration = () => {
       .then((cached) => {
         if (cancelled) return;
         const migrated = feedHistory();
-        const normalized: GenerationHistoryCache = {
+        const normalized = normalizeGenerationHistory({
           image: Array.isArray(cached?.image) && cached.image.length ? cached.image : migrated.image,
           video: Array.isArray(cached?.video) && cached.video.length ? cached.video : migrated.video,
-        };
+        });
         historyCacheRef.current = normalized;
         setHistory(normalized[generationMode]);
         setPreviewUrl(normalized[generationMode][0]?.outputs[0] || '');
@@ -460,7 +438,7 @@ export const ImageGeneration = () => {
 
   const handleGenerate = async (promptOverride?: string) => {
     const generationPrompt = promptOverride ?? prompt;
-    if (!provider || !resolveModelConnection(provider, generationMode, selectedModel)?.apiKey || !selectedModel) {
+    if (!provider || !connectionHasKey(resolveModelConnection(provider, generationMode, selectedModel)) || !selectedModel) {
       setError(`请先在设置中配置支持${generationMode === 'image' ? '图像' : '视频'}生成的 API Provider。`);
       setActiveModule('settings');
       return;
@@ -475,7 +453,7 @@ export const ImageGeneration = () => {
       if (generationMode === 'video') {
         const result = await generateProviderVideo(provider, { prompt: generationPrompt, resolution: videoResolutionForRatio(ratio) }, videoModel);
         setPreviewUrl(result.url);
-        contentFeed.add({
+        const feedItem = contentFeed.add({
           type: 'video',
           title: `视频生成任务 · ${new Date().toLocaleDateString('zh-CN')}`,
           description: generationPrompt,
@@ -494,6 +472,25 @@ export const ImageGeneration = () => {
             taskId: result.id,
           },
         });
+        let savedAssetId: string | null = null;
+        try {
+          const asset = await assetService.create({
+            type: 'video',
+            title: feedItem.title,
+            description: generationPrompt,
+            sourceUrl: result.url,
+            userMetadata: {
+              source: 'video-generation',
+              generatedUrl: result.url,
+              ...feedItem.metadata,
+            },
+          });
+          savedAssetId = asset.id;
+          contentFeed.markSaved(feedItem.id);
+          setAssetIdsByUrl((current) => ({ ...current, [result.url]: asset.id }));
+        } catch {
+          setAssetNotice('视频已生成，但保存至生成资产失败');
+        }
         setHistory((current) => [{
           id: `${Date.now()}-${result.url}`,
           prompt: generationPrompt,
@@ -506,7 +503,7 @@ export const ImageGeneration = () => {
           outputs: [result.url],
           mode: 'video' as const,
         }, ...current].slice(0, 12));
-        setAssetNotice('视频生成完成，已加入视频素材');
+        if (savedAssetId) setAssetNotice('视频生成完成，已保存至生成资产');
         window.setTimeout(() => setAssetNotice(''), 3000);
         return;
       }
@@ -530,13 +527,41 @@ export const ImageGeneration = () => {
         outputs,
         mode: 'image' as const,
       }, ...current.filter((item) => !item.outputs.some((output) => outputs.includes(output)))].slice(0, 12));
-      outputs.forEach((output, index) => contentFeed.add({
+      const feedItems = outputs.map((output, index) => contentFeed.add({
           type: 'image',
           title: `图片生成${outputs.length > 1 ? ` ${index + 1}/${outputs.length}` : ''} · ${new Date().toLocaleDateString('zh-CN')}`,
           description: generationPrompt,
           previewUrl: output,
           metadata: { prompt: generationPrompt, model: imageModel, ratio, resolution, quality, generationCount: selectedGenerationCount, referenceImageNames: referenceImages.map((item) => item.file.name) },
         }));
+      try {
+        const assets = await Promise.all(outputs.map((output, index) => assetService.create({
+          type: 'image',
+          title: feedItems[index].title,
+          description: generationPrompt,
+          sourceUrl: output,
+          userMetadata: {
+            source: 'image-generation',
+            prompt: generationPrompt,
+            model: imageModel,
+            ratio,
+            resolution,
+            quality,
+            generationCount: selectedGenerationCount,
+            generatedUrl: output,
+            referenceImageNames: referenceImages.map((item) => item.file.name),
+          },
+        })));
+        feedItems.forEach((item) => contentFeed.markSaved(item.id));
+        setAssetIdsByUrl((current) => ({
+          ...current,
+          ...Object.fromEntries(outputs.map((output, index) => [output, assets[index].id])),
+        }));
+        setAssetNotice('图片生成完成，已保存至生成资产');
+      } catch {
+        setAssetNotice('图片已生成，但保存至生成资产失败');
+      }
+      window.setTimeout(() => setAssetNotice(''), 3000);
     } catch (requestError) {
       setError(requestError instanceof Error ? requestError.message : '图像生成失败');
     } finally {
@@ -554,37 +579,37 @@ export const ImageGeneration = () => {
     anchor.click();
   };
 
-  const handleAddToAssets = async (urlOverride = previewUrl, promptOverride = prompt) => {
+  const handleAddToAssets = async (urlOverride = previewUrl, promptOverride = prompt, mediaType: 'image' | 'video' = 'image') => {
     if (!urlOverride) return;
-    const existing = contentFeed.list().find((item) => item.previewUrl === urlOverride);
-    if (existing?.savedToAssets) {
-      setAssetNotice('该图片已在资产库中');
-      return;
-    }
     try {
-      await assetService.create({
-        type: 'image',
-        title: `图片生成 · ${new Date().toLocaleDateString('zh-CN')}`,
-        description: promptOverride,
-        sourceUrl: urlOverride,
-        userMetadata: {
-          source: 'image-generation',
-          prompt: promptOverride,
-          model: imageModel,
-          ratio,
-          resolution,
-          quality,
-          generatedUrl: urlOverride,
-          referenceImageNames: referenceImages.map((item) => item.file.name),
-        },
-      });
+      const existingAssetId = assetIdsByUrl[urlOverride];
+      const asset = existingAssetId
+        ? await assetService.update(existingAssetId, { favorite: true })
+        : await assetService.create({
+            type: mediaType,
+            title: `${mediaType === 'video' ? '视频' : '图片'}生成 · ${new Date().toLocaleDateString('zh-CN')}`,
+            description: promptOverride,
+            sourceUrl: urlOverride,
+            favorite: true,
+            userMetadata: {
+              source: mediaType === 'video' ? 'video-generation' : 'image-generation',
+              prompt: promptOverride,
+              model: mediaType === 'video' ? videoModel : imageModel,
+              ratio,
+              resolution,
+              quality,
+              generatedUrl: urlOverride,
+              referenceImageNames: referenceImages.map((item) => item.file.name),
+            },
+          });
       const generated = contentFeed.list().find((item) => item.previewUrl === urlOverride);
       if (generated) contentFeed.markSaved(generated.id);
+      setAssetIdsByUrl((current) => ({ ...current, [urlOverride]: asset.id }));
       setSavedAssetUrls((current) => new Set(current).add(urlOverride));
-      setAssetNotice('已添加到资产库');
+      setAssetNotice('已添加至收藏');
       window.setTimeout(() => setAssetNotice(''), 2200);
     } catch (requestError) {
-      setError(requestError instanceof Error ? requestError.message : '添加资产失败');
+      setError(requestError instanceof Error ? requestError.message : '添加至收藏失败');
     }
   };
 
@@ -605,6 +630,83 @@ export const ImageGeneration = () => {
     if (record.outputs.includes(previewUrl)) {
       setPreviewUrl('');
     }
+  };
+
+  const showNotice = (message: string, duration = 2400) => {
+    setAssetNotice(message);
+    window.setTimeout(() => setAssetNotice((current) => current === message ? '' : current), duration);
+  };
+
+  /** 这张图片在资产库里的资产；生成时没保存成功的旧图在这里补建。 */
+  const ensureImageAsset = async (url: string) => {
+    const existing = assetIdsByUrl[url];
+    if (existing) return existing;
+    const record = history.find((item) => item.outputs.includes(url));
+    const asset = await assetService.create({
+      type: 'image',
+      title: `图片生成 · ${new Date(record?.createdAt || Date.now()).toLocaleDateString('zh-CN')}`,
+      description: record?.prompt || '',
+      sourceUrl: url,
+      userMetadata: {
+        source: 'image-generation',
+        prompt: record?.prompt || '',
+        model: record?.model,
+        ratio: record?.ratio,
+        resolution: record?.resolution,
+        quality: record?.quality,
+        generatedUrl: url,
+      },
+    });
+    setAssetIdsByUrl((current) => ({ ...current, [url]: asset.id }));
+    return asset.id;
+  };
+
+  const imageInteractions = (url: string): ImageInteractions => ({
+    onClick: () => setPreviewUrl(url),
+    onDoubleClick: () => setFullscreenImage(url),
+    onContextMenu: (event) => {
+      event.preventDefault();
+      setPreviewUrl(url);
+      // 键盘的菜单键触发时没有鼠标坐标，菜单贴着图片左上角打开。
+      const rect = event.currentTarget.getBoundingClientRect();
+      const fromKeyboard = event.clientX === 0 && event.clientY === 0;
+      setImageMenu({
+        url,
+        saved: savedAssetUrls.has(url),
+        point: fromKeyboard ? { x: rect.left + 16, y: rect.top + 16 } : { x: event.clientX, y: event.clientY },
+      });
+    },
+  });
+
+  /** 删除单张图片：从生成记录中移除；有资产时移入资产库回收站，可以恢复。 */
+  const deleteImage = (url: string, knownAssetId: string | null) => {
+    const assetId = knownAssetId || assetIdsByUrl[url] || null;
+    const message = assetId
+      ? '删除这张图片？它会从生成记录中移除，并移入资产库的回收站，可在资产库中恢复。'
+      : '删除这张图片？它会从生成记录中移除。';
+    if (!window.confirm(message)) return;
+    void (async () => {
+      try {
+        if (assetId) await assetService.remove(assetId);
+      } catch (requestError) {
+        setError(requestError instanceof Error ? requestError.message : '删除图片失败');
+        return;
+      }
+      setHistory((current) => current.flatMap((record) => {
+        if (!record.outputs.includes(url)) return [record];
+        const outputs = record.outputs.filter((item) => item !== url);
+        return outputs.length ? [{ ...record, outputs }] : [];
+      }));
+      contentFeed.removeByPreviewUrls([url]);
+      setSavedAssetUrls((current) => {
+        const next = new Set(current);
+        next.delete(url);
+        return next;
+      });
+      setAssetIdsByUrl((current) => Object.fromEntries(Object.entries(current).filter(([key]) => key !== url)));
+      if (previewUrl === url) setPreviewUrl('');
+      showNotice(assetId ? '已删除，可在资产库回收站恢复' : '已删除');
+    })();
   };
 
   const selectModel = (model: string) => {
@@ -1022,7 +1124,10 @@ export const ImageGeneration = () => {
                     <div className="flex shrink-0 items-center gap-2">
                       <Button variant="ghost" size="iconSm" type="button" onClick={() => editRecordPrompt(record)} aria-label={`编辑提示词：${record.prompt}`} title="编辑提示词" className="h-6 w-6 p-0"><Pencil size={13} /></Button>
                       <Button variant="ghost" size="iconSm" type="button" onClick={() => deleteRecord(record)} aria-label="删除生成记录" title="删除生成记录" className="h-6 w-6 p-0 text-muted-foreground hover:text-destructive"><Trash2 size={13} /></Button>
-                      {isVideoRecord && <Button variant="ghost" size="iconSm" type="button" onClick={() => downloadImage(selectedOutput)} aria-label="下载视频" title="下载视频" className="h-6 w-6 p-0"><Download size={13} /></Button>}
+                      {selectedOutput && <>
+                        <Button variant="ghost" size="iconSm" type="button" onClick={() => void handleAddToAssets(selectedOutput, record.prompt, isVideoRecord ? 'video' : 'image')} disabled={savedAssetUrls.has(selectedOutput)} aria-label={savedAssetUrls.has(selectedOutput) ? '已收藏' : '添加至收藏'} title={savedAssetUrls.has(selectedOutput) ? '已收藏' : '添加至收藏'} className="h-6 w-6 p-0"><BookmarkPlus size={13} /></Button>
+                        <Button variant="ghost" size="iconSm" type="button" onClick={() => downloadImage(selectedOutput)} aria-label={isVideoRecord ? '下载视频' : '下载图片'} title={isVideoRecord ? '下载视频' : '下载图片'} className="h-6 w-6 p-0"><Download size={13} /></Button>
+                      </>}
                     </div>
                   </div>
 
@@ -1048,31 +1153,31 @@ export const ImageGeneration = () => {
                 </header>
 
                 {isVideoRecord ? (
-                  <div className="mx-2 flex min-h-[360px] items-end justify-center overflow-hidden rounded-lg bg-[#0b0b0b]">
+                  <div className="relative mx-2 flex min-h-[360px] items-end justify-center overflow-hidden rounded-lg bg-[#0b0b0b]">
                     <video src={output} controls preload="metadata" className="max-h-[680px] w-full object-contain" />
+                    <ImageBadges saved={savedAssetUrls.has(output)} />
                   </div>
                 ) : record.outputs.length > 1 ? (
                   <div className="mx-2 grid grid-cols-2 gap-2 rounded-lg bg-[var(--surface-control)] p-2">
                     {record.outputs.map((image, outputIndex) => (
                       <div
                         key={`${record.id}-${image}`}
+                        {...imageInteractions(image)}
                         className={cn(
-                          'group relative flex min-w-0 items-center justify-center overflow-hidden rounded-md bg-[#0b0b0b] transition-shadow',
+                          'group relative flex min-w-0 cursor-default items-center justify-center overflow-hidden rounded-md bg-[#0b0b0b] transition-shadow',
                           selectedOutput === image && 'ring-2 ring-inset ring-foreground'
                         )}
                         style={{ aspectRatio: outputRatios[image] || 4 / 3 }}
                       >
-                        <button type="button" onClick={() => setPreviewUrl(image)} aria-label={`选择第 ${outputIndex + 1} 张生成图片`} aria-pressed={selectedOutput === image} className="block min-w-0 max-w-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring">
+                        <button type="button" aria-label={`选择第 ${outputIndex + 1} 张生成图片（双击全屏，右键更多操作）`} aria-pressed={selectedOutput === image} className="block min-w-0 max-w-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring">
                           <GeneratedImageTile src={image} alt={`${record.prompt}，第 ${outputIndex + 1} 张`} onRatioChange={(nextRatio) => setOutputRatios((current) => current[image] === nextRatio ? current : { ...current, [image]: nextRatio })} />
                         </button>
-                        <SavedAssetBadge saved={savedAssetUrls.has(image)} />
-                        <ImageActionOverlay onDownload={() => downloadImage(image)} onSave={() => void handleAddToAssets(image, record.prompt)} saved={savedAssetUrls.has(image)} onFullscreen={() => setFullscreenImage(image)} />
-                        <span className="absolute bottom-2 left-2 rounded bg-black/65 px-1.5 py-0.5 text-[10px] text-white opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100">{outputIndex + 1}/{record.outputs.length}</span>
+                        <ImageBadges saved={savedAssetUrls.has(image)} index={`${outputIndex + 1}/${record.outputs.length}`} />
                       </div>
                     ))}
                   </div>
                 ) : (
-                  <GeneratedImagePreview src={output} alt={record.prompt} onDownload={() => downloadImage(output)} onSave={() => void handleAddToAssets(output, record.prompt)} saved={savedAssetUrls.has(output)} onFullscreen={() => setFullscreenImage(output)} />
+                  <GeneratedImagePreview src={output} alt={record.prompt} saved={savedAssetUrls.has(output)} selected={previewUrl === output} interactions={imageInteractions(output)} />
                 )}
 
               </article>
@@ -1107,6 +1212,17 @@ export const ImageGeneration = () => {
           </div>
         </aside>
       </section>
+
+      <GeneratedImageMenu
+        target={imageMenu}
+        onClose={() => setImageMenu(null)}
+        ensureAsset={ensureImageAsset}
+        onFullscreen={setFullscreenImage}
+        onSave={(url) => void handleAddToAssets(url, history.find((record) => record.outputs.includes(url))?.prompt || prompt)}
+        onDelete={deleteImage}
+        onNotice={(message) => showNotice(message, 3200)}
+        onError={setError}
+      />
 
       {fullscreenImage && (
         <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/30 backdrop-blur-xl" role="dialog" aria-modal="true" aria-label="全屏图片详情" onClick={() => setFullscreenImage(null)}>

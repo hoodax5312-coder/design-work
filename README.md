@@ -1,6 +1,6 @@
 # 栗作 LIZUO
 
-[在线预览](https://hoodax5312-coder.github.io/design-work/) · [版本规划](./ROADMAP.md) · [更新日志](./CHANGELOG.md) · [历史版本](https://github.com/hoodax5312-coder/design-work/releases)
+[在线预览](https://hoodax5312-coder.github.io/design-work/) · [版本规划](ROADMAP.md) · [更新日志](CHANGELOG.md) · [历史版本](https://github.com/hoodax5312-coder/design-work/releases)
 
 栗作 LIZUO 是一个面向设计与内容创作者的本地优先 AI 创作工作台，集图片生成、视频生成、资产管理、专业知识与常用工具于一体。
 

@@ -1,120 +1,187 @@
-import { useRef } from 'react';
-import { ChevronDown, FolderInput, Save, Trash2, Undo, Redo } from '@/lib/remixIconShim';
+import { useEffect, useRef, useState } from 'react';
+import { ArrowLeft, ChatAi, ChevronDown, Pencil, Plus, Redo, Trash2, Undo } from '@/lib/remixIconShim';
+import { cn } from '../../lib/utils';
 import { useCanvasStore } from '../../stores/useCanvasStore';
-import { Button, Card, Separator } from '../ui';
+import { useProjectStore } from '../../stores/useProjectStore';
+import { motion, springs } from '../motion';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+  Tooltip,
+} from '../ui';
 
-export const CanvasHeader = () => {
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const {
-    nodes,
-    edges,
-    setNodes,
-    setEdges,
-    clearCanvas,
-    undo,
-    redo,
-    canUndo,
-    canRedo,
-  } = useCanvasStore();
+const PROJECT_EMOJIS = ['😀', '✨', '🌱', '🎨', '🚀', '🧩', '🌈', '🪄', '🐻', '🍀', '🌙', '🔥'];
 
-  const exportWorkflow = () => {
-    const payload = {
-      name: '未命名项目',
-      exportedAt: new Date().toISOString(),
-      nodes,
-      edges,
-    };
-    localStorage.setItem('design-work:last-workflow', JSON.stringify(payload));
-    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const anchor = document.createElement('a');
-    anchor.href = url;
-    anchor.download = `design-work-workflow-${Date.now()}.json`;
-    anchor.click();
-    URL.revokeObjectURL(url);
-  };
+/** 行内改名输入框：Enter / 失焦提交，Esc 取消。 */
+const InlineRename = ({ value, label, onCommit, onCancel }: { value: string; label: string; onCommit: (value: string) => void; onCancel: () => void }) => {
+  const [draft, setDraft] = useState(value);
+  const inputRef = useRef<HTMLInputElement>(null);
+  useEffect(() => { inputRef.current?.select(); }, []);
+  return (
+    <input
+      ref={inputRef}
+      value={draft}
+      aria-label={label}
+      onChange={(event) => setDraft(event.target.value)}
+      onBlur={() => onCommit(draft)}
+      onKeyDown={(event) => {
+        event.stopPropagation();
+        if (event.key === 'Enter') onCommit(draft);
+        if (event.key === 'Escape') onCancel();
+      }}
+      className="nokey h-7 w-[132px] rounded-md border border-border bg-background px-2 text-xs font-medium text-foreground outline-none focus:border-ring"
+    />
+  );
+};
 
-  const importWorkflow = async (file: File | undefined) => {
-    if (!file) return;
-    const text = await file.text();
-    const payload = JSON.parse(text) as { nodes?: typeof nodes; edges?: typeof edges };
-    if (!Array.isArray(payload.nodes) || !Array.isArray(payload.edges)) {
-      throw new Error('Invalid workflow file');
-    }
-    setNodes(payload.nodes);
-    setEdges(payload.edges);
-  };
+interface CanvasHeaderProps {
+  onBack?: () => void;
+  boards: string[];
+  activeBoard: string;
+  onSwitchBoard: (board: string) => void;
+  onCreateBoard: () => void;
+  onRenameBoard: (from: string, to: string) => void;
+  onDeleteBoard: (board: string) => void;
+}
+
+/** 左上角：返回、项目（表情 + 名称）与画布页切换。 */
+export const CanvasHeader = ({ onBack, boards, activeBoard, onSwitchBoard, onCreateBoard, onRenameBoard, onDeleteBoard }: CanvasHeaderProps) => {
+  const activeProject = useProjectStore((state) => state.projects.find((project) => project.id === state.activeProjectId));
+  const renameProject = useProjectStore((state) => state.renameProject);
+  const setProjectEmoji = useProjectStore((state) => state.setProjectEmoji);
+  const [emojiOpen, setEmojiOpen] = useState(false);
+  const [renaming, setRenaming] = useState<'project' | 'board' | null>(null);
+  const projectName = activeProject?.name || '创作空间';
 
   return (
-    <div className="absolute top-4 left-4 right-4 flex justify-between items-start pointer-events-none z-50">
-      <input
-        ref={fileInputRef}
-        type="file"
-        accept="application/json,.json"
-        className="hidden"
-        onChange={(event) => {
-          importWorkflow(event.target.files?.[0]).catch(() => {
-            window.alert('导入失败，请选择有效的栗作工作流 JSON 文件。');
-          });
-          event.target.value = '';
-        }}
-      />
-       {/* Left: Toolbar */}
-      <Card padding="sm" className="pointer-events-auto flex items-center gap-2 p-1">
-         {/* Project Name */}
-         <Button variant="secondary" size="sm" className="h-8">
-            <span className="font-medium text-sm">未命名项目</span>
-            <ChevronDown size={14} className="opacity-50" />
-         </Button>
-      </Card>
+    <motion.div
+      initial={{ opacity: 0, y: -8 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={springs.smooth}
+      className="canvas-chrome absolute left-3 top-3 z-30 flex h-11 max-w-[calc(100%-24px)] items-center gap-0.5 rounded-xl px-1.5"
+    >
+      {onBack && (
+        <Tooltip content="返回项目列表" side="bottom">
+          <button type="button" className="canvas-icon-button" aria-label="返回项目列表" onClick={onBack}><ArrowLeft size={16} /></button>
+        </Tooltip>
+      )}
+      <Popover open={emojiOpen} onOpenChange={setEmojiOpen}>
+        <Tooltip content="更换项目图标" side="bottom" disabled={emojiOpen}>
+          <PopoverTrigger asChild>
+            <button type="button" aria-label="更换项目图标" className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-muted text-[18px] leading-none transition-transform hover:scale-105 active:scale-95">
+              {activeProject?.emoji || '😀'}
+            </button>
+          </PopoverTrigger>
+        </Tooltip>
+        <PopoverContent align="start" side="bottom" className="grid w-[188px] grid-cols-6 gap-1 p-2">
+          {PROJECT_EMOJIS.map((emoji) => (
+            <button
+              key={emoji}
+              type="button"
+              aria-label={`使用 ${emoji} 作为项目图标`}
+              onClick={() => { if (activeProject) setProjectEmoji(activeProject.id, emoji); setEmojiOpen(false); }}
+              className={cn('grid h-7 w-7 place-items-center rounded-md text-base transition-colors hover:bg-accent', activeProject?.emoji === emoji && 'bg-accent')}
+            >
+              {emoji}
+            </button>
+          ))}
+        </PopoverContent>
+      </Popover>
 
-      {/* Right: Extra Actions */}
-      <div className="pointer-events-auto flex items-center gap-2">
-         {/* History */}
-         <Card padding="sm" className="flex items-center gap-1 p-1">
-            <Button variant="ghost" size="iconSm"
-              onClick={undo}
-              disabled={!canUndo()}
-              title="撤销"
-            >
-              <Undo size={16} />
-            </Button>
-            <Separator orientation="vertical" className="h-4" />
-            <Button variant="ghost" size="iconSm"
-              onClick={redo}
-              disabled={!canRedo()}
-              title="重做"
-            >
-              <Redo size={16} />
-            </Button>
-         </Card>
+      {renaming === 'project' ? (
+        <InlineRename
+          value={projectName}
+          label="项目名称"
+          onCancel={() => setRenaming(null)}
+          onCommit={(value) => { if (activeProject && value.trim()) renameProject(activeProject.id, value); setRenaming(null); }}
+        />
+      ) : (
+        <Tooltip content="双击重命名" side="bottom">
+          <button type="button" onDoubleClick={() => setRenaming('project')} className="max-w-[180px] truncate rounded-md px-1.5 py-1 text-xs font-semibold text-foreground">
+            {projectName}
+          </button>
+        </Tooltip>
+      )}
 
-         {/* Actions */}
-         <Card padding="sm" className="flex items-center gap-1 p-1">
-            <Button variant="ghost" size="sm"
-              onClick={() => fileInputRef.current?.click()}
-            >
-              <FolderInput size={16} />
-              <span className="text-xs font-medium">导入</span>
-            </Button>
-            <Button variant="ghost" size="sm"
-              onClick={exportWorkflow}
-            >
-              <Save size={16} />
-              <span className="text-xs font-medium">存储</span>
-            </Button>
-            <Button variant="ghost" size="sm"
-              onClick={() => {
-                if (nodes.length === 0 && edges.length === 0) return;
-                if (window.confirm('确定清空当前画布吗？')) clearCanvas();
-              }}
-              className="text-destructive hover:bg-destructive/10 hover:text-destructive"
-            >
-              <Trash2 size={16} />
-              <span className="text-xs font-medium">清空</span>
-            </Button>
-         </Card>
-       </div>
-    </div>
+      <span aria-hidden="true" className="px-0.5 text-xs text-muted-foreground/60">/</span>
+
+      {renaming === 'board' ? (
+        <InlineRename
+          value={activeBoard}
+          label="画布页名称"
+          onCancel={() => setRenaming(null)}
+          onCommit={(value) => { onRenameBoard(activeBoard, value); setRenaming(null); }}
+        />
+      ) : (
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <button type="button" aria-label="切换画布页" className="flex h-8 max-w-[160px] items-center gap-1 rounded-md px-2 text-xs font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground data-[state=open]:bg-accent data-[state=open]:text-accent-foreground">
+              <span className="truncate">{activeBoard}</span>
+              <ChevronDown size={13} className="shrink-0" />
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="start" side="bottom" className="w-[208px]">
+            <DropdownMenuLabel>画布页</DropdownMenuLabel>
+            <DropdownMenuRadioGroup value={activeBoard} onValueChange={onSwitchBoard}>
+              {boards.map((board) => <DropdownMenuRadioItem key={board} value={board}>{board}</DropdownMenuRadioItem>)}
+            </DropdownMenuRadioGroup>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem icon={Plus} onSelect={onCreateBoard}>新建画布页</DropdownMenuItem>
+            <DropdownMenuItem icon={Pencil} onSelect={() => window.setTimeout(() => setRenaming('board'), 0)}>重命名当前页</DropdownMenuItem>
+            <DropdownMenuItem icon={Trash2} destructive disabled={boards.length <= 1} onSelect={() => onDeleteBoard(activeBoard)}>删除当前页</DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      )}
+    </motion.div>
+  );
+};
+
+/** 右上角：撤销、重做与 Agent 开关。Agent 打开时整体左移，避开面板。 */
+export const CanvasTopActions = ({ agentOpen, agentWidth, onToggleAgent }: { agentOpen: boolean; agentWidth: number; onToggleAgent: () => void }) => {
+  const undo = useCanvasStore((state) => state.undo);
+  const redo = useCanvasStore((state) => state.redo);
+  const canUndo = useCanvasStore((state) => state.undoStack.length > 0);
+  const canRedo = useCanvasStore((state) => state.redoStack.length > 0);
+
+  return (
+    <motion.div
+      initial={false}
+      animate={{ x: agentOpen ? -(agentWidth + 12) : 0 }}
+      transition={springs.smooth}
+      className="absolute right-3 top-3 z-30 flex items-center gap-2"
+    >
+      <div className="canvas-chrome flex h-11 items-center gap-0.5 rounded-xl px-1.5">
+        <Tooltip content="撤销" shortcut="⌘Z" side="bottom">
+          <button type="button" className="canvas-icon-button" aria-label="撤销" disabled={!canUndo} onClick={undo}><Undo size={16} /></button>
+        </Tooltip>
+        <Tooltip content="重做" shortcut="⇧⌘Z" side="bottom">
+          <button type="button" className="canvas-icon-button" aria-label="重做" disabled={!canRedo} onClick={redo}><Redo size={16} /></button>
+        </Tooltip>
+      </div>
+      {!agentOpen && (
+        <Tooltip content="画布 Agent" shortcut="⌘J" side="bottom">
+          <motion.button
+            type="button"
+            aria-label="打开画布 Agent"
+            aria-pressed={agentOpen}
+            onClick={onToggleAgent}
+            whileTap={{ scale: 0.96 }}
+            className="canvas-chrome flex h-11 items-center gap-1.5 rounded-xl px-3.5 text-xs font-semibold text-foreground"
+          >
+            <ChatAi size={16} />
+            Agent
+          </motion.button>
+        </Tooltip>
+      )}
+    </motion.div>
   );
 };

@@ -73,3 +73,6 @@ vendor/infinite-canvas/data/storage_settings.json
 vendor/infinite-canvas/global_config.json
 vendor/infinite-canvas/history.json
 .env*
+
+# Local screenshots and QA artifacts
+.artifacts/

@@ -97,9 +97,18 @@ test('asset API supports combined filters, durable updates, bulk operations, del
     const filteredResponse = await fetch(
       `${origin}/api/assets?query=volumetric&type=image&tagId=${cityTag},${nightTag}&favorite=true&ratingMin=4&folderId=${folder.id}`,
     );
-    const filtered = await filteredResponse.json() as { items: Array<{ id: string }>; total: number };
+    const filtered = await filteredResponse.json() as {
+      items: Array<{ id: string }>;
+      total: number;
+      counts: { all: number; unfiled: number; byType: Record<string, number> };
+    };
     assert.equal(filtered.total, 1);
     assert.equal(filtered.items[0].id, match.id);
+    assert.deepEqual(filtered.counts, {
+      all: 2,
+      unfiled: 1,
+      byType: { image: 1, video: 1, audio: 0 },
+    });
 
     const updatedResponse = await fetch(`${origin}/api/assets/${match.id}`, {
       method: 'PATCH',
@@ -142,6 +151,90 @@ test('asset API supports combined filters, durable updates, bulk operations, del
     await new Promise<void>((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));
     runtime.database.close();
     await fs.rm(filesDirectory, { recursive: true, force: true });
+  }
+});
+
+test('asset API separates source categories and persists favorites on creation', async () => {
+  const runtime = createRuntime();
+  const generatedImage = runtime.assets.create({
+    type: 'image',
+    title: 'Generated image',
+    userMetadata: { source: 'image-generation' },
+  });
+  const generatedVideo = runtime.assets.create({
+    type: 'video',
+    title: 'Generated video',
+    userMetadata: { source: 'video-generation' },
+  });
+  const canvasAsset = runtime.assets.create({
+    type: 'image',
+    title: 'Canvas image',
+    userMetadata: { source: 'canvas' },
+  });
+  const uploadedAsset = runtime.assets.create({
+    type: 'audio',
+    title: 'Uploaded audio',
+    userMetadata: { source: 'local-upload' },
+  });
+  const legacyUploadedAsset = runtime.assets.create({ type: 'image', title: 'Legacy upload' });
+  const caseAsset = runtime.assets.create({
+    type: 'video',
+    title: 'Favorite case',
+    favorite: true,
+    userMetadata: { source: 'case-library', caseId: 'case-1' },
+  });
+
+  const app = express();
+  app.use(express.json());
+  app.use('/api/assets', createAssetRouter(async () => runtime));
+  const server = app.listen(0, '127.0.0.1');
+  try {
+    await new Promise<void>((resolve, reject) => {
+      server.once('listening', resolve);
+      server.once('error', reject);
+    });
+    const origin = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
+    const readIds = async (query: string) => {
+      const response = await fetch(`${origin}/api/assets?${query}`);
+      assert.equal(response.status, 200);
+      const page = await response.json() as { items: Array<{ id: string }> };
+      return new Set(page.items.map((item) => item.id));
+    };
+
+    assert.deepEqual(
+      await readIds('origin=generated'),
+      new Set([generatedImage.id, generatedVideo.id]),
+    );
+    assert.deepEqual(await readIds('origin=canvas'), new Set([canvasAsset.id]));
+    assert.deepEqual(
+      await readIds('origin=uploaded'),
+      new Set([uploadedAsset.id, legacyUploadedAsset.id]),
+    );
+    assert.deepEqual(await readIds('favorite=true'), new Set([caseAsset.id]));
+
+    const createResponse = await fetch(`${origin}/api/assets`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        type: 'video',
+        title: 'Collected generation',
+        favorite: true,
+        sourceUrl: 'https://example.com/generated.mp4',
+        userMetadata: {
+          source: 'video-generation',
+          generatedUrl: 'https://example.com/generated.mp4',
+        },
+      }),
+    });
+    assert.equal(createResponse.status, 201);
+    const created = await createResponse.json() as { id: string; favorite: boolean };
+    assert.equal(created.favorite, true);
+    assert.equal(runtime.assets.get(created.id)?.favorite, true);
+    assert.equal((await readIds('origin=generated')).has(created.id), true);
+    assert.equal((await readIds('favorite=true')).has(created.id), true);
+  } finally {
+    await new Promise<void>((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));
+    runtime.database.close();
   }
 });
 
@@ -245,4 +338,88 @@ test('smart collection compiler only accepts allowlisted fields and operators', 
     match: 'all',
     conditions: [{ field: 'type', operator: 'contains', value: 'image' }],
   }), /不支持/);
+});
+
+test('asset API reveals and exports the original file without overwriting or leaving the chosen folder', async () => {
+  const runtime = createRuntime();
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), 'design-work-asset-export-'));
+  const sourcePath = path.join(root, 'library', 'generated.png');
+  const exportDirectory = path.join(root, 'export');
+  await fs.mkdir(path.dirname(sourcePath), { recursive: true });
+  await fs.mkdir(exportDirectory);
+  await fs.writeFile(sourcePath, 'png-bytes');
+  const fileReference = {
+    absolutePath: sourcePath,
+    volumeId: 'test',
+    fileName: 'generated.png',
+    extension: 'png',
+    mimeType: 'image/png',
+    fileSize: 9,
+    fileCreatedAt: Date.now(),
+    fileModifiedAt: Date.now(),
+    contentHash: 'hash-export',
+  };
+  // 标题里的路径分隔符不能让导出写到所选文件夹之外。
+  const asset = runtime.assets.create({ type: 'image', title: '../橙子/海报', fileReference });
+  const missing = runtime.assets.create({
+    type: 'image',
+    title: 'Moved away',
+    fileReference: { ...fileReference, absolutePath: path.join(root, 'gone.png'), contentHash: 'hash-gone' },
+  });
+  const noFile = runtime.assets.create({ type: 'image', title: 'Remote only' });
+
+  const revealed: string[] = [];
+  let pickedDirectory: string | null = exportDirectory;
+  const app = express();
+  app.use(express.json());
+  app.use(
+    '/api/assets',
+    createAssetRouter(
+      async () => runtime,
+      { pickFiles: async () => [], pickDirectory: async () => pickedDirectory },
+      undefined,
+      async (filePath) => { revealed.push(filePath); },
+    ),
+  );
+  const server = app.listen(0, '127.0.0.1');
+  try {
+    await new Promise<void>((resolve, reject) => {
+      server.once('listening', resolve);
+      server.once('error', reject);
+    });
+    const origin = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
+    const post = (url: string) => fetch(`${origin}${url}`, { method: 'POST' });
+
+    assert.equal((await post(`/api/assets/${asset.id}/reveal`)).status, 200);
+    assert.deepEqual(revealed, [sourcePath]);
+
+    const first = await (await post(`/api/assets/${asset.id}/export`)).json() as { cancelled: boolean; path: string };
+    const second = await (await post(`/api/assets/${asset.id}/export`)).json() as { cancelled: boolean; path: string };
+    assert.equal(first.cancelled, false);
+    assert.equal(path.dirname(first.path), exportDirectory);
+    assert.equal(path.basename(first.path), '橙子 海报.png');
+    assert.equal(path.basename(second.path), '橙子 海报 2.png');
+    assert.equal(await fs.readFile(first.path, 'utf8'), 'png-bytes');
+    assert.equal(await fs.readFile(sourcePath, 'utf8'), 'png-bytes');
+
+    pickedDirectory = null;
+    assert.deepEqual(await (await post(`/api/assets/${asset.id}/export`)).json(), { cancelled: true });
+    assert.deepEqual((await fs.readdir(exportDirectory)).sort(), ['橙子 海报 2.png', '橙子 海报.png']);
+
+    for (const [id, message] of [
+      [missing.id, /原文件已不在保存位置/],
+      [noFile.id, /没有保存到本地的文件/],
+      ['not-an-asset', /资产不存在/],
+    ] as const) {
+      for (const action of ['reveal', 'export']) {
+        const response = await post(`/api/assets/${id}/${action}`);
+        assert.equal(response.status, 404);
+        assert.match(((await response.json()) as { error: string }).error, message);
+      }
+    }
+    assert.deepEqual(revealed, [sourcePath]);
+  } finally {
+    server.close();
+    await fs.rm(root, { recursive: true, force: true });
+  }
 });

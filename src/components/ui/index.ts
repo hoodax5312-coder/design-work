@@ -24,3 +24,21 @@ export {
   cardVariants,
   type CardProps,
 } from './Card';
+export { Popover, PopoverTrigger, PopoverAnchor, PopoverClose, PopoverContent } from './Popover';
+export { Tooltip, TooltipProvider, type TooltipProps } from './Tooltip';
+export {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuGroup,
+  DropdownMenuItem,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuShortcut,
+  DropdownMenuSub,
+  DropdownMenuSubTrigger,
+  DropdownMenuSubContent,
+} from './DropdownMenu';
+export { Kbd } from './Kbd';

@@ -59,6 +59,10 @@ test('persists duplicate conflicts, merges paths and imports in one confirmed se
       await tasks.waitForIdle();
       assert.equal(tasks.get(commit.id)?.status, 'completed');
       assert.equal(database.prepare('SELECT COUNT(*) AS count FROM assets').get()?.count, 1);
+      const importedMetadata = database
+        .prepare('SELECT user_metadata FROM assets LIMIT 1')
+        .get() as { user_metadata: string };
+      assert.equal(JSON.parse(importedMetadata.user_metadata).source, 'local-upload');
       assert.equal(
         database.prepare('SELECT COUNT(*) AS count FROM file_references').get()?.count,
         2,

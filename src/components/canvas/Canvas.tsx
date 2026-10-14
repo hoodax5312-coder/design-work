@@ -1,574 +1,1101 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type DragEvent, type MouseEvent as ReactMouseEvent } from 'react';
 import {
   Background,
-  MiniMap,
+  BackgroundVariant,
   ReactFlow,
   ReactFlowProvider,
   SelectionMode,
+  useReactFlow,
   type Connection,
   type Edge,
+  type FinalConnectionState,
   type Node,
-  type ReactFlowInstance,
+  type XYPosition,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
-import {
-  ArrowLeft,
-  Bot,
-  ChevronDown,
-  Hand,
-  ImagePlus,
-  LayoutGrid,
-  Loader2,
-  Map,
-  MessageSquareText,
-  MousePointer2,
-  PanelLeftClose,
-  PanelLeftOpen,
-  Plus,
-  Send,
-  Settings2,
-  Type,
-  Upload,
-  Video,
-} from '@/lib/remixIconShim';
-import { cn } from '../../lib/utils';
-import { getConfiguredModels, getSelectedModel, providerSupportsCategory, useProviderStore } from '../../stores/useProviderStore';
-import { useCanvasStore } from '../../stores/useCanvasStore';
-import { useProjectStore } from '../../stores/useProjectStore';
+import './canvas.css';
+import { AiGenerate, Artboard, Clipboard, Copy, Focus, Layers, LayoutMasonry, Lock, SelectAll, StopFill, Trash2, Unlink, Unlock, Upload } from '@/lib/remixIconShim';
 import { workspaceCacheService } from '../../services/workspaceCacheService';
+import { liveObjectUrls, useCanvasStore, type CanvasClipboard } from '../../stores/useCanvasStore';
+import { useProjectStore } from '../../stores/useProjectStore';
+import { AnimatePresence, MotionConfig } from '../motion';
+import { DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, TooltipProvider } from '../ui';
+import { GroupNode } from '../nodes/GroupNode';
 import { ImageGenNode } from '../nodes/ImageGenNode';
+import { NoteNode } from '../nodes/NoteNode';
 import { TextNode } from '../nodes/TextNode';
 import { VideoNode } from '../nodes/VideoNode';
-import { Badge, Button, Card, Input, Select, Textarea } from '../ui';
+import { AGENT_PANEL_WIDTH, CanvasAgentPanel } from './CanvasAgentPanel';
+import { AnchoredMenu, NodePicker, type ScreenPoint } from './CanvasContextMenu';
+import { CanvasControls, FIT_OPTIONS } from './CanvasControls';
+import { CanvasHeader, CanvasTopActions } from './CanvasHeader';
+import {
+  ALIGN_ACTIONS,
+  CanvasEmptyState,
+  CanvasToast,
+  DropOverlay,
+  MediaLightbox,
+  SelectionToolbar,
+  ShortcutsDialog,
+  isDistributeMode,
+  type CanvasToastState,
+} from './CanvasOverlays';
+import { CanvasRail, type CanvasTool } from './CanvasToolbar';
+import { CanvasActionsContext, type CanvasActions, type PickerConnect } from './canvasContext';
+import {
+  ANNOTATION_LABEL,
+  groupMemberIds,
+  isAnnotationKind,
+  isCanvasNodeKind,
+  layoutLayers,
+  nextBoardName,
+  resolveProjectBoards,
+  type AgentPlan,
+  type AlignMode,
+  type CanvasAnnotationKind,
+  type CanvasNodeKind,
+  type CanvasWorkspaceCache,
+  type ProjectBoards,
+  type StoredChatMessage,
+} from './canvasModel';
+import { FlowEdge } from './FlowEdge';
+import { describeRunSummary, isNodeRunnable, runNodeGeneration, runNodesInOrder, stopNodeGenerations } from './generation';
+import { ANNOTATION_CATALOG_LIST, NODE_CATALOG, NODE_CATALOG_LIST, makeAnnotationNode, makeCanvasNode } from './nodeCatalog';
 
-const nodeTypes = { text: TextNode, imageGen: ImageGenNode, video: VideoNode };
-type Tool = 'select' | 'pan';
-type ToolbarMenu = 'tool' | 'image' | 'video';
-type CanvasNodeType = 'text' | 'imageGen' | 'video';
-type AgentMode = 'auto' | 'ask';
-type ChatMessage = { id: string; role: 'user' | 'assistant'; content: string };
-type BoardSnapshot = { nodes: Node[]; edges: Edge[] };
-type CanvasWorkspaceCache = {
-  boards: string[];
-  activeBoard: string;
-  snapshots: Record<string, BoardSnapshot>;
-  messages: Record<string, ChatMessage[]>;
+const nodeTypes = { text: TextNode, imageGen: ImageGenNode, video: VideoNode, note: NoteNode, group: GroupNode };
+const edgeTypes = { flow: FlowEdge };
+const defaultEdgeOptions = { type: 'flow' };
+const SNAP_GRID: [number, number] = [20, 20];
+const CLIPBOARD_MARKER = 'lizuo-canvas/v1:';
+const MESSAGE_LIMIT = 120;
+const CACHE_KEY = 'canvas-workspace';
+
+type PickerState = { screen: ScreenPoint; flow: XYPosition; connect?: PickerConnect; atPoint: boolean };
+type MenuState = { screen: ScreenPoint; flow: XYPosition; kind: 'pane' | 'node' | 'selection'; nodeId?: string };
+type MediaState = { kind: 'image' | 'video'; url: string; title: string };
+
+const isEditableTarget = (target: EventTarget | null) =>
+  target instanceof Element && Boolean(target.closest('input, textarea, select, [contenteditable="true"], [role="menu"], [role="dialog"], [role="listbox"], .nokey'));
+
+const nodeSize = (node: Node) => {
+  const width = node.measured?.width ?? node.width ?? 320;
+  const [w, h] = String(node.data?.aspectRatio || '1:1').split(':').map(Number);
+  const height = node.measured?.height ?? node.height ?? Math.round(width * ((h || 1) / (w || 1)));
+  return { width, height };
 };
 
-const PROJECT_EMOJIS = ['😀', '✨', '🌱', '🎨', '🚀', '🧩', '🌈', '🪄', '🐻', '🍀', '🌙', '🔥'];
+const edgeId = (source: string, target: string) => `xy-edge__${source}-${target}`;
 
-const createWelcomeMessage = (board: string): ChatMessage => ({
-  id: `welcome-${board}`,
-  role: 'assistant',
-  content: `当前正在操作「${board}」。告诉我你想创建什么，我可以把文本、图片和视频任务直接放到这个画布。`,
-});
-
-const NODE_META: Record<CanvasNodeType, { label: string; icon: React.ElementType; dot: string }> = {
-  text: { label: '文本', icon: Type, dot: 'bg-zinc-400' },
-  imageGen: { label: '图片', icon: ImagePlus, dot: 'bg-primary' },
-  video: { label: '视频', icon: Video, dot: 'bg-sky-400' },
+/** 从期望位置开始，沿竖直方向交替向下、向上寻找不与已有节点重叠的位置。 */
+const findFreeSlot = (desired: XYPosition, size: { width: number; height: number }, nodes: Node[], gap = 48) => {
+  const overlaps = (y: number) => nodes.some((other) => {
+    const box = nodeSize(other);
+    return desired.x < other.position.x + box.width + gap && desired.x + size.width + gap > other.position.x
+      && y < other.position.y + box.height + gap && y + size.height + gap > other.position.y;
+  });
+  const step = size.height + gap;
+  for (let index = 0; index < 24; index += 1) {
+    const offset = Math.ceil(index / 2) * step * (index % 2 ? 1 : -1);
+    if (!overlaps(desired.y + offset)) return { x: desired.x, y: desired.y + offset };
+  }
+  return desired;
 };
 
-const makeNode = (type: CanvasNodeType, position: { x: number; y: number }, data: Record<string, unknown> = {}): Node => {
-  const id = crypto.randomUUID();
-  if (type === 'text') return { id, type, position, data: { content: '', prompt: '', mode: 'edit', ...data } };
-  if (type === 'video') return { id, type, position, data: { prompt: '', model: '', aspectRatio: '16:9', resolution: '1080p', duration: 5, ...data } };
-  return { id, type, position, data: { prompt: '', model: '', style: '', resolution: '1k', aspectRatio: '1:1', isFocusMode: false, ...data } };
+/** 新节点与已有节点几乎重合时斜向错开，避免叠在一起看不出。 */
+const nudgeFromOverlap = (node: Node, taken: Node[]) => {
+  for (let guard = 0; guard < 12; guard += 1) {
+    const overlapping = taken.some((other) => Math.abs(other.position.x - node.position.x) < 24 && Math.abs(other.position.y - node.position.y) < 24);
+    if (!overlapping) break;
+    node.position = { x: node.position.x + 32, y: node.position.y + 32 };
+  }
+  return node;
 };
+
+/** 放入文件得到的 blob 地址只在本次会话有效；登记后，恢复画布时才能区分仍有效与已失效的地址。 */
+const sessionObjectUrl = (file: File) => {
+  const url = URL.createObjectURL(file);
+  liveObjectUrls.add(url);
+  return url;
+};
+
+type GroupFollower = { group: string; origin: XYPosition; start: XYPosition };
 
 const CanvasInner = ({ onBack }: { onBack?: () => void }) => {
-  const flowRef = useRef<ReactFlowInstance | null>(null);
-  const mediaInputRef = useRef<HTMLInputElement>(null);
-  const toolbarRef = useRef<HTMLDivElement>(null);
-  const [tool, setTool] = useState<Tool>('select');
-  const [toolbarMenu, setToolbarMenu] = useState<ToolbarMenu | null>(null);
-  const [showMinimap, setShowMinimap] = useState(false);
-  const [showExplorer, setShowExplorer] = useState(false);
-  const [projectEmojiOpen, setProjectEmojiOpen] = useState(false);
-  const [editingProjectName, setEditingProjectName] = useState(false);
-  const [projectNameDraft, setProjectNameDraft] = useState('');
-  const [showAgent, setShowAgent] = useState(false);
-  const [agentSettingsOpen, setAgentSettingsOpen] = useState(false);
-  const [boards, setBoards] = useState(['画布 1', '画布 2']);
-  const [activeBoard, setActiveBoard] = useState('画布 1');
-  const activeBoardRef = useRef('画布 1');
-  const [notice, setNotice] = useState<string | null>(null);
-  const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
-  const [agentMode, setAgentMode] = useState<AgentMode>('auto');
-  const [agentModel, setAgentModel] = useState('');
-  const [agentPrompt, setAgentPrompt] = useState('');
-  const [agentWorking, setAgentWorking] = useState(false);
-  const [messages, setMessages] = useState<ChatMessage[]>([createWelcomeMessage('画布 1')]);
+  const flow = useReactFlow();
+  const wrapperRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const pointerRef = useRef<ScreenPoint | null>(null);
+  const clipboardRef = useRef<CanvasClipboard | null>(null);
+  const uploadTargetRef = useRef<XYPosition | null>(null);
+
+  const [tool, setTool] = useState<CanvasTool>('select');
+  const [spacePan, setSpacePan] = useState(false);
+  const [connecting, setConnecting] = useState(false);
+  const [snapToGrid, setSnapToGrid] = useState(false);
+  const [picker, setPicker] = useState<PickerState | null>(null);
+  const [menu, setMenu] = useState<MenuState | null>(null);
+  const [agentOpen, setAgentOpen] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [shortcutsOpen, setShortcutsOpen] = useState(false);
+  const [media, setMedia] = useState<MediaState | null>(null);
+  const [toast, setToast] = useState<CanvasToastState | null>(null);
+  const [dragOver, setDragOver] = useState(false);
 
   const nodes = useCanvasStore((state) => state.nodes);
   const edges = useCanvasStore((state) => state.edges);
+  const selectedIds = useCanvasStore((state) => state.selectedNodes);
   const onNodesChange = useCanvasStore((state) => state.onNodesChange);
   const onEdgesChange = useCanvasStore((state) => state.onEdgesChange);
   const onConnect = useCanvasStore((state) => state.onConnect);
-  const addNode = useCanvasStore((state) => state.addNode);
+  const commit = useCanvasStore((state) => state.commit);
+  const addNodes = useCanvasStore((state) => state.addNodes);
+  const removeNodes = useCanvasStore((state) => state.removeNodes);
+  const selectNodes = useCanvasStore((state) => state.selectNodes);
+  const duplicateNodes = useCanvasStore((state) => state.duplicateNodes);
+  const disconnectNodes = useCanvasStore((state) => state.disconnectNodes);
+  const alignNodes = useCanvasStore((state) => state.alignNodes);
+  const setLocked = useCanvasStore((state) => state.setLocked);
+  const moveNodes = useCanvasStore((state) => state.moveNodes);
+  const groupNodes = useCanvasStore((state) => state.groupNodes);
+  const pasteNodes = useCanvasStore((state) => state.pasteNodes);
+  const tidyNodes = useCanvasStore((state) => state.tidyNodes);
   const undo = useCanvasStore((state) => state.undo);
   const redo = useCanvasStore((state) => state.redo);
   const restoreSnapshot = useCanvasStore((state) => state.restoreSnapshot);
-  const activeProject = useProjectStore((state) => state.projects.find((project) => project.id === state.activeProjectId));
-  const saveProjectCanvas = useProjectStore((state) => state.saveProjectCanvas);
-  const renameProject = useProjectStore((state) => state.renameProject);
-  const setProjectEmoji = useProjectStore((state) => state.setProjectEmoji);
-  const activeProjectName = activeProject?.name || '创作空间';
-  const activeProjectEmoji = activeProject?.emoji || '😀';
-  const boardSnapshotsRef = useRef<Record<string, BoardSnapshot>>({});
-  const boardMessagesRef = useRef<Record<string, ChatMessage[]>>({});
-  const boardsInitializedRef = useRef(false);
-  const canvasCacheLoadedRef = useRef(false);
+  const setZoom = useCanvasStore((state) => state.setZoom);
+  const projectId = useProjectStore((state) => state.activeProjectId);
 
-  useEffect(() => {
-    if (!activeProject) return undefined;
-    const timer = window.setTimeout(() => {
-      saveProjectCanvas(activeProject.id, { nodes, edges });
-    }, 240);
-    return () => window.clearTimeout(timer);
-  }, [activeProject, edges, nodes, saveProjectCanvas]);
+  /* ---------- 提示条 ---------- */
 
-  const providers = useProviderStore((state) => state.providers);
-  const activeProviderId = useProviderStore((state) => state.activeProviderIds.language);
-  const languageModels = useMemo(() => providers.flatMap((provider) => getConfiguredModels(provider, 'language')
-    .map((model) => ({ value: `${provider.id}::${model.id}`, label: model.id, provider }))), [providers]);
-  const fallbackProvider = providers.find((provider) => provider.id === activeProviderId && providerSupportsCategory(provider, 'language')) || languageModels[0]?.provider;
-  const resolvedAgentModel = languageModels.some((item) => item.value === agentModel)
-    ? agentModel
-    : fallbackProvider && getSelectedModel(fallbackProvider, 'language')
-    ? `${fallbackProvider.id}::${getSelectedModel(fallbackProvider, 'language')}`
-    : languageModels[0]?.value || '';
+  const toastTimer = useRef<number>();
+  const notify = useCallback((message: string, action?: CanvasToastState['action']) => {
+    window.clearTimeout(toastTimer.current);
+    setToast({ id: Date.now(), message, action });
+    toastTimer.current = window.setTimeout(() => setToast(null), action ? 5200 : 2400);
+  }, []);
+  useEffect(() => () => window.clearTimeout(toastTimer.current), []);
 
-  useEffect(() => {
-    let cancelled = false;
-    void workspaceCacheService.read<CanvasWorkspaceCache>('canvas-workspace')
-      .then((cached) => {
-        if (cancelled) return;
-        if (cached?.boards?.length) {
-          boardSnapshotsRef.current = cached.snapshots || {};
-          boardMessagesRef.current = cached.messages || {};
-          activeBoardRef.current = cached.activeBoard || cached.boards[0];
-          setBoards(cached.boards);
-          setActiveBoard(activeBoardRef.current);
-          const snapshot = boardSnapshotsRef.current[activeBoardRef.current] || { nodes: [], edges: [] };
-          const nextMessages = boardMessagesRef.current[activeBoardRef.current] || [createWelcomeMessage(activeBoardRef.current)];
-          setMessages(nextMessages);
-          restoreSnapshot(snapshot.nodes, snapshot.edges);
-        }
-        canvasCacheLoadedRef.current = true;
-      })
-      .catch(() => { canvasCacheLoadedRef.current = true; });
-    return () => { cancelled = true; };
-  }, [restoreSnapshot]);
+  /* ---------- 坐标 ---------- */
 
-  useEffect(() => {
-    if (!canvasCacheLoadedRef.current || !boardsInitializedRef.current) return;
-    const timer = window.setTimeout(() => {
-      void workspaceCacheService.write('canvas-workspace', {
-        boards,
-        activeBoard: activeBoardRef.current,
-        snapshots: boardSnapshotsRef.current,
-        messages: boardMessagesRef.current,
-      }).catch(() => undefined);
-    }, 240);
-    return () => window.clearTimeout(timer);
-  }, [boards, activeBoard, edges, messages, nodes]);
+  const visibleCenter = useCallback((): XYPosition => {
+    const rect = wrapperRef.current?.getBoundingClientRect();
+    if (!rect) return { x: 0, y: 0 };
+    const usableWidth = rect.width - (agentOpen ? AGENT_PANEL_WIDTH + 24 : 0);
+    return flow.screenToFlowPosition({ x: rect.left + usableWidth / 2, y: rect.top + rect.height / 2 });
+  }, [agentOpen, flow]);
 
-  const beginProjectNameEdit = () => {
-    setProjectNameDraft(activeProjectName);
-    setEditingProjectName(true);
-  };
+  /** 鼠标在画布内时用鼠标位置，否则用可见区域中心。 */
+  const insertionPoint = useCallback((): XYPosition => {
+    const rect = wrapperRef.current?.getBoundingClientRect();
+    const pointer = pointerRef.current;
+    if (rect && pointer && pointer.x > rect.left && pointer.x < rect.right && pointer.y > rect.top && pointer.y < rect.bottom) {
+      return flow.screenToFlowPosition(pointer);
+    }
+    return visibleCenter();
+  }, [flow, visibleCenter]);
 
-  const commitProjectName = () => {
-    if (activeProject && projectNameDraft.trim()) renameProject(activeProject.id, projectNameDraft);
-    setEditingProjectName(false);
-  };
+  const focusNodes = useCallback((ids: string[], select = true) => {
+    if (!ids.length) return;
+    if (select) selectNodes(ids);
+    window.setTimeout(() => void flow.fitView({ nodes: ids.map((id) => ({ id })), padding: 0.32, maxZoom: 1, duration: 320 }), 40);
+  }, [flow, selectNodes]);
 
-  const selectProjectEmoji = (emoji: string) => {
-    if (activeProject) setProjectEmoji(activeProject.id, emoji);
-    setProjectEmojiOpen(false);
-  };
+  /* ---------- 新建节点 ---------- */
 
-  useEffect(() => {
-    if (boardsInitializedRef.current) return;
-    boardSnapshotsRef.current = {
-      '画布 1': { nodes, edges },
-      '画布 2': { nodes: [], edges: [] },
-    };
-    boardMessagesRef.current = {
-      '画布 1': messages,
-      '画布 2': [createWelcomeMessage('画布 2')],
-    };
-    boardsInitializedRef.current = true;
-  }, [edges, messages, nodes]);
-
-  useEffect(() => {
-    if (!boardsInitializedRef.current) return;
-    boardSnapshotsRef.current[activeBoardRef.current] = { nodes, edges };
-  }, [activeBoard, edges, nodes]);
-
-  useEffect(() => {
-    if (!boardsInitializedRef.current) return;
-    boardMessagesRef.current[activeBoardRef.current] = messages;
-  }, [activeBoard, messages]);
-
-  const switchBoard = useCallback((board: string) => {
-    const currentBoard = activeBoardRef.current;
-    if (board === currentBoard) return;
-    boardSnapshotsRef.current[currentBoard] = { nodes, edges };
-    boardMessagesRef.current[currentBoard] = messages;
-    const nextSnapshot = boardSnapshotsRef.current[board] || { nodes: [], edges: [] };
-    const nextMessages = boardMessagesRef.current[board] || [createWelcomeMessage(board)];
-    activeBoardRef.current = board;
-    setActiveBoard(board);
-    setMessages(nextMessages);
-    restoreSnapshot(nextSnapshot.nodes, nextSnapshot.edges);
-    window.setTimeout(() => void flowRef.current?.fitView({ duration: 220, padding: 0.28 }), 20);
-  }, [edges, messages, nodes, restoreSnapshot]);
-
-  const createBoard = useCallback(() => {
-    const nextName = `画布 ${boards.length + 1}`;
-    boardSnapshotsRef.current[nextName] = { nodes: [], edges: [] };
-    boardMessagesRef.current[nextName] = [createWelcomeMessage(nextName)];
-    setBoards((current) => [...current, nextName]);
-    switchBoard(nextName);
-  }, [boards.length, switchBoard]);
-
-  const selectedIds = useMemo(() => new Set(nodes.filter((node) => node.selected).map((node) => node.id)), [nodes]);
-  const visibleEdges = useMemo(() => selectedIds.size
-    ? edges.filter((edge) => selectedIds.has(edge.source) || selectedIds.has(edge.target))
-    : [], [edges, selectedIds]);
-
-  const addAtCenter = useCallback((type: CanvasNodeType, data: Record<string, unknown> = {}) => {
-    const center = flowRef.current?.screenToFlowPosition({ x: window.innerWidth * 0.5, y: window.innerHeight * 0.48 });
-    const position = center || { x: 180 + nodes.length * 28, y: 120 + nodes.length * 24 };
-    const node = makeNode(type, position, data);
-    addNode(node);
-    window.setTimeout(() => flowRef.current?.setCenter(position.x + 210, position.y + 140, { zoom: 0.9, duration: 260 }), 20);
-    setNotice(`已添加${NODE_META[type].label}节点`);
+  /** 在指定点（节点中心）放一个新节点；与已有节点重叠时错开。 */
+  const addNodeAt = useCallback((kind: CanvasNodeKind, point: XYPosition, data: Record<string, unknown> = {}) => {
+    const node = nudgeFromOverlap(makeCanvasNode(kind, point, data, { centered: true }), useCanvasStore.getState().nodes);
+    addNodes([node]);
     return node;
-  }, [addNode, nodes.length]);
+  }, [addNodes]);
 
-  useEffect(() => {
-    if (!notice) return;
-    const timer = window.setTimeout(() => setNotice(null), 2200);
-    return () => window.clearTimeout(timer);
-  }, [notice]);
+  /** 便签与分组只是批注：不参与生成，也不接受连线。 */
+  const addAnnotationAt = useCallback((kind: CanvasAnnotationKind, point: XYPosition) => {
+    const node = nudgeFromOverlap(makeAnnotationNode(kind, point), useCanvasStore.getState().nodes);
+    addNodes([node]);
+    return node;
+  }, [addNodes]);
 
-  useEffect(() => {
-    const close = () => setContextMenu(null);
-    window.addEventListener('mousedown', close);
-    return () => window.removeEventListener('mousedown', close);
-  }, []);
+  const addFromShortcut = useCallback((kind: CanvasNodeKind) => addNodeAt(kind, insertionPoint()), [addNodeAt, insertionPoint]);
 
-  useEffect(() => {
-    if (!toolbarMenu) return;
-    const closeOnOutsideClick = (event: MouseEvent) => {
-      if (!event.composedPath().includes(toolbarRef.current as EventTarget)) setToolbarMenu(null);
-    };
-    const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') setToolbarMenu(null);
-    };
-    window.addEventListener('mousedown', closeOnOutsideClick);
-    window.addEventListener('keydown', closeOnEscape);
-    return () => {
-      window.removeEventListener('mousedown', closeOnOutsideClick);
-      window.removeEventListener('keydown', closeOnEscape);
-    };
-  }, [toolbarMenu]);
+  const openPicker = useCallback<CanvasActions['openPicker']>((screen, options = {}) => {
+    setMenu(null);
+    setPicker({
+      screen,
+      flow: options.flowPosition ?? flow.screenToFlowPosition(screen),
+      connect: options.connect,
+      atPoint: Boolean(options.flowPosition) || !options.connect,
+    });
+  }, [flow]);
 
-  useEffect(() => {
-    const switchToolWithShortcut = (event: KeyboardEvent) => {
-      const target = event.target as HTMLElement | null;
-      if (target?.matches('input, textarea, select, [contenteditable="true"]')) return;
-      if (event.key.toLowerCase() === 'v') setTool('select');
-      if (event.key.toLowerCase() === 'h') setTool('pan');
-    };
-    window.addEventListener('keydown', switchToolWithShortcut);
-    return () => window.removeEventListener('keydown', switchToolWithShortcut);
-  }, []);
-
-  useEffect(() => {
-    const handleHistoryShortcut = (event: KeyboardEvent) => {
-      if (!(event.ctrlKey || event.metaKey)) return;
-      const target = event.target as HTMLElement | null;
-      if (target?.matches('input, textarea, select, [contenteditable="true"]')) return;
-      const key = event.key.toLowerCase();
-      if (key === 'z') {
-        event.preventDefault();
-        if (event.shiftKey) redo();
-        else undo();
-      } else if (key === 'y' && event.ctrlKey) {
-        event.preventDefault();
-        redo();
-      }
-    };
-    window.addEventListener('keydown', handleHistoryShortcut);
-    return () => window.removeEventListener('keydown', handleHistoryShortcut);
-  }, [redo, undo]);
-
-  const importMedia = (file?: File) => {
-    if (!file) return;
-    const url = URL.createObjectURL(file);
-    if (file.type.startsWith('video/')) addAtCenter('video', { prompt: file.name, previewUrl: url, status: '本地视频已放入画布' });
-    else if (file.type.startsWith('image/')) addAtCenter('imageGen', { prompt: file.name, imageUrl: url });
-    else addAtCenter('text', { content: file.name });
-  };
-
-  const submitAgent = async () => {
-    const prompt = agentPrompt.trim();
-    if (!prompt || agentWorking) return;
-    setMessages((current) => [...current, { id: crypto.randomUUID(), role: 'user', content: prompt }]);
-    setAgentPrompt('');
-    if (agentMode === 'ask') {
-      setMessages((current) => [...current, { id: crypto.randomUUID(), role: 'assistant', content: '已理解任务。切换到「自动执行」后，我会将结果直接放入当前画布。' }]);
+  const createFromPicker = useCallback((kind: CanvasNodeKind) => {
+    if (!picker) return;
+    const { connect, flow: point, atPoint } = picker;
+    if (!connect) {
+      addNodeAt(kind, point);
       return;
     }
-    setAgentWorking(true);
-    await new Promise((resolve) => window.setTimeout(resolve, 520));
-    const lowerPrompt = prompt.toLowerCase();
-    const type: CanvasNodeType = /视频|video|动画|镜头/.test(lowerPrompt) ? 'video' : /图片|图像|image|海报|插画/.test(lowerPrompt) ? 'imageGen' : 'text';
-    const data = type === 'text' ? { content: prompt, prompt } : { prompt };
-    addAtCenter(type, data);
-    setMessages((current) => [...current, { id: crypto.randomUUID(), role: 'assistant', content: `已调用画布工具，并创建${NODE_META[type].label}节点。你可以继续编辑节点内容或连接其他素材。` }]);
-    setAgentWorking(false);
+    const anchor = useCanvasStore.getState().nodes.find((node) => node.id === connect.nodeId);
+    if (!anchor) return;
+    const node = makeCanvasNode(kind, { x: 0, y: 0 });
+    const size = nodeSize(node);
+    const anchorSize = nodeSize(anchor);
+    const downstream = connect.side === 'source';
+    const position = atPoint
+      ? { x: downstream ? point.x : point.x - size.width, y: point.y - size.height / 2 }
+      : {
+          x: downstream ? anchor.position.x + anchorSize.width + 120 : anchor.position.x - 120 - size.width,
+          y: anchor.position.y + anchorSize.height / 2 - size.height / 2,
+        };
+    const slot = atPoint ? position : findFreeSlot(position, size, useCanvasStore.getState().nodes);
+    node.position = { x: Math.round(slot.x), y: Math.round(slot.y) };
+    const [source, target] = downstream ? [anchor.id, node.id] : [node.id, anchor.id];
+    addNodes([node], [{ id: edgeId(source, target), source, target, type: 'flow' }]);
+  }, [addNodeAt, addNodes, picker]);
+
+  const createAnnotationFromPicker = useCallback((kind: CanvasAnnotationKind) => {
+    if (picker && !picker.connect) addAnnotationAt(kind, picker.flow);
+  }, [addAnnotationAt, picker]);
+
+  /* ---------- 上传与粘贴 ---------- */
+
+  const importFiles = useCallback(async (files: File[], at: XYPosition) => {
+    const created: Node[] = [];
+    let skipped = 0;
+    for (const [index, file] of files.entries()) {
+      const point = { x: at.x + index * 40, y: at.y + index * 40 };
+      if (file.type.startsWith('image/')) {
+        created.push(makeCanvasNode('imageGen', point, { title: file.name, imageUrl: sessionObjectUrl(file), source: 'upload' }, { centered: true }));
+      } else if (file.type.startsWith('video/')) {
+        created.push(makeCanvasNode('video', point, { title: file.name, previewUrl: sessionObjectUrl(file), source: 'upload' }, { centered: true }));
+      } else if (/\.(txt|md)$/i.test(file.name) || file.type.startsWith('text/')) {
+        created.push(makeCanvasNode('text', point, { title: file.name, content: await file.text() }, { centered: true }));
+      } else {
+        skipped += 1;
+      }
+    }
+    if (created.length) addNodes(created);
+    if (skipped) notify(`有 ${skipped} 个文件类型不支持，只能放入图片、视频或文本`);
+    else if (created.length) notify(`已放入 ${created.length} 个素材`);
+  }, [addNodes, notify]);
+
+  const openUpload = useCallback((at?: XYPosition) => {
+    uploadTargetRef.current = at ?? null;
+    fileInputRef.current?.click();
+  }, []);
+
+  const copySelection = useCallback((cut = false) => {
+    const { nodes: all, edges: allEdges, selectedNodes } = useCanvasStore.getState();
+    const picked = new Set(selectedNodes);
+    if (!picked.size) return;
+    const clip: CanvasClipboard = {
+      nodes: all.filter((node) => picked.has(node.id)),
+      edges: allEdges.filter((edge) => picked.has(edge.source) && picked.has(edge.target)),
+    };
+    clipboardRef.current = clip;
+    void navigator.clipboard?.writeText(CLIPBOARD_MARKER + JSON.stringify(clip)).catch(() => undefined);
+    if (cut) {
+      const removed = removeNodes([...picked]);
+      const skipped = picked.size - removed;
+      if (!removed) notify('所选节点都已锁定，只复制、未剪切');
+      else notify(skipped ? `已剪切 ${removed} 个节点，${skipped} 个锁定节点只复制` : `已剪切 ${removed} 个节点`);
+    } else {
+      notify(`已复制 ${picked.size} 个节点`);
+    }
+  }, [notify, removeNodes]);
+
+  const pasteClipboard = useCallback((clip: CanvasClipboard | null, at: XYPosition) => {
+    if (!clip?.nodes.length) return;
+    const ids = pasteNodes(clip, at);
+    if (ids.length) notify(`已粘贴 ${ids.length} 个节点`);
+  }, [notify, pasteNodes]);
+
+  useEffect(() => {
+    const onPaste = (event: ClipboardEvent) => {
+      if (isEditableTarget(event.target) || !event.clipboardData) return;
+      const files = [...event.clipboardData.files];
+      if (files.length) {
+        event.preventDefault();
+        void importFiles(files, insertionPoint());
+        return;
+      }
+      const text = event.clipboardData.getData('text/plain');
+      if (text.startsWith(CLIPBOARD_MARKER)) {
+        event.preventDefault();
+        try {
+          const clip = JSON.parse(text.slice(CLIPBOARD_MARKER.length)) as CanvasClipboard;
+          if (Array.isArray(clip.nodes) && Array.isArray(clip.edges)) pasteClipboard(clip, insertionPoint());
+        } catch {
+          notify('剪贴板内容已损坏，无法粘贴');
+        }
+        return;
+      }
+      if (text.trim()) {
+        event.preventDefault();
+        addNodeAt('text', insertionPoint(), { content: text });
+      }
+    };
+    window.addEventListener('paste', onPaste);
+    return () => window.removeEventListener('paste', onPaste);
+  }, [addNodeAt, importFiles, insertionPoint, notify, pasteClipboard]);
+
+  /* ---------- 节点操作 ---------- */
+
+  const runSelected = useCallback((ids = useCanvasStore.getState().selectedNodes) => {
+    const { nodes: all, edges: allEdges } = useCanvasStore.getState();
+    const picked = all.filter((node) => ids.includes(node.id));
+    if (!picked.length) {
+      notify('先选择要生成的节点');
+      return;
+    }
+    const runnable = picked.filter((node) => isNodeRunnable(node, all, allEdges)).map((node) => node.id);
+    if (!runnable.length) {
+      notify(picked.every((node) => isAnnotationKind(node.type)) ? '便签和分组不参与生成' : '所选节点还没有提示词，或正在生成');
+      return;
+    }
+    if (runnable.length === 1) {
+      void runNodeGeneration(runnable[0]);
+      return;
+    }
+    notify(`开始运行 ${runnable.length} 个节点`);
+    void runNodesInOrder(runnable).then((summary) => notify(describeRunSummary(summary)));
+  }, [notify]);
+
+  const deleteWithUndo = useCallback((ids: string[]) => {
+    if (!ids.length) return;
+    const removed = removeNodes(ids);
+    if (!removed) {
+      notify('所选节点都已锁定，解锁后才能删除');
+      return;
+    }
+    const skipped = ids.length - removed;
+    notify(skipped ? `已删除 ${removed} 个节点，跳过 ${skipped} 个锁定节点` : `已删除 ${removed} 个节点`, { label: '撤销', run: undo });
+  }, [notify, removeNodes, undo]);
+
+  /** 键盘删除走 xyflow 自带流程，锁定节点已被过滤掉；这里补上与菜单删除一致的提示。 */
+  const handleBeforeDelete = useCallback(async ({ nodes: removing }: { nodes: Node[]; edges: Edge[] }) => {
+    const { nodes: all, selectedNodes } = useCanvasStore.getState();
+    const removingIds = new Set(removing.map((node) => node.id));
+    const skipped = all.filter((node) => selectedNodes.includes(node.id) && node.data?.locked && !removingIds.has(node.id)).length;
+    if (skipped && !removing.length) notify('所选节点都已锁定，解锁后才能删除');
+    else if (removing.length) notify(skipped ? `已删除 ${removing.length} 个节点，跳过 ${skipped} 个锁定节点` : `已删除 ${removing.length} 个节点`, { label: '撤销', run: undo });
+    return true;
+  }, [notify, undo]);
+
+  const tidy = useCallback((ids?: string[]) => {
+    const scope = ids?.length ? ids : undefined;
+    // 便签和分组不参与整理，只按可生成的节点计数。
+    const pool = useCanvasStore.getState().nodes.filter((node) => isCanvasNodeKind(node.type) && (!scope || scope.includes(node.id)));
+    if (pool.length < 2) {
+      notify('至少需要两个节点才能整理');
+      return;
+    }
+    tidyNodes(scope);
+    window.setTimeout(() => void flow.fitView({ ...FIT_OPTIONS, nodes: scope?.map((id) => ({ id })) }), 40);
+    notify('已按连线整理布局', { label: '撤销', run: undo });
+  }, [flow, notify, tidyNodes, undo]);
+
+  const groupSelection = useCallback((ids = useCanvasStore.getState().selectedNodes) => {
+    const picked = new Set(ids);
+    const members = useCanvasStore.getState().nodes.filter((node) => picked.has(node.id) && node.type !== 'group');
+    if (!members.length) {
+      notify('先选择要编组的节点');
+      return;
+    }
+    if (groupNodes(members.map((node) => node.id))) notify(`已编组 ${members.length} 个节点`, { label: '撤销', run: undo });
+  }, [groupNodes, notify, undo]);
+
+  /** 解散分组只删画框，组内节点留在原处。 */
+  const ungroupSelection = useCallback((ids = useCanvasStore.getState().selectedNodes) => {
+    const picked = new Set(ids);
+    const groups = useCanvasStore.getState().nodes.filter((node) => picked.has(node.id) && node.type === 'group');
+    if (!groups.length) return;
+    const removed = removeNodes(groups.map((node) => node.id));
+    if (!removed) notify('所选分组已锁定，解锁后才能解散');
+    else notify(`已解散 ${removed} 个分组，组内节点保留`, { label: '撤销', run: undo });
+  }, [notify, removeNodes, undo]);
+
+  const toggleLockSelection = useCallback((ids = useCanvasStore.getState().selectedNodes) => {
+    const picked = new Set(ids);
+    const targets = useCanvasStore.getState().nodes.filter((node) => picked.has(node.id));
+    if (!targets.length) return;
+    const lock = !targets.every((node) => node.data?.locked);
+    setLocked(targets.map((node) => node.id), lock);
+    notify(lock ? `已锁定 ${targets.length} 个节点：不可拖动、缩放或删除` : `已解锁 ${targets.length} 个节点`);
+  }, [notify, setLocked]);
+
+  const alignSelection = useCallback((mode: AlignMode, ids = useCanvasStore.getState().selectedNodes) => {
+    const picked = new Set(ids);
+    const movable = useCanvasStore.getState().nodes.filter((node) => picked.has(node.id) && !node.data?.locked).map((node) => node.id);
+    const distribute = isDistributeMode(mode);
+    if (movable.length < (distribute ? 3 : 2)) {
+      notify(distribute ? '均分至少需要 3 个未锁定的节点' : '对齐至少需要 2 个未锁定的节点');
+      return;
+    }
+    alignNodes(movable, mode);
+  }, [alignNodes, notify]);
+
+  const stopSelection = useCallback((ids = useCanvasStore.getState().selectedNodes) => {
+    const stopped = stopNodeGenerations(ids);
+    if (stopped) notify(`已在本地停止 ${stopped} 个生成；供应商侧可能仍会完成并计费`);
+  }, [notify]);
+
+  /** 侧栏的分组按钮：有选区时编组所选，否则在视野中心新建空画框。 */
+  const addAnnotation = useCallback((kind: CanvasAnnotationKind) => {
+    const { nodes: all, selectedNodes } = useCanvasStore.getState();
+    const picked = new Set(selectedNodes);
+    if (kind === 'group' && all.some((node) => picked.has(node.id) && node.type !== 'group')) {
+      groupSelection(selectedNodes);
+      return;
+    }
+    addAnnotationAt(kind, visibleCenter());
+  }, [addAnnotationAt, groupSelection, visibleCenter]);
+
+  const selectionStats = useMemo(() => {
+    const picked = new Set(selectedIds);
+    const selection = nodes.filter((node) => picked.has(node.id));
+    return {
+      runnable: selection.filter((node) => isNodeRunnable(node, nodes, edges)).length,
+      generating: selection.filter((node) => node.data?.isGenerating).length,
+      allLocked: selection.length > 0 && selection.every((node) => node.data?.locked),
+    };
+  }, [edges, nodes, selectedIds]);
+
+  /* ---------- 连线 ---------- */
+
+  const isValidConnection = useCallback((connection: Edge | Connection) => {
+    const { source, target } = connection;
+    if (!source || !target || source === target) return false;
+    const { nodes: allNodes, edges: allEdges } = useCanvasStore.getState();
+    // 便签与分组不参与生成，也不接受连线。
+    if (allNodes.some((node) => (node.id === source || node.id === target) && isAnnotationKind(node.type))) return false;
+    if (allEdges.some((edge) => edge.source === source && edge.target === target)) return false;
+    const downstream = new Map<string, string[]>();
+    allEdges.forEach((edge) => downstream.set(edge.source, [...(downstream.get(edge.source) || []), edge.target]));
+    const stack = [target];
+    const seen = new Set<string>();
+    while (stack.length) {
+      const id = stack.pop() as string;
+      if (id === source) return false;
+      if (seen.has(id)) continue;
+      seen.add(id);
+      stack.push(...(downstream.get(id) || []));
+    }
+    return true;
+  }, []);
+
+  const handleConnectEnd = useCallback((event: MouseEvent | TouchEvent, state: FinalConnectionState) => {
+    setConnecting(false);
+    if (state.isValid || !state.fromNode || !state.fromHandle) return;
+    const point = 'changedTouches' in event ? event.changedTouches[0] : event;
+    if (!point) return;
+    const fromId = state.fromNode.id;
+    const side = state.fromHandle.type;
+    const hit = document.elementFromPoint(point.clientX, point.clientY);
+    const otherId = hit?.closest('.react-flow__node')?.getAttribute('data-id');
+    const other = otherId ? useCanvasStore.getState().nodes.find((node) => node.id === otherId) : undefined;
+    // 松开在便签或分组上，与松开在空白处一样：在该点新建节点。
+    if (other && !isAnnotationKind(other.type)) {
+      if (other.id === fromId) return;
+      const connection: Connection = side === 'source'
+        ? { source: fromId, target: other.id, sourceHandle: null, targetHandle: null }
+        : { source: other.id, target: fromId, sourceHandle: null, targetHandle: null };
+      if (isValidConnection(connection)) onConnect(connection);
+      else notify('无法连接：会形成循环或重复连线');
+      return;
+    }
+    if (!other && !hit?.closest('.react-flow__pane')) return;
+    const screen = { x: point.clientX, y: point.clientY };
+    openPicker(screen, { connect: { nodeId: fromId, side }, flowPosition: flow.screenToFlowPosition(screen) });
+  }, [flow, isValidConnection, notify, onConnect, openPicker]);
+
+  /* ---------- 分组拖动 ---------- */
+
+  // 分组按位置收纳节点（不用 parentId）：拖动开始时记下组内节点的起点，拖动中按分组的位移带着它们走。
+  const followersRef = useRef<Map<string, GroupFollower>>(new Map());
+
+  const beginDrag = useCallback((dragged: Node[]) => {
+    commit();
+    const all = useCanvasStore.getState().nodes;
+    const moving = new Set(dragged.map((node) => node.id));
+    const followers = new Map<string, GroupFollower>();
+    dragged.filter((node) => node.type === 'group').forEach((group) => {
+      groupMemberIds(group, all).forEach((id) => {
+        const member = all.find((node) => node.id === id);
+        if (!member || moving.has(id) || member.data?.locked || followers.has(id)) return;
+        followers.set(id, { group: group.id, origin: group.position, start: member.position });
+      });
+    });
+    followersRef.current = followers;
+  }, [commit]);
+
+  const followDrag = useCallback((dragged: Node[]) => {
+    if (!followersRef.current.size) return;
+    const groups = new Map(dragged.map((node) => [node.id, node.position]));
+    const positions: Record<string, XYPosition> = {};
+    followersRef.current.forEach((entry, id) => {
+      const at = groups.get(entry.group);
+      if (at) positions[id] = { x: entry.start.x + at.x - entry.origin.x, y: entry.start.y + at.y - entry.origin.y };
+    });
+    moveNodes(positions);
+  }, [moveNodes]);
+
+  const endDrag = useCallback((dragged: Node[]) => {
+    followDrag(dragged);
+    followersRef.current = new Map();
+  }, [followDrag]);
+
+  /* ---------- 画布页（按项目保存） ---------- */
+
+  const [boardState, setBoardState] = useState<ProjectBoards | null>(null);
+  // 画布页状态同时保存在 ref 中：切换画布页要读写画布 store，这类副作用不能放进 setState 的 updater
+  //（StrictMode 会重复调用 updater，第二次会把新画布页的内容写进旧画布页）。
+  const boardRef = useRef<ProjectBoards | null>(null);
+  const commitBoards = useCallback((next: ProjectBoards | null) => {
+    boardRef.current = next;
+    setBoardState(next);
+  }, []);
+  const cacheRef = useRef<CanvasWorkspaceCache>({ version: 2, projects: {} });
+  const loadedProjectRef = useRef<string | null>(null);
+  const writableRef = useRef(false);
+  const pendingWriteRef = useRef<CanvasWorkspaceCache | null>(null);
+  const writeTimerRef = useRef<number>();
+
+  const flushWrite = useCallback(() => {
+    window.clearTimeout(writeTimerRef.current);
+    const payload = pendingWriteRef.current;
+    pendingWriteRef.current = null;
+    if (payload) void workspaceCacheService.write(CACHE_KEY, payload).catch(() => undefined);
+  }, []);
+
+  useEffect(() => {
+    if (!projectId) return undefined;
+    let cancelled = false;
+    loadedProjectRef.current = null;
+    commitBoards(null);
+    void workspaceCacheService.read<unknown>(CACHE_KEY).then(
+      (raw) => ({ raw, ok: true }),
+      () => ({ raw: null, ok: false }),
+    ).then(({ raw, ok }) => {
+      if (cancelled) return;
+      const live = useCanvasStore.getState();
+      const saved = useProjectStore.getState().projects.find((project) => project.id === projectId)?.canvas;
+      // 画布 store 为空、项目里却存着内容时（例如开发热更新重建了 store），以项目保存的内容为准，避免把空画布写回画布页。
+      const useSaved = !live.nodes.length && Boolean(saved?.nodes?.length);
+      if (useSaved && saved) restoreSnapshot(saved.nodes as Node[], (saved.edges || []) as Edge[]);
+      const current = useSaved && saved ? { nodes: saved.nodes, edges: saved.edges || [] } : { nodes: live.nodes, edges: live.edges };
+      const resolved = resolveProjectBoards(raw, projectId, current);
+      cacheRef.current = resolved.cache;
+      // 读取失败时不回写，避免用空缓存覆盖其他项目的画布页。
+      writableRef.current = ok;
+      loadedProjectRef.current = projectId;
+      commitBoards(resolved.boards);
+    });
+    return () => {
+      cancelled = true;
+      flushWrite();
+    };
+  }, [commitBoards, flushWrite, projectId, restoreSnapshot]);
+
+  useEffect(() => {
+    if (!boardState || !projectId || loadedProjectRef.current !== projectId || !writableRef.current) return;
+    const payload: CanvasWorkspaceCache = {
+      ...cacheRef.current,
+      projects: {
+        ...cacheRef.current.projects,
+        [projectId]: { ...boardState, snapshots: { ...boardState.snapshots, [boardState.activeBoard]: { nodes, edges } } },
+      },
+    };
+    cacheRef.current = payload;
+    pendingWriteRef.current = payload;
+    window.clearTimeout(writeTimerRef.current);
+    writeTimerRef.current = window.setTimeout(flushWrite, 400);
+  }, [boardState, edges, flushWrite, nodes, projectId]);
+
+  const activeBoard = boardState?.activeBoard || '画布 1';
+  const boards = boardState?.boards || [activeBoard];
+  const messages = boardState?.messages[activeBoard] || [];
+
+  const switchBoard = useCallback((board: string) => {
+    const current = boardRef.current;
+    if (!current || board === current.activeBoard || !current.boards.includes(board)) return;
+    const { nodes: liveNodes, edges: liveEdges } = useCanvasStore.getState();
+    const snapshots = { ...current.snapshots, [current.activeBoard]: { nodes: liveNodes, edges: liveEdges } };
+    const next = snapshots[board] || { nodes: [], edges: [] };
+    commitBoards({ ...current, activeBoard: board, snapshots });
+    restoreSnapshot(next.nodes as Node[], next.edges as Edge[]);
+    setPicker(null);
+    setMenu(null);
+    window.setTimeout(() => void flow.fitView(FIT_OPTIONS), 60);
+  }, [commitBoards, flow, restoreSnapshot]);
+
+  const createBoard = useCallback(() => {
+    const current = boardRef.current;
+    if (!current) return;
+    const name = nextBoardName(current.boards);
+    commitBoards({
+      ...current,
+      boards: [...current.boards, name],
+      snapshots: { ...current.snapshots, [name]: { nodes: [], edges: [] } },
+      messages: { ...current.messages, [name]: [] },
+    });
+    switchBoard(name);
+  }, [commitBoards, switchBoard]);
+
+  const renameBoard = useCallback((from: string, to: string) => {
+    const current = boardRef.current;
+    const name = to.trim();
+    if (!current || !name || name === from) return;
+    if (current.boards.includes(name)) {
+      notify(`已存在名为「${name}」的画布页`);
+      return;
+    }
+    const rename = <T,>(record: Record<string, T>) => Object.fromEntries(Object.entries(record).map(([key, value]) => [key === from ? name : key, value]));
+    commitBoards({
+      boards: current.boards.map((board) => (board === from ? name : board)),
+      activeBoard: current.activeBoard === from ? name : current.activeBoard,
+      snapshots: rename(current.snapshots),
+      messages: rename(current.messages),
+    });
+  }, [commitBoards, notify]);
+
+  const deleteBoard = useCallback((board: string) => {
+    const initial = boardRef.current;
+    if (!initial || initial.boards.length <= 1) return;
+    const index = initial.boards.indexOf(board);
+    const live = useCanvasStore.getState();
+    const removed = {
+      snapshot: board === initial.activeBoard ? { nodes: live.nodes, edges: live.edges } : initial.snapshots[board],
+      messages: initial.messages[board] || [],
+    };
+    if (board === initial.activeBoard) switchBoard(initial.boards[index + 1] || initial.boards[index - 1]);
+    const current = boardRef.current;
+    if (!current) return;
+    const snapshots = { ...current.snapshots };
+    const nextMessages = { ...current.messages };
+    delete snapshots[board];
+    delete nextMessages[board];
+    commitBoards({ ...current, boards: current.boards.filter((item) => item !== board), snapshots, messages: nextMessages });
+    notify(`已删除「${board}」`, {
+      label: '撤销',
+      run: () => {
+        const latest = boardRef.current;
+        if (!latest || latest.boards.includes(board)) return;
+        const restored = [...latest.boards];
+        restored.splice(Math.min(index, restored.length), 0, board);
+        commitBoards({
+          ...latest,
+          boards: restored,
+          snapshots: { ...latest.snapshots, [board]: removed.snapshot || { nodes: [], edges: [] } },
+          messages: { ...latest.messages, [board]: removed.messages },
+        });
+      },
+    });
+  }, [commitBoards, notify, switchBoard]);
+
+  const updateMessages = useCallback((updater: (current: StoredChatMessage[]) => StoredChatMessage[]) => {
+    const current = boardRef.current;
+    if (!current) return;
+    commitBoards({
+      ...current,
+      messages: { ...current.messages, [current.activeBoard]: updater(current.messages[current.activeBoard] || []).slice(-MESSAGE_LIMIT) },
+    });
+  }, [commitBoards]);
+
+  /* ---------- Agent 方案落到画布 ---------- */
+
+  const placePlan = useCallback((plan: AgentPlan) => {
+    if (!plan.nodes.length) return [];
+    const created = plan.nodes.map((item) => makeCanvasNode(item.type, { x: 0, y: 0 }, item.type === 'text'
+      ? { title: item.title || undefined, prompt: item.prompt, content: item.content }
+      : { title: item.title || undefined, prompt: item.prompt || item.content }));
+    const newEdges: Edge[] = plan.nodes.flatMap((item, index) => item.from.map((from) => ({
+      id: edgeId(created[from].id, created[index].id),
+      source: created[from].id,
+      target: created[index].id,
+      type: 'flow',
+    })));
+    const items = created.map((node) => ({ id: node.id, x: 0, y: 0, ...nodeSize(node) }));
+    const layout = layoutLayers(items, newEdges, { x: 120, y: 64 });
+    const width = Math.max(...items.map((item) => layout[item.id].x + item.width));
+    const height = Math.max(...items.map((item) => layout[item.id].y + item.height));
+    const existing = useCanvasStore.getState().nodes;
+    let origin: XYPosition;
+    if (existing.length) {
+      const right = Math.max(...existing.map((node) => node.position.x + nodeSize(node).width));
+      const top = Math.min(...existing.map((node) => node.position.y));
+      origin = { x: right + 160, y: top };
+    } else {
+      const center = visibleCenter();
+      origin = { x: center.x - width / 2, y: center.y - height / 2 };
+    }
+    const positioned = created.map((node) => ({ ...node, position: { x: Math.round(origin.x + layout[node.id].x), y: Math.round(origin.y + layout[node.id].y) } }));
+    addNodes(positioned, newEdges);
+    const ids = positioned.map((node) => node.id);
+    focusNodes(ids, false);
+    return ids;
+  }, [addNodes, focusNodes, visibleCenter]);
+
+  /* ---------- 快捷键 ---------- */
+
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      const mod = event.metaKey || event.ctrlKey;
+      const key = event.key.toLowerCase();
+      // ⌘J 与 Esc 在输入框里也生效，便于收起 Agent。
+      if (mod && key === 'j') {
+        event.preventDefault();
+        setAgentOpen((open) => !open);
+        return;
+      }
+      if (isEditableTarget(event.target)) return;
+
+      if (event.code === 'Space' && !mod) {
+        event.preventDefault();
+        if (!event.repeat) setSpacePan(true);
+        return;
+      }
+      if (mod) {
+        if (key === 'z') { event.preventDefault(); if (event.shiftKey) redo(); else undo(); return; }
+        if (key === 'y') { event.preventDefault(); redo(); return; }
+        if (key === 'a') { event.preventDefault(); selectNodes(useCanvasStore.getState().nodes.map((node) => node.id)); return; }
+        if (key === 'c') { copySelection(false); return; }
+        if (key === 'x') { event.preventDefault(); copySelection(true); return; }
+        if (key === 'd') { event.preventDefault(); const ids = useCanvasStore.getState().selectedNodes; if (ids.length) duplicateNodes(ids); return; }
+        if (key === 'f') { event.preventDefault(); setSearchOpen(true); return; }
+        if (key === 'enter') { event.preventDefault(); runSelected(); return; }
+        if (key === '=' || key === '+') { event.preventDefault(); void flow.zoomIn({ duration: 160 }); return; }
+        if (key === '-') { event.preventDefault(); void flow.zoomOut({ duration: 160 }); return; }
+        if (key === 'g') { event.preventDefault(); if (event.shiftKey) ungroupSelection(); else groupSelection(); return; }
+        if (key === 'l' && event.shiftKey) { event.preventDefault(); toggleLockSelection(); return; }
+        return;
+      }
+      if (event.altKey) {
+        // ⌥ 在 macOS 上会改变 key，按物理键位匹配对齐快捷键。
+        const align = ALIGN_ACTIONS.find((item) => item.code === event.code && Boolean(item.shift) === event.shiftKey);
+        if (align && useCanvasStore.getState().selectedNodes.length > 1) {
+          event.preventDefault();
+          alignSelection(align.mode);
+        }
+        return;
+      }
+      if (event.shiftKey && event.code === 'Digit1') { event.preventDefault(); void flow.fitView(FIT_OPTIONS); return; }
+      if (event.shiftKey && event.code === 'Digit0') { event.preventDefault(); void flow.zoomTo(1, { duration: 200 }); return; }
+      if (event.key === '?') { event.preventDefault(); setShortcutsOpen(true); return; }
+      if (event.shiftKey) return;
+      if (key === 'v') { setTool('select'); return; }
+      if (key === 'h') { setTool('pan'); return; }
+      const kind = NODE_CATALOG_LIST.find((item) => item.shortcut.toLowerCase() === key)?.kind;
+      if (kind) { event.preventDefault(); addFromShortcut(kind); return; }
+      const annotation = ANNOTATION_CATALOG_LIST.find((item) => item.shortcut?.toLowerCase() === key)?.kind;
+      if (annotation) { event.preventDefault(); addAnnotationAt(annotation, insertionPoint()); return; }
+      if (key === 'escape') {
+        setSearchOpen(false);
+        if (useCanvasStore.getState().selectedNodes.length) selectNodes([]);
+      }
+    };
+    const onKeyUp = (event: KeyboardEvent) => {
+      if (event.code === 'Space') setSpacePan(false);
+    };
+    const onBlur = () => setSpacePan(false);
+    window.addEventListener('keydown', onKeyDown);
+    window.addEventListener('keyup', onKeyUp);
+    window.addEventListener('blur', onBlur);
+    return () => {
+      window.removeEventListener('keydown', onKeyDown);
+      window.removeEventListener('keyup', onKeyUp);
+      window.removeEventListener('blur', onBlur);
+    };
+  }, [addAnnotationAt, addFromShortcut, alignSelection, copySelection, duplicateNodes, flow, groupSelection, insertionPoint, redo, runSelected, selectNodes, toggleLockSelection, undo, ungroupSelection]);
+
+  /* ---------- 右键菜单 ---------- */
+
+  const openMenu = (event: ReactMouseEvent | MouseEvent, kind: MenuState['kind'], nodeId?: string) => {
+    event.preventDefault();
+    setPicker(null);
+    const screen = { x: event.clientX, y: event.clientY };
+    setMenu({ screen, flow: flow.screenToFlowPosition(screen), kind, nodeId });
   };
 
-  const minimapNodeColor = useMemo(() => (node: Node) => {
-    if (node.type === 'imageGen') {
-      return 'color-mix(in srgb, transparent, var(--foreground) 34%)';
-    }
-    if (node.type === 'video') {
-      return 'color-mix(in srgb, transparent, var(--foreground) 26%)';
-    }
-    return 'color-mix(in srgb, transparent, var(--foreground) 20%)';
-  }, []);
-  const visibleNodes = nodes;
+  const menuNode = menu?.nodeId ? nodes.find((node) => node.id === menu.nodeId) : undefined;
+  const menuIds = menu?.kind === 'selection' ? selectedIds : menu?.nodeId ? [menu.nodeId] : [];
+  const menuNodes = nodes.filter((node) => menuIds.includes(node.id));
+  const menuLabel = menuNode && (isCanvasNodeKind(menuNode.type) ? `${NODE_CATALOG[menuNode.type].label}节点` : isAnnotationKind(menuNode.type) ? ANNOTATION_LABEL[menuNode.type] : '');
+  const menuGenerative = menuNodes.some((node) => isCanvasNodeKind(node.type));
+  const menuAllLocked = menuNodes.length > 0 && menuNodes.every((node) => node.data?.locked);
+  // 右键单个分组删除时连同组内节点；键盘 ⌫ 只删画框，与解散相同。
+  const menuGroup = menu?.kind === 'node' && menuNode?.type === 'group' ? menuNode : undefined;
+
+  const actions = useMemo<CanvasActions>(() => ({ openPicker, openMedia: setMedia, notify }), [notify, openPicker]);
+
+  const panning = tool === 'pan' || spacePan;
 
   return (
-    <main className="absolute inset-0 min-h-0 overflow-hidden bg-background text-foreground">
-      {showExplorer && (
-        <aside className="absolute bottom-3 left-3 top-3 z-40 flex w-[252px] flex-col rounded-xl bg-card/95 text-card-foreground shadow-[0_8px_28px_rgba(15,15,15,0.08)] backdrop-blur-xl dark:shadow-[0_8px_28px_rgba(0,0,0,0.2)]">
-          <div className="flex h-14 shrink-0 items-center gap-1 px-3">
-            {onBack && <Button type="button" variant="ghost" size="iconSm" onClick={onBack} aria-label="返回项目列表" title="返回项目列表" className="h-8 w-8 shrink-0"><ArrowLeft size={15} /></Button>}
-            <div className="relative shrink-0">
-              <Button type="button" variant="ghost" size="iconSm" onClick={() => setProjectEmojiOpen((open) => !open)} aria-label="选择项目表情" title="选择项目表情" className="h-8 w-8 rounded-full bg-muted text-[20px] leading-none">{activeProjectEmoji}</Button>
-              {projectEmojiOpen && <Card padding="none" className="absolute left-0 top-10 z-50 grid w-[176px] grid-cols-6 gap-1 p-2 shadow-xl">{PROJECT_EMOJIS.map((emoji) => <Button key={emoji} type="button" variant="ghost" size="iconSm" onClick={() => selectProjectEmoji(emoji)} aria-label={`使用${emoji}表情`} className="h-7 w-7 text-base">{emoji}</Button>)}</Card>}
-            </div>
-            <div className="min-w-0 flex-1 text-xs font-semibold">
-              {editingProjectName ? <Input autoFocus value={projectNameDraft} onChange={(event) => setProjectNameDraft(event.target.value)} onBlur={commitProjectName} onKeyDown={(event) => { if (event.key === 'Enter') commitProjectName(); if (event.key === 'Escape') setEditingProjectName(false); }} aria-label="编辑项目名称" inputSize="sm" className="h-8 px-2 text-xs" /> : <button type="button" onDoubleClick={beginProjectNameEdit} className="block w-full truncate text-left" title="双击编辑项目名称">{activeProjectName}</button>}
-            </div>
-            <Button type="button" variant="ghost" size="iconSm" onClick={() => setShowExplorer(false)} aria-label="收起画布侧栏"><PanelLeftClose size={15} /></Button>
-          </div>
+    <MotionConfig reducedMotion="user">
+      <TooltipProvider>
+        <CanvasActionsContext.Provider value={actions}>
+          <main
+            ref={wrapperRef}
+            className="lizuo-canvas absolute inset-0 min-h-0 overflow-hidden text-foreground"
+            data-tool={panning ? 'pan' : 'select'}
+            data-space-pan={spacePan || undefined}
+            data-connecting={connecting || undefined}
+            onPointerMove={(event) => { pointerRef.current = { x: event.clientX, y: event.clientY }; }}
+            onDoubleClick={(event) => {
+              const target = event.target as Element;
+              // 双击空白处或分组内的空白处都可添加节点。
+              if (target.classList?.contains('react-flow__pane') || target.classList?.contains('canvas-group')) openPicker({ x: event.clientX, y: event.clientY });
+            }}
+            onDragOver={(event: DragEvent) => {
+              if (!event.dataTransfer.types.includes('Files')) return;
+              event.preventDefault();
+              event.dataTransfer.dropEffect = 'copy';
+              setDragOver(true);
+            }}
+            onDragLeave={(event: DragEvent) => {
+              if (!wrapperRef.current?.contains(event.relatedTarget as Element | null)) setDragOver(false);
+            }}
+            onDrop={(event: DragEvent) => {
+              if (!event.dataTransfer.files.length) return;
+              event.preventDefault();
+              setDragOver(false);
+              void importFiles([...event.dataTransfer.files], flow.screenToFlowPosition({ x: event.clientX, y: event.clientY }));
+            }}
+          >
+            <ReactFlow
+              nodes={nodes}
+              edges={edges}
+              nodeTypes={nodeTypes}
+              edgeTypes={edgeTypes}
+              defaultEdgeOptions={defaultEdgeOptions}
+              onNodesChange={onNodesChange}
+              onEdgesChange={onEdgesChange}
+              onConnect={onConnect}
+              onConnectStart={() => { setConnecting(true); setPicker(null); setMenu(null); }}
+              onConnectEnd={handleConnectEnd}
+              isValidConnection={isValidConnection}
+              connectOnClick={false}
+              connectionDragThreshold={4}
+              connectionRadius={28}
+              onNodeDragStart={(_, __, dragged) => beginDrag(dragged)}
+              onNodeDrag={(_, __, dragged) => followDrag(dragged)}
+              onNodeDragStop={(_, __, dragged) => endDrag(dragged)}
+              onSelectionDragStart={(_, dragged) => beginDrag(dragged)}
+              onSelectionDrag={(_, dragged) => followDrag(dragged)}
+              onSelectionDragStop={(_, dragged) => endDrag(dragged)}
+              onPaneClick={() => { setPicker(null); setMenu(null); }}
+              onPaneContextMenu={(event) => openMenu(event, 'pane')}
+              onNodeContextMenu={(event, node) => {
+                const multi = node.selected && useCanvasStore.getState().selectedNodes.length > 1;
+                if (!node.selected) selectNodes([node.id]);
+                openMenu(event, multi ? 'selection' : 'node', node.id);
+              }}
+              onSelectionContextMenu={(event) => openMenu(event, 'selection')}
+              onMoveEnd={(_, viewport) => setZoom(viewport.zoom)}
+              deleteKeyCode={['Backspace', 'Delete']}
+              onBeforeDelete={handleBeforeDelete}
+              selectionKeyCode="Shift"
+              multiSelectionKeyCode={['Meta', 'Control', 'Shift']}
+              selectionOnDrag={!panning}
+              panOnDrag={panning ? true : [1]}
+              selectionMode={SelectionMode.Partial}
+              panOnScroll
+              zoomOnPinch
+              zoomOnDoubleClick={false}
+              snapToGrid={snapToGrid}
+              snapGrid={SNAP_GRID}
+              minZoom={0.1}
+              maxZoom={3}
+              fitView
+              fitViewOptions={{ padding: 0.24, maxZoom: 1 }}
+              proOptions={{ hideAttribution: true }}
+              className="design-work-flow h-full w-full"
+            >
+              <Background variant={BackgroundVariant.Dots} gap={20} size={1.8} color="var(--canvas-dot)" />
+              <CanvasControls snapToGrid={snapToGrid} onSnapToGridChange={setSnapToGrid} />
+              <SelectionToolbar
+                ids={selectedIds}
+                runnable={selectionStats.runnable}
+                generating={selectionStats.generating}
+                allLocked={selectionStats.allLocked}
+                onRun={() => runSelected(selectedIds)}
+                onStop={() => stopSelection(selectedIds)}
+                onAlign={(mode) => alignSelection(mode, selectedIds)}
+                onGroup={() => groupSelection(selectedIds)}
+                onToggleLock={() => toggleLockSelection(selectedIds)}
+                onTidy={() => tidy(selectedIds)}
+                onDuplicate={() => duplicateNodes(selectedIds)}
+                onDisconnect={() => disconnectNodes(selectedIds)}
+                onDelete={() => deleteWithUndo(selectedIds)}
+              />
+            </ReactFlow>
 
-          <div className="px-3 pb-2">
-            <div className="mb-1 flex h-8 items-center justify-between px-2 text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground"><span>画布</span><Button type="button" variant="ghost" size="iconSm" onClick={createBoard} aria-label="新增画布" className="h-6 w-6"><Plus size={13} /></Button></div>
-            <div className="space-y-1">
-              {boards.map((board) => (
-                <Button key={board} type="button" variant="ghost" size="sm" onClick={() => switchBoard(board)} aria-pressed={activeBoard === board} className={cn('h-9 w-full justify-start gap-2 border-0 px-2 text-xs shadow-none hover:bg-accent hover:text-accent-foreground', activeBoard === board && 'bg-accent text-accent-foreground')}>
-                  <LayoutGrid size={14} /><span className="flex-1 truncate text-left">{board}</span>
-                </Button>
-              ))}
-            </div>
-          </div>
+            <AnimatePresence>
+              {boardState && nodes.length === 0 && (
+                <CanvasEmptyState
+                  key="empty"
+                  onAdd={(kind) => addNodeAt(kind, visibleCenter())}
+                  onUpload={() => openUpload(visibleCenter())}
+                  onOpenAgent={() => setAgentOpen(true)}
+                />
+              )}
+            </AnimatePresence>
 
-          <div className="flex min-h-0 flex-1 flex-col px-3 pb-3 pt-2">
-            <div className="mb-2 flex h-8 items-center px-2"><span className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">组件</span></div>
-            <div className="min-h-0 flex-1 space-y-1 overflow-y-auto">
-              {visibleNodes.length ? visibleNodes.map((node) => {
-                const type = (node.type || 'text') as CanvasNodeType;
-                const meta = NODE_META[type] || NODE_META.text;
-                const Icon = meta.icon;
-                const title = String(node.data?.prompt || node.data?.content || meta.label);
-                return <Button key={node.id} type="button" variant="ghost" size="sm" onClick={() => flowRef.current?.setCenter(node.position.x + 210, node.position.y + 130, { zoom: 1, duration: 240 })} className="group h-10 w-full justify-start gap-2 border-0 px-2 text-xs shadow-none hover:bg-accent hover:text-accent-foreground"><span className="grid h-6 w-6 shrink-0 place-items-center rounded-md bg-muted"><Icon size={12} /></span><span className="min-w-0 flex-1 truncate text-left">{title}</span><span className={cn('h-1.5 w-1.5 rounded-full', meta.dot)} /></Button>;
-              }) : <div className="px-3 py-8 text-center text-xs text-muted-foreground">暂无内容</div>}
-            </div>
-          </div>
-        </aside>
-      )}
-
-      <section className="absolute inset-0 z-0 overflow-hidden">
-        {!showExplorer && (
-          <div className="absolute left-3 top-3 z-30 flex h-10 max-w-[280px] items-center gap-1 rounded-lg border border-border bg-card/90 py-1 pl-1 pr-1 text-card-foreground shadow-sm backdrop-blur-xl">
-            {onBack && <Button type="button" variant="ghost" size="iconSm" onClick={onBack} aria-label="返回项目列表" title="返回项目列表" className="h-8 w-8 shrink-0"><ArrowLeft size={15} /></Button>}
-            <div className="relative shrink-0">
-              <Button type="button" variant="ghost" size="iconSm" onClick={() => setProjectEmojiOpen((open) => !open)} aria-label="选择项目表情" title="选择项目表情" className="h-8 w-8 rounded-full bg-muted p-0 text-[20px] leading-none">{activeProjectEmoji}</Button>
-              {projectEmojiOpen && <Card padding="none" className="absolute left-0 top-10 z-50 grid w-[176px] grid-cols-6 gap-1 p-2 shadow-xl">{PROJECT_EMOJIS.map((emoji) => <Button key={emoji} type="button" variant="ghost" size="iconSm" onClick={() => selectProjectEmoji(emoji)} aria-label={`使用${emoji}表情`} className="h-7 w-7 text-base">{emoji}</Button>)}</Card>}
-            </div>
-            <div className="min-w-0 flex-1 truncate text-xs font-semibold">{editingProjectName ? <Input autoFocus value={projectNameDraft} onChange={(event) => setProjectNameDraft(event.target.value)} onBlur={commitProjectName} onKeyDown={(event) => { if (event.key === 'Enter') commitProjectName(); if (event.key === 'Escape') setEditingProjectName(false); }} aria-label="编辑项目名称" inputSize="sm" className="h-8 px-2 text-xs" /> : <button type="button" onDoubleClick={beginProjectNameEdit} className="block w-full truncate text-left" title="双击编辑项目名称">{activeProjectName}</button>}</div>
-            <Button type="button" variant="ghost" size="iconSm" onClick={() => setShowExplorer(true)} aria-label="展开画布侧栏" title="展开项目面板" className="h-8 w-8 shrink-0"><PanelLeftOpen size={15} /></Button>
-          </div>
-        )}
-
-        <ReactFlow
-          nodes={nodes}
-          edges={visibleEdges}
-          nodeTypes={nodeTypes}
-          onNodesChange={onNodesChange}
-          onEdgesChange={onEdgesChange}
-          onConnect={(connection: Connection) => onConnect(connection)}
-          onInit={(instance) => { flowRef.current = instance; }}
-          onPaneContextMenu={(event) => { event.preventDefault(); setContextMenu({ x: event.clientX, y: event.clientY }); }}
-          onPaneClick={() => setContextMenu(null)}
-          deleteKeyCode={['Backspace', 'Delete']}
-          fitView
-          fitViewOptions={{ padding: 0.28, maxZoom: 0.95 }}
-          panOnDrag={tool === 'pan'}
-          selectionOnDrag={tool === 'select'}
-          selectionMode={SelectionMode.Partial}
-          panOnScroll
-          zoomOnPinch
-          minZoom={0.15}
-          maxZoom={2.5}
-          defaultEdgeOptions={{ type: 'smoothstep', animated: true, style: { stroke: 'var(--muted-foreground)', strokeWidth: 1.4 } }}
-          proOptions={{ hideAttribution: true }}
-          className="design-work-flow h-full w-full bg-background"
-        >
-          <Background gap={18} size={0.8} color="color-mix(in srgb, transparent, var(--foreground) 13%)" />
-          {showMinimap && !showAgent && (
-            <MiniMap
-              pannable
-              zoomable
-              nodeColor={minimapNodeColor}
-              nodeStrokeColor="var(--border)"
-              nodeStrokeWidth={1}
-              bgColor="var(--card)"
-              maskColor="color-mix(in srgb, transparent, var(--background) 45%)"
-              maskStrokeColor="var(--border)"
-              maskStrokeWidth={1}
-              style={{ width: 192, height: 108, backdropFilter: 'blur(18px) saturate(120%)' }}
-              className="!bottom-3 !left-auto !right-3 !m-0 !overflow-hidden !rounded-lg !border-border !shadow-[0_8px_24px_rgba(0,0,0,0.08)] dark:!shadow-[0_8px_24px_rgba(0,0,0,0.18)]"
+            <CanvasHeader
+              onBack={onBack}
+              boards={boards}
+              activeBoard={activeBoard}
+              onSwitchBoard={switchBoard}
+              onCreateBoard={createBoard}
+              onRenameBoard={renameBoard}
+              onDeleteBoard={deleteBoard}
             />
-          )}
-        </ReactFlow>
+            <CanvasTopActions agentOpen={agentOpen} agentWidth={AGENT_PANEL_WIDTH} onToggleAgent={() => setAgentOpen((open) => !open)} />
+            <CanvasRail
+              tool={tool}
+              onToolChange={setTool}
+              onAdd={(kind) => addNodeAt(kind, visibleCenter())}
+              onAddAnnotation={addAnnotation}
+              onUpload={() => openUpload()}
+              onTidy={() => tidy()}
+              onShowShortcuts={() => setShortcutsOpen(true)}
+              searchOpen={searchOpen}
+              onSearchOpenChange={setSearchOpen}
+              onFocusNode={(id) => focusNodes([id])}
+            />
+            <CanvasAgentPanel
+              open={agentOpen}
+              board={activeBoard}
+              messages={messages}
+              onMessagesChange={updateMessages}
+              onClose={() => setAgentOpen(false)}
+              onPlacePlan={placePlan}
+              onRunNodes={(ids) => {
+                const live = useCanvasStore.getState().nodes.map((node) => node.id);
+                const present = ids.filter((id) => live.includes(id));
+                if (present.length) void runNodesInOrder(present).then((summary) => notify(describeRunSummary(summary)));
+                else notify('这些节点已不在当前画布上');
+              }}
+              onFocusNodes={(ids) => {
+                const live = new Set(useCanvasStore.getState().nodes.map((node) => node.id));
+                const present = ids.filter((id) => live.has(id));
+                if (present.length) focusNodes(present);
+                else notify('这些节点已不在当前画布上');
+              }}
+            />
 
-        <input ref={mediaInputRef} type="file" accept="image/*,video/*,.txt,.md" className="sr-only" onChange={(event) => { importMedia(event.target.files?.[0]); event.target.value = ''; }} />
+            <NodePicker
+              point={picker?.screen ?? null}
+              title={picker?.connect ? (picker.connect.side === 'source' ? '添加下游节点' : '添加上游节点') : '添加节点'}
+              onPick={createFromPicker}
+              onPickAnnotation={picker?.connect ? undefined : createAnnotationFromPicker}
+              onUpload={picker?.connect ? undefined : () => openUpload(picker?.flow)}
+              onClose={() => setPicker(null)}
+            />
 
-        <Card ref={toolbarRef} padding="sm" className="absolute bottom-3 left-1/2 z-30 flex max-w-[calc(100%-24px)] -translate-x-1/2 items-center gap-2 overflow-visible border-border bg-card/95 p-1 text-card-foreground shadow-[0_8px_28px_rgba(0,0,0,0.12)] backdrop-blur-xl">
-          <div className="relative">
-            <div role="group" aria-label="画布操作工具" className="flex h-8 overflow-hidden rounded-md bg-muted">
-              <Button
-                type="button"
-                variant="ghost"
-                size="iconSm"
-                onClick={() => setToolbarMenu(null)}
-                aria-label={tool === 'select' ? '当前工具：选择与移动' : '当前工具：拖动画布'}
-                title={tool === 'select' ? '选择与移动（V）' : '拖动画布（H）'}
-                className="h-8 w-8 rounded-r-none bg-foreground p-0 text-background hover:bg-foreground/90 hover:text-background"
-              >
-                {tool === 'select' ? <MousePointer2 size={16} /> : <Hand size={16} />}
-              </Button>
-              <Button
-                type="button"
-                variant="ghost"
-                size="iconSm"
-                onClick={() => setToolbarMenu((menu) => menu === 'tool' ? null : 'tool')}
-                aria-label="展开画布操作工具"
-                aria-haspopup="menu"
-                aria-expanded={toolbarMenu === 'tool'}
-                title="选择画布操作工具"
-                className="h-8 w-5 rounded-l-none p-0 text-muted-foreground"
-              >
-                <ChevronDown size={10} />
-              </Button>
-            </div>
-            {toolbarMenu === 'tool' && (
-              <Card role="menu" padding="none" className="absolute bottom-10 left-0 w-40 p-1.5 shadow-xl">
-                {([
-                  ['select', MousePointer2, '选择与移动', 'V'],
-                  ['pan', Hand, '拖动画布', 'H'],
-                ] as const).map(([value, Icon, label, shortcut]) => (
-                  <Button
-                    key={value}
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    role="menuitemradio"
-                    aria-checked={tool === value}
-                    onClick={() => { setTool(value); setToolbarMenu(null); }}
-                    className={cn('h-9 w-full justify-start gap-2 px-2 text-xs', tool === value && 'bg-muted text-foreground')}
+            <AnchoredMenu point={menu?.screen ?? null} onClose={() => setMenu(null)} label="画布菜单">
+              {menu?.kind === 'pane' && (
+                <>
+                  <DropdownMenuLabel>添加到此处</DropdownMenuLabel>
+                  {NODE_CATALOG_LIST.map((item) => (
+                    <DropdownMenuItem key={item.kind} icon={item.icon} shortcut={item.shortcut} onSelect={() => addNodeAt(item.kind, menu.flow)}>{item.label}</DropdownMenuItem>
+                  ))}
+                  {ANNOTATION_CATALOG_LIST.map((item) => (
+                    <DropdownMenuItem key={item.kind} icon={item.icon} shortcut={item.shortcut} onSelect={() => addAnnotationAt(item.kind, menu.flow)}>{item.label}</DropdownMenuItem>
+                  ))}
+                  <DropdownMenuItem icon={Upload} onSelect={() => openUpload(menu.flow)}>上传图片或视频</DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem icon={Clipboard} shortcut="⌘V" disabled={!clipboardRef.current} onSelect={() => pasteClipboard(clipboardRef.current, menu.flow)}>粘贴</DropdownMenuItem>
+                  <DropdownMenuItem icon={SelectAll} shortcut="⌘A" disabled={!nodes.length} onSelect={() => selectNodes(nodes.map((node) => node.id))}>全选</DropdownMenuItem>
+                  <DropdownMenuItem icon={LayoutMasonry} disabled={nodes.length < 2} onSelect={() => tidy()}>整理布局</DropdownMenuItem>
+                  <DropdownMenuItem icon={Focus} shortcut="⇧1" disabled={!nodes.length} onSelect={() => void flow.fitView(FIT_OPTIONS)}>适应画布</DropdownMenuItem>
+                </>
+              )}
+              {(menu?.kind === 'node' || menu?.kind === 'selection') && (
+                <>
+                  {menu.kind === 'node' && menuLabel && <DropdownMenuLabel>{menuLabel}</DropdownMenuLabel>}
+                  {menu.kind === 'selection' && <DropdownMenuLabel>已选 {menuIds.length} 个节点</DropdownMenuLabel>}
+                  {menuGenerative && (
+                    <DropdownMenuItem
+                      icon={AiGenerate}
+                      shortcut="⌘↵"
+                      disabled={!menuNodes.some((node) => isNodeRunnable(node, nodes, edges))}
+                      onSelect={() => runSelected(menuIds)}
+                    >
+                      {menu.kind === 'selection' ? '按顺序全部生成' : '生成'}
+                    </DropdownMenuItem>
+                  )}
+                  {menuNodes.some((node) => node.data?.isGenerating) && (
+                    <DropdownMenuItem icon={StopFill} onSelect={() => stopSelection(menuIds)}>停止生成</DropdownMenuItem>
+                  )}
+                  <DropdownMenuItem icon={Copy} shortcut="⌘D" onSelect={() => duplicateNodes(menuIds)}>创建副本</DropdownMenuItem>
+                  <DropdownMenuItem icon={Clipboard} shortcut="⌘C" onSelect={() => copySelection(false)}>复制</DropdownMenuItem>
+                  {menu.kind === 'selection' && <DropdownMenuItem icon={LayoutMasonry} onSelect={() => tidy(menuIds)}>整理所选</DropdownMenuItem>}
+                  <DropdownMenuSeparator />
+                  {menuNodes.some((node) => node.type !== 'group') && (
+                    <DropdownMenuItem icon={Artboard} shortcut="⌘G" onSelect={() => groupSelection(menuIds)}>编组</DropdownMenuItem>
+                  )}
+                  {menuNodes.some((node) => node.type === 'group') && (
+                    <DropdownMenuItem icon={Layers} shortcut="⇧⌘G" onSelect={() => ungroupSelection(menuIds)}>解散分组</DropdownMenuItem>
+                  )}
+                  <DropdownMenuItem icon={menuAllLocked ? Unlock : Lock} shortcut="⇧⌘L" onSelect={() => toggleLockSelection(menuIds)}>
+                    {menuAllLocked ? '解锁' : '锁定'}
+                  </DropdownMenuItem>
+                  {menuGenerative && (
+                    <DropdownMenuItem
+                      icon={Unlink}
+                      disabled={!edges.some((edge) => menuIds.includes(edge.source) || menuIds.includes(edge.target))}
+                      onSelect={() => disconnectNodes(menuIds)}
+                    >
+                      断开连线
+                    </DropdownMenuItem>
+                  )}
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    icon={Trash2}
+                    shortcut={menuGroup ? undefined : '⌫'}
+                    destructive
+                    disabled={menuAllLocked}
+                    onSelect={() => deleteWithUndo(menuGroup ? [menuGroup.id, ...groupMemberIds(menuGroup, nodes)] : menuIds)}
                   >
-                    <Icon size={14} />
-                    <span className="flex-1 text-left">{label}</span>
-                    <kbd className="text-[10px] text-muted-foreground">{shortcut}</kbd>
-                  </Button>
-                ))}
-              </Card>
+                    {menuGroup ? '删除分组及组内节点' : '删除'}
+                  </DropdownMenuItem>
+                </>
+              )}
+            </AnchoredMenu>
+
+            <input
+              ref={fileInputRef}
+              type="file"
+              multiple
+              accept="image/*,video/*,.txt,.md"
+              className="sr-only"
+              onChange={(event) => {
+                const files = [...(event.target.files || [])];
+                event.target.value = '';
+                if (files.length) void importFiles(files, uploadTargetRef.current ?? visibleCenter());
+              }}
+            />
+
+            <DropOverlay visible={dragOver} />
+            <CanvasToast toast={toast} onDismiss={() => setToast(null)} />
+            <MediaLightbox media={media} onClose={() => setMedia(null)} />
+            <ShortcutsDialog open={shortcutsOpen} onOpenChange={setShortcutsOpen} />
+            <span className="sr-only" aria-live="polite">{connecting ? '正在连线，松开到节点上完成连接，松开到空白处新建节点' : ''}</span>
+            {connecting && (
+              <div className="pointer-events-none absolute bottom-20 left-1/2 z-30 -translate-x-1/2 rounded-full bg-foreground/85 px-3 py-1.5 text-[11px] font-medium text-background">
+                松开到节点上完成连接，松开到空白处新建节点
+              </div>
             )}
-          </div>
-          <CanvasToolButton icon={Upload} label="上传素材" onClick={() => mediaInputRef.current?.click()} />
-          <CanvasToolButton icon={Type} label="添加文字" onClick={() => addAtCenter('text')} />
-          <div className="relative">
-            <div role="group" aria-label="生成图片" className="flex h-8 overflow-hidden rounded-md">
-              <Button
-                type="button"
-                variant="ghost"
-                size="iconSm"
-                onClick={() => addAtCenter('imageGen')}
-                aria-label="生成图片"
-                title="添加图片节点"
-                className="h-8 w-8 rounded-r-none p-0"
-              >
-                <ImagePlus size={16} />
-              </Button>
-            </div>
-          </div>
-          <div>
-            <div role="group" aria-label="生成视频" className="flex h-8 overflow-hidden rounded-md">
-              <Button
-                type="button"
-                variant="ghost"
-                size="iconSm"
-                onClick={() => addAtCenter('video')}
-                aria-label="生成视频"
-                title="添加视频节点"
-                className="h-8 w-8 rounded-r-none p-0"
-              >
-                <Video size={16} />
-              </Button>
-            </div>
-          </div>
-          <span aria-hidden="true" className="h-6 w-px shrink-0 bg-border" />
-          <div className="flex h-8 items-center gap-1 rounded-lg bg-muted p-0.5">
-            <CanvasToolButton icon={Map} label="小地图" active={showMinimap} onClick={() => { const nextVisible = !showMinimap; setShowMinimap(nextVisible); if (nextVisible) setShowAgent(false); }} className="h-7 w-7" />
-            <CanvasToolButton icon={Bot} label={showAgent ? '收起 Agent' : '展开 Agent'} active={showAgent} onClick={() => { const nextVisible = !showAgent; setShowAgent(nextVisible); if (nextVisible) setShowMinimap(false); }} className="h-7 w-7" />
-          </div>
-        </Card>
-
-        {contextMenu && (
-          <Card padding="sm" className="fixed z-50 w-44 p-1.5 shadow-lg" style={{ left: contextMenu.x, top: contextMenu.y }} onMouseDown={(event) => event.stopPropagation()}>
-            <p className="px-2 py-1.5 text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">添加到画布</p>
-            {(['text', 'imageGen', 'video'] as CanvasNodeType[]).map((type) => { const meta = NODE_META[type]; const Icon = meta.icon; return <Button key={type} type="button" variant="ghost" size="sm" onClick={() => { addAtCenter(type); setContextMenu(null); }} className="w-full justify-start text-xs"><Icon size={14} />{meta.label}</Button>; })}
-          </Card>
-        )}
-        {notice && <div role="status" className="absolute bottom-16 left-1/2 z-40 -translate-x-1/2 rounded-lg bg-foreground px-3 py-2 text-xs font-semibold text-background shadow-lg">{notice}</div>}
-      </section>
-
-      {showAgent && (
-        <aside className="absolute bottom-3 right-3 top-3 z-40 flex w-[352px] flex-col rounded-xl bg-card/[0.96] text-card-foreground shadow-[0_8px_28px_rgba(15,15,15,0.08)] backdrop-blur-xl dark:shadow-[0_8px_28px_rgba(0,0,0,0.22)]">
-          <header className="flex h-14 shrink-0 items-center gap-2 px-3"><span className="grid h-8 w-8 place-items-center rounded-lg bg-muted text-foreground"><Bot size={16} /></span><div className="min-w-0 flex-1"><div className="text-xs font-semibold">Canvas Agent</div><div className="truncate text-xs text-muted-foreground">{agentWorking ? `正在操作 ${activeBoard}` : `当前画布：${activeBoard}`}</div></div><Button type="button" variant="ghost" size="iconSm" onClick={() => setAgentSettingsOpen((open) => !open)} aria-label="Agent 设置"><Settings2 size={15} /></Button></header>
-
-          {agentSettingsOpen && <Card padding="sm" className="absolute right-3 top-12 z-40 w-[310px] p-3 shadow-xl"><div className="mb-2 text-xs font-semibold">Agent 模型</div><Select aria-label="Agent 模型" value={resolvedAgentModel} onChange={(event) => setAgentModel(event.target.value)} selectSize="sm" options={languageModels.length ? languageModels.map(({ value, label }) => ({ value, label })) : [{ value: '', label: '暂无语言模型' }]} disabled={!languageModels.length} /><div className="mb-2 mt-4 text-xs font-semibold">执行模式</div><div className="grid grid-cols-2 gap-1 rounded-lg bg-muted p-1"><Button type="button" variant={agentMode === 'auto' ? 'primary' : 'ghost'} size="sm" onClick={() => setAgentMode('auto')} className="text-xs">自动执行</Button><Button type="button" variant={agentMode === 'ask' ? 'primary' : 'ghost'} size="sm" onClick={() => setAgentMode('ask')} className="text-xs">询问执行</Button></div><p className="mt-2 text-xs leading-4 text-muted-foreground">自动执行会直接创建画布节点；询问执行会先确认任务。</p></Card>}
-
-          <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-4 py-4">
-            {messages.map((message) => <div key={message.id} className={cn('flex', message.role === 'user' ? 'justify-end' : 'justify-start')}><div className={cn('max-w-[88%] rounded-xl px-3 py-2.5 text-xs leading-5', message.role === 'user' ? 'bg-primary text-primary-foreground' : 'bg-muted text-foreground')}><div className="mb-1 flex items-center gap-1.5 text-xs font-semibold opacity-65">{message.role === 'user' ? <MessageSquareText size={10} /> : <Bot size={10} />}{message.role === 'user' ? '你' : 'Agent'}</div>{message.content}</div></div>)}
-            {agentWorking && <div className="flex items-center gap-2 text-xs text-muted-foreground"><Loader2 size={13} className="animate-spin text-primary" />正在调用 create_canvas_item…</div>}
-          </div>
-
-          <div className="shrink-0 p-3">
-            <Card padding="none" className="overflow-hidden border-border shadow-sm focus-within:border-ring">
-              <Textarea value={agentPrompt} onChange={(event) => setAgentPrompt(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); void submitAgent(); } }} placeholder="输入消息，Enter 发送" variant="ghost" className="h-20 min-h-20 resize-none px-3 py-3 text-xs leading-5" />
-              <div className="flex items-center gap-1 px-2 pb-2"><Button type="button" variant="ghost" size="iconSm" onClick={() => mediaInputRef.current?.click()} aria-label="添加参考素材" className="h-7 w-7"><Plus size={14} /></Button><Button type="button" variant="ghost" size="sm" onClick={() => setAgentSettingsOpen((open) => !open)} className="h-7 min-w-0 max-w-[170px] gap-1 px-2 text-xs text-muted-foreground"><span className="truncate">{languageModels.find((item) => item.value === resolvedAgentModel)?.label || '选择模型'}</span><ChevronDown size={10} /></Button><Badge variant="subtle" className="ml-auto text-xs">{agentMode === 'auto' ? '自动' : '询问'}</Badge><Button type="button" variant="primary" size="iconSm" onClick={() => void submitAgent()} disabled={!agentPrompt.trim() || agentWorking} aria-label="发送给 Agent" className="h-7 w-7 rounded-full"><Send size={12} /></Button></div>
-            </Card>
-          </div>
-        </aside>
-      )}
-    </main>
+          </main>
+        </CanvasActionsContext.Provider>
+      </TooltipProvider>
+    </MotionConfig>
   );
 };
 
-const CanvasToolButton = ({ icon: Icon, label, active, disabled, onClick, className }: { icon: React.ElementType; label: string; active?: boolean; disabled?: boolean; onClick: () => void; className?: string }) => (
-  <Button type="button" variant={active ? 'secondary' : 'ghost'} size="iconSm" aria-label={label} title={label} aria-pressed={active} disabled={disabled} onClick={onClick} className={cn('h-8 w-8 shrink-0', className)}><Icon size={16} strokeWidth={active ? 2.2 : 1.8} /></Button>
+export const Canvas = ({ onBack }: { onBack?: () => void }) => (
+  <ReactFlowProvider>
+    <CanvasInner onBack={onBack} />
+  </ReactFlowProvider>
 );
-
-export const Canvas = ({ onBack }: { onBack?: () => void }) => <ReactFlowProvider><CanvasInner onBack={onBack} /></ReactFlowProvider>;

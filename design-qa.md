@@ -1,8 +1,8 @@
 # Design QA：模型默认配置下拉菜单
 
 - source visual truth path: `/var/folders/lx/m6jhyf_j7rj62zr076tmjckr0000gn/T/codex-clipboard-a6ecf4c4-b525-4d9f-9ecd-dc82449d9818.png`
-- implementation screenshot path: `/Users/hoodax/Documents/Codex/项目-design work/03-程序区/电脑运行文件/design-qa-default-source-menu.jpg`
-- focused comparison path: `/Users/hoodax/Documents/Codex/项目-design work/03-程序区/电脑运行文件/design-qa-default-source-menu-comparison.jpg`
+- implementation screenshot path: `/Users/hoodax/Documents/Codex/项目-Li zuo 测试/代码/design-work/design-qa-default-source-menu.jpg`
+- focused comparison path: `/Users/hoodax/Documents/Codex/项目-Li zuo 测试/代码/design-work/design-qa-default-source-menu-comparison.jpg`
 - implementation URL: `http://127.0.0.1:5173/`
 - viewport: `1375 × 923 CSS px`, `deviceScaleFactor: 1`
 - source pixels: `1224 × 310`；implementation pixels: `1375 × 923`；focused comparison pixels: `1224 × 619`

@@ -56,11 +56,18 @@ export interface AssetFolder {
   assetCount: number;
 }
 
+export interface AssetCounts {
+  all: number;
+  unfiled: number;
+  byType: Record<string, number>;
+}
+
 export interface AssetPage {
   items: AssetSummary[];
   total: number;
   limit: number;
   offset: number;
+  counts: AssetCounts;
 }
 
 export interface DurableTask {

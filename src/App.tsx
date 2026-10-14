@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   ArrowRight,
+  FileText,
   Image as ImageIcon,
   Presentation,
   Scissors,
@@ -19,6 +20,7 @@ import { ExportCenter, SourceCenter } from './components/delivery/DeliveryCenter
 import { WorkflowModal } from './components/modals/WorkflowModal';
 import { SettingsPage } from './components/settings/SettingsPage';
 import { useUIStore } from './stores/useUIStore';
+import { useProviderStore } from './stores/useProviderStore';
 import { type ModuleType } from './stores/useUIStore';
 import { Badge, Card } from './components/ui';
 import { cn } from './lib/utils';
@@ -39,6 +41,13 @@ const toolCards: Array<{
   icon: React.ElementType;
   tag: string;
 }> = [
+  {
+    title: '文档编辑器',
+    description: '整理笔记、创作资料与项目文档，支持文件夹管理和富文本编辑。',
+    module: 'document-editor',
+    icon: FileText,
+    tag: '内容工具',
+  },
   {
     title: '电商详情页',
     description: '生成适配电商场景的商品详情内容与视觉素材。',
@@ -119,15 +128,14 @@ const ToolsHub = () => {
 };
 
 const AssetWorkspace = () => {
-  const [section, setSection] = useState<'assets' | 'prompts' | 'notes'>('assets');
+  const [section, setSection] = useState<'assets' | 'prompts'>('assets');
   return (
     <div className="module-workspace flex h-full min-h-0 flex-col bg-[var(--module-workspace-bg,var(--background))]">
       <div className="ui-module-toolbar mx-3 flex h-14 shrink-0 items-center justify-between border-0 px-0 shadow-none">
         <div role="tablist" aria-label="资产内容" className="flex h-8 items-center gap-1">
           {([
-            ['assets', '素材'],
-            ['prompts', '词库'],
-            ['notes', '笔记'],
+            ['assets', '素材库'],
+            ['prompts', '提示词库'],
           ] as const).map(([value, label]) => (
             <button
               key={value}
@@ -146,7 +154,6 @@ const AssetWorkspace = () => {
       <div className={cn('mx-3 min-h-0 flex-1 overflow-hidden', section === 'assets' ? 'mb-0' : 'mb-3')}>
         {section === 'assets' && <AssetLibraryPage showSourceTabs={false} showSearch={false} flushLayout />}
         {section === 'prompts' && <QuickNotes />}
-        {section === 'notes' && <PersonalSpace embedded />}
       </div>
     </div>
   );
@@ -154,6 +161,11 @@ const AssetWorkspace = () => {
 
 function App() {
   const { activeModule } = useUIStore();
+
+  // API 配置保存在本机网关，启动时读取一次；生成页和设置页都依赖它。
+  useEffect(() => {
+    void useProviderStore.getState().load();
+  }, []);
 
   return (
     <AppShell>
@@ -172,11 +184,12 @@ function App() {
         {activeModule === 'assets' && <AssetWorkspace />}
         {activeModule === 'cases' && <AssetLibraryPage initialSource="online" showSourceTabs={false} showSearch />}
         {activeModule === 'tools' && <ToolsHub />}
+        {activeModule === 'document-editor' && <PersonalSpace />}
         {activeModule === 'sources' && <SourceCenter />}
         {activeModule === 'exports' && <ExportCenter />}
         {activeModule === 'settings' && <SettingsPage />}
         {/* Render Canvas as fallback or specific placeholders for other modules */}
-        {activeModule !== 'magic-canvas' && activeModule !== 'image-gen' && activeModule !== 'ppt-gen' && activeModule !== 'video-gen' && activeModule !== 'projects' && activeModule !== 'ecommerce' && activeModule !== 'background-remove' && activeModule !== 'product-retouch' && activeModule !== 'assets' && activeModule !== 'cases' && activeModule !== 'tools' && activeModule !== 'sources' && activeModule !== 'exports' && activeModule !== 'settings' && (
+        {activeModule !== 'magic-canvas' && activeModule !== 'image-gen' && activeModule !== 'ppt-gen' && activeModule !== 'video-gen' && activeModule !== 'projects' && activeModule !== 'ecommerce' && activeModule !== 'background-remove' && activeModule !== 'product-retouch' && activeModule !== 'assets' && activeModule !== 'cases' && activeModule !== 'tools' && activeModule !== 'document-editor' && activeModule !== 'sources' && activeModule !== 'exports' && activeModule !== 'settings' && (
           <ModulePlaceholder title="模块建设中" description="这个入口还没有接入具体页面。" />
         )}
         <WorkflowModal />

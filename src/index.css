@@ -252,6 +252,38 @@
     --sidebar-border: oklch(0.9401 0 0); --sidebar-ring: oklch(0.7731 0 0);
   }
 
+  /* Watermelon UI: Duolingo-like playful shadcn kit — lime primary, roomy radii, nested soft cards, pressable buttons. */
+  :root[data-theme='watermelon'] {
+    --background: #FFFFFF; --foreground: #0A0A0A; --card: #FFFFFF; --card-foreground: #0A0A0A;
+    --popover: #FFFFFF; --popover-foreground: #0A0A0A;
+    --primary: #80CD00; --primary-foreground: #FFFFFF;
+    --secondary: #F4F4F5; --secondary-foreground: #18181B;
+    --muted: #F5F5F5; --muted-foreground: #6B6B6B;
+    --accent: #F2F2F2; --accent-foreground: #171717;
+    --destructive: #DF2225; --destructive-foreground: #FFFFFF;
+    --border: #E8E8E8; --input: #E5E5E5; --ring: #80CD00;
+    --sidebar: #FAFAFA; --sidebar-foreground: #0A0A0A;
+    --sidebar-primary: #80CD00; --sidebar-primary-foreground: #FFFFFF;
+    --sidebar-accent: #ECF7DA; --sidebar-accent-foreground: #3D6B00;
+    --sidebar-accent-hover: #F2F2F2;
+    --sidebar-border: #E8E8E8; --sidebar-ring: #80CD00;
+    --workspace-bg: #F4F4F4;
+    --brand-accent: #80CD00;
+    --accent-readable: #4F8A00;
+    --neutral-surface: #FFFFFF;
+    --neutral-surface-subtle: #F5F5F5;
+    --neutral-field-surface: #F5F5F5;
+    --neutral-control-selected: #FFFFFF;
+    --neutral-surface-hover: #EDEDED;
+    --neutral-border: #E5E5E5;
+    --generation-control-bg: #F5F5F5;
+    --generation-count-selected-bg: #FFFFFF;
+    --generation-segment-selected-bg: #FFFFFF;
+    --generation-segment-hover-bg: #EDEDED;
+    --theme-watermelon-edge: #66A400;
+    --radius: .875rem; --theme-font: Inter, "PingFang SC", system-ui, sans-serif;
+  }
+
   :root[data-theme='nature'] {
     --background: lab(98.84% .0000298023 -.0000119209); --foreground: lab(0% 0 0); --card: lab(100% 0 0); --card-foreground: lab(0% 0 0);
     --popover: lab(98.84% .0000298023 -.0000119209); --popover-foreground: lab(0% 0 0);
@@ -289,8 +321,9 @@
     --sidebar-border: oklch(0.32 0 0); --sidebar-ring: oklch(0.72 0 0);
     --surface-control: lab(13% 0 0);
     --surface-control-foreground: lab(100% 0 0);
-    --workspace-bg: lab(0% 0 0);
-    --module-workspace-bg: lab(7% 0 0);
+    /* 与浅色模式镜像：浅色里内容区最白、导航与外壳偏灰；暗色里内容区最深、导航与外壳是浅一点的黑。 */
+    --workspace-bg: lab(7% 0 0);
+    --module-workspace-bg: lab(0% 0 0);
     --generation-control-border-width: 1px;
     --generation-control-border: var(--neutral-border);
   }
@@ -533,6 +566,59 @@
     --surface-panel-shadow: 0 1px 4px color-mix(in srgb, var(--primary) 7%, transparent);
   }
 
+  :root[data-theme='watermelon'] {
+    --surface-card-bg: var(--card);
+    --surface-card-foreground: var(--card-foreground);
+    --surface-card-border: #EBEBEB;
+    --surface-card-border-width: 1px;
+    --surface-card-radius: 1.25rem;
+    --surface-card-shadow: 0 1px 0 rgb(0 0 0 / 3%), 0 2px 6px rgb(0 0 0 / 5%);
+    --surface-card-hover-shadow: 0 6px 16px rgb(0 0 0 / 8%);
+    --surface-card-hover-transform: translateY(-2px);
+    --surface-panel-bg: var(--card);
+    --surface-panel-foreground: var(--card-foreground);
+    --surface-panel-border: #EBEBEB;
+    --surface-panel-border-width: 1px;
+    --surface-panel-radius: 1.5rem;
+    --surface-panel-shadow: 0 1px 2px rgb(0 0 0 / 4%);
+    --action-generate-bg: var(--primary);
+    --action-generate-bg-hover: #8AD70A;
+    --action-generate-foreground: var(--primary-foreground);
+    --action-secondary-bg: #FFFFFF;
+    --action-secondary-bg-hover: #F7F7F7;
+    --action-secondary-foreground: var(--foreground);
+    --action-secondary-border: #E5E5E5;
+  }
+
+  /* Pressable "game" buttons: a highlight on top and a darker edge below that collapses on press.
+     Scoped to the shared primary Button and generate action so small checked toggles stay flat. */
+  :root[data-theme='watermelon'] button[class~='bg-primary'][class*='hover:bg-primary/90'],
+  :root[data-theme='watermelon'] button[class*='bg-[var(--action-generate-bg)]'] {
+    font-weight: 600;
+    box-shadow: inset 0 2px 0 rgb(255 255 255 / 30%), 0 3px 0 var(--theme-watermelon-edge);
+    transition-property: color, background-color, box-shadow, transform, opacity;
+  }
+
+  :root[data-theme='watermelon'] button[class~='bg-primary'][class*='hover:bg-primary/90']:active:not(:disabled),
+  :root[data-theme='watermelon'] button[class*='bg-[var(--action-generate-bg)]']:active:not(:disabled) {
+    box-shadow: inset 0 2px 0 rgb(255 255 255 / 30%), 0 1px 0 var(--theme-watermelon-edge);
+    transform: translateY(2px);
+  }
+
+  :root[data-theme='watermelon'] button[class~='bg-primary'][class*='hover:bg-primary/90']:disabled,
+  :root[data-theme='watermelon'] button[class*='bg-[var(--action-generate-bg)]']:disabled {
+    box-shadow: none;
+  }
+
+  /* Inside segmented tracks the edge must fit the 2px track padding, and pills follow the track radius. */
+  :root[data-theme='watermelon'] .settings-segmented-control > button {
+    border-radius: max(0px, calc(var(--radius) - 6px));
+  }
+
+  :root[data-theme='watermelon'] .settings-segmented-control > button[class~='bg-primary'] {
+    box-shadow: inset 0 1px 0 rgb(255 255 255 / 30%), 0 2px 0 var(--theme-watermelon-edge);
+  }
+
   :root[data-theme='claude'] .settings-segmented-control,
   :root[data-theme='claude'] .settings-font-select {
     border: 1px solid var(--neutral-border);
@@ -561,6 +647,12 @@
     --surface-card-border-width: 0px;
     --surface-card-shadow: 0 1px 6px rgb(0 0 0 / 7%);
     --surface-card-hover-shadow: 0 3px 10px rgb(0 0 0 / 9%);
+  }
+
+  /* 暗色内容区已是最深的黑，投影看不出来，设置分组改回用描边分界。 */
+  :root.dark[data-theme='nature'] {
+    --settings-group-border-width: 1px;
+    --settings-group-shadow: none;
   }
 
   :root[data-theme='nature'] .knowledge-tabs-toolbar {
@@ -865,7 +957,8 @@
     position: sticky;
     top: 0;
     z-index: 30;
-    background: color-mix(in srgb, var(--workspace-bg) 94%, transparent);
+    /* 吸顶标题在内容区里，底色跟内容区走，不用导航外壳的颜色。 */
+    background: color-mix(in srgb, var(--module-workspace-bg, var(--background)) 94%, transparent);
     backdrop-filter: blur(12px);
   }
 

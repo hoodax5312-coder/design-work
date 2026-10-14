@@ -5,7 +5,7 @@ export type PanelType = 'assets' | 'workflow' | 'history' | 'tools' | null;
 export type ModalType = 'workflow' | null;
 export type WorkspaceMode = 'editor' | 'manager';
 export type GenerationMode = 'image' | 'video';
-export type ThemePreset = 'nature' | 'brutalist' | 'claude';
+export type ThemePreset = 'nature' | 'brutalist' | 'claude' | 'watermelon';
 export type FontPreset = 'theme-default' | 'noto-sans' | 'noto-serif' | 'zcool-xiaowei';
 export type ThemeMode = 'light' | 'dark' | 'system';
 export type ContentLayout = 'centered' | 'full';
@@ -31,6 +31,7 @@ export const THEME_PRESETS: Record<ThemePreset, { label: string; preview: ThemeP
   nature: { label: 'Default', preview: { background: 'lab(98.84% .0000298023 -.0000119209)', card: 'lab(100% 0 0)', primary: 'lab(0% 0 0)', muted: 'lab(96.52% -.0000298023 .0000119209)', border: 'lab(90.72% .0000298023 -.0000119209)', borderWidth: '1px', radius: '.5rem', shadow: '0 1px 2px color-mix(in srgb, lab(0% 0 0) 6%, transparent)' } },
   brutalist: { label: 'Neo-brutalism', preview: { background: '#FFFDF5', card: '#FFFFFF', primary: '#FACC15', muted: '#C4B5FD', border: '#000000', borderWidth: '3px', radius: '0', shadow: '8px 8px 0 #000000' } },
   claude: { label: 'Claude', preview: { background: 'lab(97.9228% -.175089 2.05069)', card: 'lab(100% 0 0)', primary: 'lab(54.5081% 39.1499 38.3555)', muted: 'lab(92.4332% -.00917912 5.86995)', border: 'lab(86.6716% -.311345 2.61091)', borderWidth: '1px', radius: '.5rem', shadow: '0 2px 8px color-mix(in srgb, lab(54.5081% 39.1499 38.3555) 8%, transparent)' } },
+  watermelon: { label: 'Watermelon', preview: { background: '#F7F7F7', card: '#FFFFFF', primary: '#80CD00', muted: '#F2F2F2', border: '#E8E8E8', borderWidth: '1px', radius: '.875rem', shadow: '0 2px 6px rgb(0 0 0 / 6%)' } },
 };
 
 export const FONT_PRESETS: Record<FontPreset, { label: string }> = {
@@ -55,6 +56,7 @@ export const PERSONALIZATION_DEFAULTS = {
 const FIXED_THEME_MODES: Partial<Record<ThemePreset, ThemeMode>> = {
   brutalist: 'light',
   claude: 'light',
+  watermelon: 'light',
 };
 
 export interface MenuOption {
@@ -78,6 +80,7 @@ export type ModuleType =
   | 'video-gen'
   | 'projects'
   | 'tools'
+  | 'document-editor'
   | 'ecommerce'
   | 'background-remove'
   | 'product-retouch'
@@ -229,7 +232,7 @@ export const useUIStore = create<UIState>()(persist((set) => ({
     const fontPreset = previous?.fontPreset && previous.fontPreset in FONT_PRESETS
       ? previous.fontPreset as FontPreset
       : legacyFontMap[previous?.fontPreset || ''] || PERSONALIZATION_DEFAULTS.fontPreset;
-    const themePreset: ThemePreset = previous?.themePreset === 'brutalist' || previous?.themePreset === 'claude'
+    const themePreset: ThemePreset = previous?.themePreset === 'brutalist' || previous?.themePreset === 'claude' || previous?.themePreset === 'watermelon'
       ? previous.themePreset
       : PERSONALIZATION_DEFAULTS.themePreset;
     const previousMode = previous?.themeMode ?? previous?.theme;

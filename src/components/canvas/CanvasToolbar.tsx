@@ -1,186 +1,153 @@
-import React, { useState } from 'react';
-import { 
-  Type, 
-  Image as ImageIcon, 
-  Video, 
-  Mic, 
-  Clock, 
-  User, 
-  LayoutGrid, 
-  MessageSquare,
-  Scissors,
-  Clapperboard,
-  Network,
-  Boxes
-} from '@/lib/remixIconShim';
+import { useMemo, useState } from 'react';
+import { Hand, Keyboard, LayoutMasonry, MousePointer2, Plus, Search, Upload } from '@/lib/remixIconShim';
 import { cn } from '../../lib/utils';
 import { useCanvasStore } from '../../stores/useCanvasStore';
-import { nanoid } from 'nanoid';
-import { Button, Card } from '../ui';
+import { GooeyDial, motion, springs, type GooeyDialItem } from '../motion';
+import { Kbd, Popover, PopoverAnchor, PopoverContent, Tooltip } from '../ui';
+import { isCanvasNodeKind, nodeSummary, nodeTitle, type CanvasAnnotationKind, type CanvasNodeKind } from './canvasModel';
+import { ANNOTATION_CATALOG, NODE_CATALOG, NODE_CATALOG_LIST } from './nodeCatalog';
 
-interface ToolbarItemProps {
-  icon: React.ElementType;
-  label?: string;
-  active?: boolean;
-  onClick?: () => void;
-  children?: React.ReactNode;
+export type CanvasTool = 'select' | 'pan';
+
+interface CanvasRailProps {
+  tool: CanvasTool;
+  onToolChange: (tool: CanvasTool) => void;
+  onAdd: (kind: CanvasNodeKind) => void;
+  /** 便签直接新建；分组有选中节点时把它们编组，否则新建空画框。 */
+  onAddAnnotation: (kind: CanvasAnnotationKind) => void;
+  onUpload: () => void;
+  onTidy: () => void;
+  onShowShortcuts: () => void;
+  searchOpen: boolean;
+  onSearchOpenChange: (open: boolean) => void;
+  onFocusNode: (id: string) => void;
 }
 
-const ToolbarItem = ({ icon: Icon, label, active, onClick, children }: ToolbarItemProps) => {
-  const [isHovered, setIsHovered] = useState(false);
+const RailButton = ({ label, shortcut, active, onClick, children }: { label: string; shortcut?: string; active?: boolean; onClick: () => void; children: React.ReactNode }) => (
+  <Tooltip content={label} shortcut={shortcut} side="right">
+    <button type="button" className="canvas-icon-button" aria-label={label} aria-pressed={active} data-active={active || undefined} onClick={onClick}>
+      {children}
+    </button>
+  </Tooltip>
+);
+
+/** 节点搜索：按名称、提示词或内容查找并定位。 */
+const NodeSearch = ({ onFocusNode, onClose }: { onFocusNode: (id: string) => void; onClose: () => void }) => {
+  const nodes = useCanvasStore((state) => state.nodes);
+  const [query, setQuery] = useState('');
+  const [cursor, setCursor] = useState(0);
+  const results = useMemo(() => {
+    const term = query.trim().toLowerCase();
+    return nodes
+      .filter((node) => isCanvasNodeKind(node.type))
+      .map((node) => ({ id: node.id, kind: node.type as CanvasNodeKind, title: nodeTitle(node), summary: nodeSummary(node, 48) }))
+      .filter((item) => !term || `${item.title} ${item.summary}`.toLowerCase().includes(term));
+  }, [nodes, query]);
+  const active = Math.min(cursor, Math.max(results.length - 1, 0));
+
+  const pick = (id?: string) => {
+    if (!id) return;
+    onFocusNode(id);
+    onClose();
+  };
 
   return (
-    <div 
-      className="relative flex items-center"
-      onMouseEnter={() => setIsHovered(true)}
-      onMouseLeave={() => setIsHovered(false)}
-    >
-      <Button
-        variant={active ? 'primary' : 'secondary'}
-        size="iconLg"
-        onClick={onClick}
-        className="group relative z-20"
-        aria-label={label}
-      >
-        <Icon size={20} strokeWidth={2} />
-        
-        {/* Tooltip Label (Only if no children/submenu) */}
-        {!children && isHovered && label && (
-          <div className="absolute left-full z-50 ml-3 whitespace-nowrap rounded-md bg-popover px-3 py-1.5 text-xs text-popover-foreground shadow-md animate-in fade-in slide-in-from-left-2">
-            {label}
-          </div>
+    <div className="flex max-h-[min(420px,70vh)] flex-col">
+      <div className="flex items-center gap-2 border-b border-border px-3 pb-2 pt-1">
+        <Search size={14} className="shrink-0 text-muted-foreground" />
+        <input
+          autoFocus
+          value={query}
+          onChange={(event) => { setQuery(event.target.value); setCursor(0); }}
+          onKeyDown={(event) => {
+            if (event.key === 'ArrowDown') { event.preventDefault(); setCursor((value) => Math.min(value + 1, results.length - 1)); }
+            if (event.key === 'ArrowUp') { event.preventDefault(); setCursor((value) => Math.max(value - 1, 0)); }
+            if (event.key === 'Enter') { event.preventDefault(); pick(results[active]?.id); }
+          }}
+          placeholder="搜索节点名称或内容"
+          aria-label="搜索节点"
+          className="h-7 min-w-0 flex-1 bg-transparent text-xs text-foreground outline-none placeholder:text-muted-foreground"
+        />
+        <Kbd>⌘F</Kbd>
+      </div>
+      <div role="listbox" aria-label="节点" className="min-h-0 flex-1 overflow-y-auto p-1">
+        {results.length ? results.map((item, index) => {
+          const Icon = NODE_CATALOG[item.kind].icon;
+          return (
+            <button
+              key={item.id}
+              type="button"
+              role="option"
+              aria-selected={index === active}
+              onMouseEnter={() => setCursor(index)}
+              onClick={() => pick(item.id)}
+              className={cn('flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left', index === active && 'bg-accent text-accent-foreground')}
+            >
+              <span className="grid h-7 w-7 shrink-0 place-items-center rounded-md bg-muted text-foreground"><Icon size={13} /></span>
+              <span className="min-w-0 flex-1">
+                <span className="block truncate text-xs font-medium">{item.title}</span>
+                <span className="block truncate text-[11px] text-muted-foreground">{item.summary || '暂无内容'}</span>
+              </span>
+            </button>
+          );
+        }) : (
+          <p className="px-3 py-6 text-center text-xs text-muted-foreground">{nodes.length ? '没有匹配的节点' : '画布上还没有节点'}</p>
         )}
-      </Button>
-
-      {/* Hover Menu / Submenu */}
-      {children && (
-        <div 
-          className={cn(
-            "absolute left-full ml-3 pl-2 transition-all duration-200 origin-left z-10",
-            isHovered 
-              ? "opacity-100 translate-x-0 pointer-events-auto" 
-              : "opacity-0 -translate-x-2 pointer-events-none"
-          )}
-        >
-          <Card padding="sm" className="flex min-w-[140px] flex-col gap-0.5 p-1.5 shadow-lg">
-             {children}
-          </Card>
-        </div>
-      )}
+      </div>
     </div>
   );
 };
 
-const SubMenuItem = ({ icon: Icon, label, onClick }: { icon: React.ElementType; label: string; onClick: () => void }) => (
-  <Button
-    variant="ghost"
-    size="sm"
-    onClick={onClick}
-    className="w-full justify-start text-xs"
-  >
-    <Icon size={14} />
-    {label}
-  </Button>
-);
-
-export const CanvasToolbar = () => {
-  const addNode = useCanvasStore((state) => state.addNode);
-
-  const handleAddText = () => {
-    addNode({
-      id: nanoid(),
-      type: 'text',
-      position: { x: 100 + Math.random() * 100, y: 100 + Math.random() * 100 },
-      data: { content: '请输入文本...', mode: 'ai' },
-    });
-  };
-
-  const handleAddImageNode = () => {
-    addNode({
-      id: nanoid(),
-      type: 'imageGen', // Using imageGen type as placeholder
-      position: { x: 200 + Math.random() * 100, y: 200 + Math.random() * 100 },
-      data: { prompt: '', model: 'default' },
-    });
-  };
-
-  const handleAddVideoNode = () => {
-    addNode({
-      id: nanoid(),
-      type: 'video',
-      position: { x: 300 + Math.random() * 100, y: 300 + Math.random() * 100 },
-      data: { prompt: '', model: '' },
-    });
-  };
-
-  const handleAddStoryboardNode = () => {
-    addNode({
-      id: nanoid(),
-      type: 'storyboard',
-      position: { x: 380 + Math.random() * 80, y: 120 + Math.random() * 80 },
-      data: {
-        script: '',
-        mode: 'video',
-        shots: [],
-        isGenerating: false,
-      },
-    });
-  };
-
-  const handleAddModelRouterNode = () => {
-    addNode({
-      id: nanoid(),
-      type: 'modelRouter',
-      position: { x: 760 + Math.random() * 80, y: 120 + Math.random() * 80 },
-      data: {
-        provider: 'Custom',
-        model: '',
-        endpoint: '',
-        requestMode: 'async',
-        keyRotation: true,
-        blacklistCount: 0,
-        template: '{\\n  "model": "{{modelName}}",\\n  "prompt": "{{prompt}}",\\n  "ratio": "{{ratio}}",\\n  "duration": "{{duration}}"\\n}',
-      },
-    });
-  };
+/** 左侧竖向工具栏：新建（黏性拨盘）、选择/抓手、上传、搜索、整理、快捷键。 */
+export const CanvasRail = ({ tool, onToolChange, onAdd, onAddAnnotation, onUpload, onTidy, onShowShortcuts, searchOpen, onSearchOpenChange, onFocusNode }: CanvasRailProps) => {
+  const NoteIcon = ANNOTATION_CATALOG.note.icon;
+  const GroupIcon = ANNOTATION_CATALOG.group.icon;
+  const [dialOpen, setDialOpen] = useState(false);
+  const showMinimap = useCanvasStore((state) => state.showMinimap);
+  const dialItems: GooeyDialItem[] = [
+    ...NODE_CATALOG_LIST.map((item) => ({ id: item.kind, label: item.label, icon: item.icon, shortcut: item.shortcut, onSelect: () => onAdd(item.kind) })),
+    { id: 'upload', label: '上传', icon: Upload, onSelect: onUpload },
+  ];
 
   return (
-    <div className="absolute left-6 top-24 flex flex-col gap-4 z-50 pointer-events-auto">
-      {/* Main Tools Group */}
-      <div className="flex flex-col gap-3">
-        <ToolbarItem 
-          icon={Type} 
-          label="添加文本节点" 
-          onClick={handleAddText} 
-        />
-        
-        <ToolbarItem icon={ImageIcon} label="添加图片节点" onClick={handleAddImageNode} />
-
-        <ToolbarItem icon={Video} label="添加视频节点" onClick={handleAddVideoNode} />
-
-        <ToolbarItem icon={Boxes}>
-          <SubMenuItem icon={Clapperboard} label="智能分镜" onClick={handleAddStoryboardNode} />
-          <SubMenuItem icon={Network} label="模型路由" onClick={handleAddModelRouterNode} />
-          <SubMenuItem icon={Scissors} label="视频分析" onClick={() => {
-            addNode({
-              id: nanoid(),
-              type: 'videoAnalyze',
-              position: { x: 520 + Math.random() * 80, y: 320 + Math.random() * 80 },
-              data: { threshold: 30, isExtracting: false, isExtractingVoiceover: false },
-            });
-          }} />
-        </ToolbarItem>
-
-        <ToolbarItem icon={Mic} label="音频生成" />
-        <ToolbarItem icon={Clock} label="历史记录" />
-        <ToolbarItem icon={User} label="数字人" />
-        <ToolbarItem icon={LayoutGrid} label="更多工具" />
+    // 外层只负责定位：在顶部栏与左下角控件（含小地图）之间垂直居中，避免互相遮挡。
+    // 动效放在内层，framer-motion 的行内 transform 会覆盖 Tailwind 的 translate 类。
+    <div className="pointer-events-none absolute left-3 top-16 z-30 flex items-center transition-[bottom] duration-200" style={{ bottom: showMinimap ? 200 : 68 }}>
+    <motion.div
+      initial={{ opacity: 0, x: -10 }}
+      animate={{ opacity: 1, x: 0 }}
+      transition={springs.smooth}
+      className="pointer-events-auto max-h-full"
+    >
+      <div className="canvas-chrome flex flex-col items-center gap-1 rounded-2xl p-1.5">
+        <Tooltip content="添加节点" side="right" disabled={dialOpen}>
+          <span className="inline-flex">
+            <GooeyDial items={dialItems} open={dialOpen} onOpenChange={setDialOpen} label="添加节点" icon={Plus} size={36} itemSize={34} gap={14} />
+          </span>
+        </Tooltip>
+        <span aria-hidden="true" className="my-0.5 h-px w-5 bg-border" />
+        <RailButton label="选择" shortcut="V" active={tool === 'select'} onClick={() => onToolChange('select')}><MousePointer2 size={16} /></RailButton>
+        <RailButton label="抓手" shortcut="H / 空格" active={tool === 'pan'} onClick={() => onToolChange('pan')}><Hand size={16} /></RailButton>
+        <span aria-hidden="true" className="my-0.5 h-px w-5 bg-border" />
+        <RailButton label="便签" shortcut="N" onClick={() => onAddAnnotation('note')}><NoteIcon size={16} /></RailButton>
+        <RailButton label="分组：编组所选，或新建空画框" shortcut="⌘G" onClick={() => onAddAnnotation('group')}><GroupIcon size={16} /></RailButton>
+        <span aria-hidden="true" className="my-0.5 h-px w-5 bg-border" />
+        <RailButton label="上传图片或视频" onClick={onUpload}><Upload size={16} /></RailButton>
+        <Popover open={searchOpen} onOpenChange={onSearchOpenChange}>
+          <PopoverAnchor asChild>
+            <span className="inline-flex">
+              <RailButton label="搜索节点" shortcut="⌘F" active={searchOpen} onClick={() => onSearchOpenChange(!searchOpen)}><Search size={16} /></RailButton>
+            </span>
+          </PopoverAnchor>
+          <PopoverContent side="right" align="start" sideOffset={14} className="w-[300px] p-0 pt-2">
+            <NodeSearch onFocusNode={onFocusNode} onClose={() => onSearchOpenChange(false)} />
+          </PopoverContent>
+        </Popover>
+        <RailButton label="整理布局" onClick={onTidy}><LayoutMasonry size={16} /></RailButton>
+        <span aria-hidden="true" className="my-0.5 h-px w-5 bg-border" />
+        <RailButton label="快捷键" shortcut="?" onClick={onShowShortcuts}><Keyboard size={16} /></RailButton>
       </div>
-
-      {/* Bottom Action */}
-      <div className="mt-auto">
-        <ToolbarItem icon={MessageSquare} label="AI 助手" />
-      </div>
+    </motion.div>
     </div>
   );
 };

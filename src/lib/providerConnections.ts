@@ -99,6 +99,58 @@ export const providerSupportsCategory = (
   category: ModelCategory,
 ) => getConfiguredModels(provider, category).length > 0;
 
+/** 地址的协议 + 域名 + 端口，统一小写；格式不对时返回空字符串。 */
+export const urlOrigin = (url: string | undefined) => {
+  try {
+    const origin = new URL(String(url || '').trim()).origin.toLowerCase();
+    return origin === 'null' ? '' : origin;
+  } catch {
+    return '';
+  }
+};
+
+const uniqueOrigins = (urls: Array<string | undefined>) =>
+  [...new Set(urls.map(urlOrigin).filter(Boolean))];
+
+/** 模型有自己的 Key：刚填写的，或网关里已保存的。 */
+export const modelHasOwnKey = (model: ProviderModel) =>
+  Boolean(model.apiKeyOverride?.trim() || model.apiKeyOverrideHint);
+
+/** 通用 Key 会发往的地址：通用 Base URL，加上没有自己 Key 的模型覆盖的 Base URL。 */
+export const providerKeyOrigins = (provider: ProviderConfig) => uniqueOrigins([
+  provider.baseUrl,
+  ...provider.models
+    .filter((model) => !modelHasOwnKey(model))
+    .map((model) => model.baseUrlOverride),
+]);
+
+/** 模型 Key 会发往的地址。 */
+export const modelKeyOrigins = (provider: ProviderConfig, model: ProviderModel) =>
+  uniqueOrigins([model.baseUrlOverride?.trim() || provider.baseUrl]);
+
+export const originsAllowed = (required: string[], allowed: string[]) =>
+  required.every((origin) => allowed.includes(origin));
+
+/** 已保存的通用 Key 能否继续用：当前所有会用到它的地址都在保存时允许的范围内。 */
+export const providerKeyHintUsable = (provider: ProviderConfig) =>
+  Boolean(provider.apiKeyHint
+    && originsAllowed(providerKeyOrigins(provider), provider.apiKeyHint.origins));
+
+export const modelKeyHintUsable = (provider: ProviderConfig, model: ProviderModel) =>
+  Boolean(model.apiKeyOverrideHint
+    && originsAllowed(modelKeyOrigins(provider, model), model.apiKeyOverrideHint.origins));
+
+export const isProviderSaved = (provider: ProviderConfig) => Boolean(
+  provider.savedAt || provider.apiKey.trim() || provider.apiKeyHint || provider.models.length,
+);
+
+export const connectionHasKey = (connection: ResolvedProviderConnection | undefined) =>
+  Boolean(connection?.apiKey || connection?.storedKey);
+
+/**
+ * Key 的取用顺序：模型刚填写的 Key → 模型已保存的 Key → 通用刚填写的 Key → 通用已保存的 Key。
+ * 已保存的 Key 只给出引用，由网关填入。
+ */
 export const resolveModelConnection = (
   provider: ProviderConfig | undefined,
   category: ModelCategory,
@@ -107,13 +159,24 @@ export const resolveModelConnection = (
   const model = provider?.models.find((item) =>
     item.id === modelId && item.categories.includes(category));
   if (!provider || !model) return undefined;
-  return {
+  const connection = {
     category,
     protocol: provider.protocol,
     baseUrl: model.baseUrlOverride?.trim() || provider.baseUrl.trim(),
-    apiKey: model.apiKeyOverride?.trim() || provider.apiKey.trim(),
+    apiKey: '',
     model: model.id,
   };
+  const modelKey = model.apiKeyOverride?.trim();
+  if (modelKey) return { ...connection, apiKey: modelKey };
+  if (model.apiKeyOverrideHint) {
+    return { ...connection, storedKey: { providerId: provider.id, modelId: model.id, scope: 'model' } };
+  }
+  const providerKey = provider.apiKey.trim();
+  if (providerKey) return { ...connection, apiKey: providerKey };
+  if (provider.apiKeyHint) {
+    return { ...connection, storedKey: { providerId: provider.id, scope: 'provider' } };
+  }
+  return connection;
 };
 
 export const invalidateProviderModels = (
@@ -124,7 +187,7 @@ export const invalidateProviderModels = (
   models: provider.models.map((model) => {
     const affected = field === 'protocol'
       || (field === 'baseUrl' && !model.baseUrlOverride)
-      || (field === 'apiKey' && !model.apiKeyOverride);
+      || (field === 'apiKey' && !modelHasOwnKey(model));
     return affected ? { ...model, verification: { status: 'pending' } } : model;
   }),
 });
@@ -136,6 +199,45 @@ export const markModelsPending = (provider: ProviderConfig): ProviderConfig => (
     verification: { status: 'pending' },
   })),
 });
+
+/**
+ * 把一批模型加入或移出某个类型。加入时已有的模型只补上类型，新模型按传入顺序追加；
+ * 移出后不再属于任何类型的模型会被删除。原默认模型不在该类型里时，改用该类型的第一个模型。
+ */
+export const setModelsInCategory = (
+  provider: ProviderConfig,
+  category: ModelCategory,
+  ids: string[],
+  included: boolean,
+  verification: ProviderVerification = { status: 'pending' },
+): ProviderConfig => {
+  const targets = new Set(ids.map((id) => id.trim()).filter(Boolean));
+  let models: ProviderModel[];
+  if (included) {
+    const existing = new Set(provider.models.map((model) => model.id));
+    models = [
+      ...provider.models.map((model) => (targets.has(model.id) && !model.categories.includes(category)
+        ? { ...model, categories: [...model.categories, category] }
+        : model)),
+      ...[...targets]
+        .filter((id) => !existing.has(id))
+        .map((id) => ({ id, categories: [category], verification: { ...verification } })),
+    ];
+  } else {
+    models = provider.models.flatMap((model) => {
+      if (!targets.has(model.id) || !model.categories.includes(category)) return [model];
+      const categories = model.categories.filter((item) => item !== category);
+      return categories.length ? [{ ...model, categories }] : [];
+    });
+  }
+  const inCategory = models.filter((model) => model.categories.includes(category));
+  const current = provider.selectedModels[category];
+  const nextSelected = current && inCategory.some((model) => model.id === current) ? current : inCategory[0]?.id;
+  const selectedModels = { ...provider.selectedModels };
+  if (nextSelected) selectedModels[category] = nextSelected;
+  else delete selectedModels[category];
+  return { ...provider, models, selectedModels };
+};
 
 interface LegacyAssignment {
   modelId: string;

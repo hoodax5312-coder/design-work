@@ -73,6 +73,7 @@ const explorerContent: Record<ModuleType, { title: string; section: string; entr
       { label: '共享资产', meta: '24', icon: Boxes },
     ],
   },
+  'document-editor': { title: '文档编辑器', section: '文档', entries: [] },
   'magic-canvas': {
     title: '画板结构',
     section: '当前画板',
