@@ -1,5 +1,5 @@
 import { type ReactNode } from 'react';
-import { RefreshCw, Download, Sparkles, BookmarkPlus } from '@/lib/remixIconShim';
+import { RefreshCw, Download, Sparkles, Heart } from '@/lib/remixIconShim';
 import { Button } from '../ui';
 
 interface PreviewPanelProps {
@@ -58,7 +58,7 @@ export function PreviewPanel({
                 title="添加到资产"
                 className="h-8 w-8"
               >
-                <BookmarkPlus size={18} />
+                <Heart size={18} />
               </Button>
             )}
           </div>

@@ -107,6 +107,8 @@ interface UIState {
   activeModule: ModuleType;
   workspaceMode: WorkspaceMode;
   rightPanelOpen: boolean;
+  /** 画布 Agent 右侧面板是否打开；仅运行时使用，不持久化。 */
+  canvasAgentOpen: boolean;
   generationMode: GenerationMode;
   setActivePanel: (panel: PanelType) => void;
   openModal: (modal: ModalType) => void;
@@ -119,6 +121,7 @@ interface UIState {
   setWorkspaceMode: (mode: WorkspaceMode) => void;
   setGenerationMode: (mode: GenerationMode) => void;
   setRightPanelOpen: (open: boolean) => void;
+  setCanvasAgentOpen: (open: boolean) => void;
   toggleRightPanel: () => void;
   toggleTheme: () => void;
   setThemePreset: (preset: ThemePreset) => void;
@@ -165,6 +168,7 @@ export const useUIStore = create<UIState>()(persist((set) => ({
   activeModule: 'image-gen',
   workspaceMode: 'editor',
   rightPanelOpen: true,
+  canvasAgentOpen: false,
   generationMode: 'image',
   setActivePanel: (panel) => set({ activePanel: panel }),
   openModal: (modal) => set({ modalOpen: modal }),
@@ -177,6 +181,7 @@ export const useUIStore = create<UIState>()(persist((set) => ({
   setWorkspaceMode: (mode) => set({ workspaceMode: mode }),
   setGenerationMode: (mode) => set({ generationMode: mode }),
   setRightPanelOpen: (open) => set({ rightPanelOpen: open }),
+  setCanvasAgentOpen: (open) => set({ canvasAgentOpen: open }),
   toggleRightPanel: () => set((state) => ({ rightPanelOpen: !state.rightPanelOpen })),
   toggleTheme: () => set((state) => {
     if (FIXED_THEME_MODES[state.themePreset]) return state;
@@ -259,6 +264,7 @@ export const useUIStore = create<UIState>()(persist((set) => ({
       activeModule: 'image-gen' as ModuleType,
       workspaceMode: 'editor' as WorkspaceMode,
       rightPanelOpen: previous?.rightPanelOpen ?? true,
+      canvasAgentOpen: false,
     };
   },
   partialize: (state) => ({

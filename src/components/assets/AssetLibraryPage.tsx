@@ -20,7 +20,8 @@ import {
   Palette,
   Search,
   Sparkles,
-  Star,
+  Heart,
+  HeartFill,
   Trash2,
   Upload,
   UploadCloud,
@@ -52,6 +53,17 @@ import {
   Skeleton,
 } from '../ui';
 import { CaseDetailOverlay, CaseFilterSections, CaseGrid, CaseTabs, useCaseLibrary } from './CaseLibrary';
+import { GeneratedImageMenu, type GeneratedImageMenuTarget } from '../image-gen/GeneratedImageMenu';
+import { MediaLightbox } from '../canvas/CanvasOverlays';
+
+/** 全屏查看用的图片地址：优先原始生成地址，其次本地预览。 */
+const assetImageUrl = (asset: AssetSummary) => {
+  const generatedUrl = asset.userMetadata?.generatedUrl;
+  if (typeof generatedUrl === 'string' && generatedUrl && asset.userMetadata?.generatedSourceStatus !== 'unrecoverable') {
+    return generatedUrl;
+  }
+  return asset.previewUrl || `/api/assets/${asset.id}/preview?size=512`;
+};
 
 const sortOptions = [
   { id: 'updatedAt', label: '时间', hint: '最新优先' },
@@ -73,7 +85,7 @@ const assetOriginOptions: Array<{ id: AssetOriginFilter; label: string; icon: Re
   { id: 'generated', label: '生成资产', icon: Sparkles },
   { id: 'canvas', label: '画布资产', icon: Palette },
   { id: 'uploaded', label: '本地上传', icon: Upload },
-  { id: 'favorites', label: '我的收藏', icon: Star },
+  { id: 'favorites', label: '我的收藏', icon: Heart },
 ];
 const formatDate = (value: number) =>
   new Intl.DateTimeFormat('zh-CN', {
@@ -136,6 +148,8 @@ export const AssetLibraryPage = ({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [taskRefreshKey, setTaskRefreshKey] = useState(0);
   const [generatedItems, setGeneratedItems] = useState<GeneratedContentItem[]>([]);
+  const [assetMenu, setAssetMenu] = useState<{ target: GeneratedImageMenuTarget; asset: AssetSummary } | null>(null);
+  const [lightbox, setLightbox] = useState<{ kind: 'image'; url: string; title: string } | null>(null);
 
   useEffect(() => {
     const sync = () => setGeneratedItems(contentFeed.list());
@@ -371,6 +385,66 @@ export const AssetLibraryPage = ({
       setSelectedAsset(null);
     }
     refresh();
+  };
+
+  const openAssetDetail = (asset: AssetSummary) => {
+    setSelectedId(asset.id);
+    setSelectedAsset(asset);
+  };
+
+  /** 图片直接全屏；其他类型打开详情面板。 */
+  const openFullscreen = (asset: AssetSummary) => {
+    if (asset.type === 'image') setLightbox({ kind: 'image', url: assetImageUrl(asset), title: asset.title });
+    else openAssetDetail(asset);
+  };
+
+  const openAssetMenu = (event: React.MouseEvent, asset: AssetSummary) => {
+    event.preventDefault();
+    const isFeedItem = asset.userMetadata?.feedItem === true;
+    setAssetMenu({
+      asset,
+      target: {
+        point: { x: event.clientX, y: event.clientY },
+        url: assetImageUrl(asset),
+        saved: asset.favorite,
+        // 旧会话的生成卡片还没有资产记录，菜单会提示并禁用资产操作。
+        assetId: isFeedItem ? undefined : asset.id,
+      },
+    });
+  };
+
+  const favoriteAsset = async (asset: AssetSummary) => {
+    try {
+      await assetService.bulkFavorite([asset.id], true);
+      showNotice('已添加至收藏');
+      refresh();
+    } catch (caught) {
+      showNotice(caught instanceof Error ? caught.message : '收藏失败');
+    }
+  };
+
+  const removeAsset = async (asset: AssetSummary) => {
+    if (asset.userMetadata?.feedItem === true) {
+      showNotice('这张图片还没有存入资产库，请到生成页删除');
+      return;
+    }
+    if (!window.confirm(`将“${asset.title}”移入回收站？`)) return;
+    try {
+      await assetService.remove(asset.id);
+      setSelectedIds((current) => {
+        const next = new Set(current);
+        next.delete(asset.id);
+        return next;
+      });
+      if (selectedId === asset.id) {
+        setSelectedId(null);
+        setSelectedAsset(null);
+      }
+      showNotice('已移入回收站');
+      refresh();
+    } catch (caught) {
+      showNotice(caught instanceof Error ? caught.message : '删除资产失败');
+    }
   };
 
   const openFolderCreator = (parentId: string | null) => {
@@ -905,7 +979,7 @@ export const AssetLibraryPage = ({
               onClick={() => assetService.bulkFavorite([...selectedIds], true).then(refresh)}
               className="h-7 text-xs"
             >
-              <Star size={12} />
+              <Heart size={12} />
               收藏
             </Button>
             {folders.length > 0 && (
@@ -966,6 +1040,8 @@ export const AssetLibraryPage = ({
                   }}
                   onToggle={() => toggleSelected(asset.id)}
                   onPreviewReady={loadAssets}
+                  onFullscreen={() => openFullscreen(asset)}
+                  onContextMenu={(event) => openAssetMenu(event, asset)}
                 />
               ))}
             </div>
@@ -1033,6 +1109,20 @@ export const AssetLibraryPage = ({
           <Button type="button" variant="ghost" size="sm" role="menuitem" onClick={() => { setFolderContextMenu(null); void deleteFolder(contextFolder); }} className="h-9 w-full justify-start gap-2.5 px-2.5 text-left text-xs text-destructive hover:bg-destructive/10 hover:text-destructive"><Trash2 size={15} />删除</Button>
         </Card>
       </>}
+      <GeneratedImageMenu
+        target={assetMenu?.target || null}
+        onClose={() => setAssetMenu(null)}
+        deleteLabel={assetMenu?.asset.type === 'image' ? '删除此图片' : '删除此素材'}
+        onFullscreen={() => { if (assetMenu) openFullscreen(assetMenu.asset); }}
+        onSave={() => { if (assetMenu) void favoriteAsset(assetMenu.asset); }}
+        onDelete={() => { if (assetMenu) void removeAsset(assetMenu.asset); }}
+        onNotice={(message) => {
+          showNotice(message);
+          refresh();
+        }}
+        onError={showNotice}
+      />
+      <MediaLightbox media={lightbox} onClose={() => setLightbox(null)} />
       <CaseDetailOverlay cases={cases} />
       {importSession && (
         <ImportCenter
@@ -1083,6 +1173,8 @@ const AssetCard = ({
   onOpen,
   onToggle,
   onPreviewReady,
+  onFullscreen,
+  onContextMenu,
 }: {
   asset: AssetSummary;
   index: number;
@@ -1091,12 +1183,16 @@ const AssetCard = ({
   onOpen: () => void;
   onToggle: () => void;
   onPreviewReady: () => void;
+  onFullscreen: () => void;
+  onContextMenu: (event: React.MouseEvent) => void;
 }) => (
   <article
     data-asset-index={index}
     tabIndex={0}
     role="gridcell"
     onClick={onOpen}
+    onDoubleClick={onFullscreen}
+    onContextMenu={onContextMenu}
     onKeyDown={(event) => {
       keyboardNavigate(event, index);
       if (event.key === 'Enter' || event.key === ' ') {
@@ -1135,7 +1231,7 @@ const AssetCard = ({
       </Button>
       {asset.favorite && (
         <span className="absolute right-2.5 top-2.5 z-10 grid h-6 w-6 place-items-center rounded-lg bg-white/85 text-amber-500 backdrop-blur-md dark:bg-black/55">
-          <Star size={12} className="fill-current" />
+          <HeartFill size={12} />
         </span>
       )}
       <div className="pointer-events-none absolute inset-x-0 bottom-0 translate-y-2 bg-gradient-to-t from-black/80 via-black/55 to-transparent px-3 pb-3 pt-10 text-white opacity-0 transition-all duration-200 group-hover:translate-y-0 group-hover:opacity-100 group-focus-within:translate-y-0 group-focus-within:opacity-100">
@@ -1220,7 +1316,7 @@ export const AssetRow = ({
     <span className="rounded-md bg-muted px-2 py-1 text-xs font-semibold uppercase text-muted-foreground">
       {asset.type}
     </span>
-    {asset.favorite && <Star size={12} className="fill-amber-400 text-amber-400" />}
+    {asset.favorite && <HeartFill size={12} className="text-amber-400" />}
     <span className="w-20 text-right text-xs text-muted-foreground">{formatDate(asset.updatedAt)}</span>
   </Button>
 );

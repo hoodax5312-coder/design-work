@@ -25,21 +25,27 @@ export interface GooeyDialProps {
   itemSize?: number;
   /** 展开项间距（px），需大于模糊半径的两倍，静止时才会彼此分离。 */
   gap?: number;
+  /** 展开方向：向右（默认）或向上。 */
+  direction?: 'right' | 'up';
   className?: string;
 }
 
 /**
- * 黏性展开的快捷拨盘：触发按钮向右“分裂”出一排圆形操作。
+ * 黏性展开的快捷拨盘：触发按钮向右（或向上）“分裂”出一排圆形操作。
  * 黏连效果只作用在纯色底层，图标与文字渲染在其上方，不受滤镜影响。
  */
-export const GooeyDial = ({ items, open, onOpenChange, label, icon: Icon, size = 40, itemSize = 36, gap = 12, className }: GooeyDialProps) => {
+export const GooeyDial = ({ items, open, onOpenChange, label, icon: Icon, size = 40, itemSize = 36, gap = 12, direction = 'right', className }: GooeyDialProps) => {
   const rootRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const itemRefs = useRef<Array<HTMLButtonElement | null>>([]);
   const filterId = `gooey-${useId().replace(/[^a-zA-Z0-9]/g, '')}`;
+  const vertical = direction === 'up';
   const inset = (size - itemSize) / 2;
   const offsetFor = (index: number) => size + gap + index * (itemSize + gap) - inset;
   const extent = size + gap + items.length * (itemSize + gap);
+  const moveTo = (index: number) => (vertical ? { x: 0, y: open ? -offsetFor(index) : 0 } : { x: open ? offsetFor(index) : 0, y: 0 });
+  const nextKey = vertical ? 'ArrowUp' : 'ArrowRight';
+  const prevKey = vertical ? 'ArrowDown' : 'ArrowLeft';
 
   useEffect(() => {
     if (!open) return undefined;
@@ -67,10 +73,10 @@ export const GooeyDial = ({ items, open, onOpenChange, label, icon: Icon, size =
       close();
       return;
     }
-    if (event.key !== 'ArrowRight' && event.key !== 'ArrowLeft') return;
+    if (event.key !== nextKey && event.key !== prevKey) return;
     event.preventDefault();
     const current = itemRefs.current.findIndex((element) => element === document.activeElement);
-    const step = event.key === 'ArrowRight' ? 1 : -1;
+    const step = event.key === nextKey ? 1 : -1;
     const next = (current + step + items.length) % items.length;
     itemRefs.current[next]?.focus({ preventScroll: true });
   };
@@ -79,7 +85,7 @@ export const GooeyDial = ({ items, open, onOpenChange, label, icon: Icon, size =
     <div ref={rootRef} className={cn('relative shrink-0', className)} style={{ width: size, height: size }} onKeyDown={handleKeyDown}>
       <svg aria-hidden="true" className="pointer-events-none absolute h-0 w-0">
         <defs>
-          <filter id={filterId} x="-10%" y="-80%" width="120%" height="260%">
+          <filter id={filterId} {...(vertical ? { x: '-80%', y: '-10%', width: '260%', height: '120%' } : { x: '-10%', y: '-80%', width: '120%', height: '260%' })}>
             <feGaussianBlur in="SourceGraphic" stdDeviation="5" result="blur" />
             <feColorMatrix in="blur" mode="matrix" values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 22 -10" result="goo" />
             <feComposite in="SourceGraphic" in2="goo" operator="atop" />
@@ -87,15 +93,19 @@ export const GooeyDial = ({ items, open, onOpenChange, label, icon: Icon, size =
         </defs>
       </svg>
 
-      <div aria-hidden="true" className="pointer-events-none absolute left-0 top-0" style={{ width: extent, height: size, filter: `url(#${filterId})` }}>
-        <span className="absolute left-0 top-0 rounded-full bg-foreground" style={{ width: size, height: size }} />
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute left-0"
+        style={vertical ? { width: size, height: extent, top: size - extent, filter: `url(#${filterId})` } : { width: extent, height: size, top: 0, filter: `url(#${filterId})` }}
+      >
+        <span className="absolute left-0 rounded-full bg-foreground" style={{ width: size, height: size, top: vertical ? extent - size : 0 }} />
         {items.map((item, index) => (
           <motion.span
             key={item.id}
             className="absolute rounded-full bg-foreground"
-            style={{ width: itemSize, height: itemSize, left: inset, top: inset }}
+            style={{ width: itemSize, height: itemSize, left: inset, top: vertical ? extent - size + inset : inset }}
             initial={false}
-            animate={{ x: open ? offsetFor(index) : 0, scale: open ? 1 : 0.5 }}
+            animate={{ ...moveTo(index), scale: open ? 1 : 0.5 }}
             transition={{ ...springs.bouncy, delay: open ? index * 0.035 : (items.length - 1 - index) * 0.02 }}
           />
         ))}
@@ -132,7 +142,7 @@ export const GooeyDial = ({ items, open, onOpenChange, label, icon: Icon, size =
               className="group absolute grid place-items-center rounded-full text-background outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
               style={{ width: itemSize, height: itemSize, left: inset, top: inset, pointerEvents: open ? 'auto' : 'none' }}
               initial={false}
-              animate={{ x: open ? offsetFor(index) : 0, opacity: open ? 1 : 0, scale: open ? 1 : 0.5 }}
+              animate={{ ...moveTo(index), opacity: open ? 1 : 0, scale: open ? 1 : 0.5 }}
               whileHover={{ scale: 1.08 }}
               whileTap={{ scale: 0.94 }}
               transition={{ ...springs.bouncy, delay: open ? index * 0.035 : (items.length - 1 - index) * 0.02 }}
@@ -140,9 +150,12 @@ export const GooeyDial = ({ items, open, onOpenChange, label, icon: Icon, size =
               <ItemIcon size={17} />
               <motion.span
                 aria-hidden="true"
-                className="pointer-events-none absolute left-1/2 top-full mt-2 flex items-center gap-1 whitespace-nowrap rounded-full border border-border bg-popover px-2 py-0.5 text-[11px] font-medium leading-4 text-popover-foreground shadow-sm"
+                className={cn(
+                  'pointer-events-none absolute flex items-center gap-1 whitespace-nowrap rounded-full border border-border bg-popover px-2 py-0.5 text-[11px] font-medium leading-4 text-popover-foreground shadow-sm',
+                  vertical ? 'left-full top-1/2 ml-2' : 'left-1/2 top-full mt-2',
+                )}
                 initial={false}
-                animate={{ opacity: open ? 1 : 0, x: '-50%', y: open ? 0 : -4 }}
+                animate={vertical ? { opacity: open ? 1 : 0, y: '-50%', x: open ? 0 : -4 } : { opacity: open ? 1 : 0, x: '-50%', y: open ? 0 : -4 }}
                 transition={{ ...springs.snappy, delay: open ? 0.12 + index * 0.03 : 0 }}
               >
                 {item.label}

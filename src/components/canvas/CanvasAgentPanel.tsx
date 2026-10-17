@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { AiGenerate, ArrowUp, ChatAi, Check, ChevronDown, ErrorWarning, Focus, Settings, Sparkles, X } from '@/lib/remixIconShim';
 import { cn } from '../../lib/utils';
 import { generateProviderText } from '../../services/providerService';
@@ -28,13 +28,16 @@ import {
   type StoredChatMessage,
 } from './canvasModel';
 import { resolveModelChoice, type ModelOption } from './generation';
+import { CanvasNodeParams, CanvasNodeParamsEmpty, type ParamNode } from './CanvasNodeParams';
 import { NODE_CATALOG } from './nodeCatalog';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/Tabs';
 
 export const AGENT_PANEL_WIDTH = 380;
 
 type AgentMode = 'auto' | 'confirm';
 const MODE_KEY = 'lizuo-canvas-agent-mode';
 const MODEL_KEY = 'lizuo-canvas-agent-model';
+const SCROLL_BOTTOM_THRESHOLD = 48;
 
 const SUGGESTIONS = [
   '为一款冷萃咖啡做一组 3 张海报，先写文案再出图',
@@ -52,6 +55,9 @@ interface CanvasAgentPanelProps {
   onPlacePlan: (plan: AgentPlan) => string[];
   onRunNodes: (ids: string[]) => void;
   onFocusNodes: (ids: string[]) => void;
+  selectedNode?: ParamNode | null;
+  selectedCount: number;
+  selectedAnnotation?: boolean;
 }
 
 const readStored = (key: string) => {
@@ -95,7 +101,7 @@ const PlanCard = ({ plan, placed, onPlace, onRun, onFocus }: { plan: AgentPlan; 
 );
 
 /** 右侧画布 Agent：用已配置的文本模型把需求拆成节点，并按模式放入画布。 */
-export const CanvasAgentPanel = ({ open, board, messages, onMessagesChange, onClose, onPlacePlan, onRunNodes, onFocusNodes }: CanvasAgentPanelProps) => {
+export const CanvasAgentPanel = ({ open, board, messages, onMessagesChange, onClose, onPlacePlan, onRunNodes, onFocusNodes, selectedNode, selectedCount, selectedAnnotation }: CanvasAgentPanelProps) => {
   const providers = useProviderStore((state) => state.providers);
   const activeProviderId = useProviderStore((state) => state.activeProviderIds.language);
   const setActiveModule = useUIStore((state) => state.setActiveModule);
@@ -103,22 +109,78 @@ export const CanvasAgentPanel = ({ open, board, messages, onMessagesChange, onCl
   const [storedModel, setStoredModel] = useState(() => readStored(MODEL_KEY));
   const [draft, setDraft] = useState('');
   const [working, setWorking] = useState(false);
+  const [activeTab, setActiveTab] = useState<'params' | 'agent'>('agent');
   const listRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const requestRef = useRef(0);
+  const scrollRef = useRef({ board, initialized: false, visible: false, top: 0, pinned: true });
 
   const choice = useMemo(() => {
     const [providerId, ...model] = storedModel.split('::');
     return resolveModelChoice({ providerId, model: model.join('::') }, 'language', providers, activeProviderId);
   }, [activeProviderId, providers, storedModel]);
 
-  useEffect(() => {
-    if (open) window.setTimeout(() => inputRef.current?.focus({ preventScroll: true }), 120);
-  }, [open]);
+  const selectedNodeId = selectedNode?.id;
 
   useEffect(() => {
-    listRef.current?.scrollTo({ top: listRef.current.scrollHeight, behavior: 'smooth' });
-  }, [messages.length, working]);
+    if (selectedNodeId) setActiveTab('params');
+  }, [selectedNodeId]);
+
+  useEffect(() => {
+    if (!open || activeTab !== 'agent') return;
+    const timer = window.setTimeout(() => inputRef.current?.focus({ preventScroll: true }), 120);
+    return () => window.clearTimeout(timer);
+  }, [activeTab, open]);
+
+  useLayoutEffect(() => {
+    const state = scrollRef.current;
+    if (state.board !== board) {
+      state.board = board;
+      state.initialized = false;
+      state.visible = false;
+      state.top = 0;
+      state.pinned = true;
+    }
+
+    const list = listRef.current;
+    const visible = open && activeTab === 'agent' && Boolean(list) && Boolean(list?.clientHeight);
+    if (!visible || !list) {
+      state.visible = false;
+      return;
+    }
+
+    const becameVisible = !state.visible;
+    state.visible = true;
+    if (!state.initialized) {
+      list.scrollTop = list.scrollHeight;
+      state.top = list.scrollTop;
+      state.pinned = true;
+      state.initialized = true;
+      return;
+    }
+
+    if (becameVisible) {
+      list.scrollTop = Math.min(state.top, Math.max(0, list.scrollHeight - list.clientHeight));
+      state.top = list.scrollTop;
+      state.pinned = list.scrollHeight - list.scrollTop - list.clientHeight <= SCROLL_BOTTOM_THRESHOLD;
+      return;
+    }
+
+    if (state.pinned) {
+      list.scrollTop = list.scrollHeight;
+      state.top = list.scrollTop;
+    }
+  }, [activeTab, board, messages, open, working]);
+
+  const handleListScroll = () => {
+    const list = listRef.current;
+    const state = scrollRef.current;
+    if (!list || !open || activeTab !== 'agent' || !list.clientHeight) return;
+    state.visible = true;
+    state.initialized = true;
+    state.top = list.scrollTop;
+    state.pinned = list.scrollHeight - list.scrollTop - list.clientHeight <= SCROLL_BOTTOM_THRESHOLD;
+  };
 
   // 切换画布页时丢弃上一页还在路上的回复。
   useEffect(() => () => { requestRef.current += 1; }, [board]);
@@ -183,8 +245,8 @@ export const CanvasAgentPanel = ({ open, board, messages, onMessagesChange, onCl
           animate="visible"
           exit="exit"
           aria-label="画布 Agent"
-          className="canvas-chrome nokey nowheel absolute bottom-3 right-3 top-3 z-40 flex flex-col overflow-hidden rounded-2xl text-card-foreground"
-          style={{ width: AGENT_PANEL_WIDTH, boxShadow: 'var(--canvas-shadow-lg)' }}
+          className="canvas-chrome nokey nowheel absolute bottom-0 right-0 top-0 z-40 flex flex-col overflow-hidden text-card-foreground"
+          style={{ width: AGENT_PANEL_WIDTH, boxShadow: 'var(--canvas-shadow-lg)', border: 'none' }}
         >
           <header className="flex h-14 shrink-0 items-center gap-2.5 px-4">
             <span className="grid h-8 w-8 place-items-center rounded-full bg-muted">{working ? <ThinkingOrb size={22} /> : <ChatAi size={16} />}</span>
@@ -197,7 +259,16 @@ export const CanvasAgentPanel = ({ open, board, messages, onMessagesChange, onCl
             </Tooltip>
           </header>
 
-          <div ref={listRef} className="min-h-0 flex-1 overflow-y-auto px-4 pb-4">
+          <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as 'params' | 'agent')} className="flex min-h-0 flex-1 flex-col">
+            <TabsList className="mx-4 grid w-auto shrink-0 grid-cols-2">
+              <TabsTrigger value="params">参数</TabsTrigger>
+              <TabsTrigger value="agent">Agent</TabsTrigger>
+            </TabsList>
+            <TabsContent value="params" forceMount className={cn('min-h-0 flex-1 flex-col overflow-hidden', activeTab === 'params' ? 'flex' : 'hidden')}>
+              {selectedNode ? <CanvasNodeParams key={selectedNode.id} {...selectedNode} /> : <CanvasNodeParamsEmpty selectedCount={selectedCount} reason={selectedAnnotation ? 'annotation' : undefined} />}
+            </TabsContent>
+            <TabsContent value="agent" forceMount className={cn('min-h-0 flex-1 flex-col overflow-hidden', activeTab === 'agent' ? 'flex' : 'hidden')}>
+          <div ref={listRef} data-testid="agent-message-list" onScroll={handleListScroll} className="min-h-0 flex-1 overflow-y-auto px-4 pb-4">
             {messages.length === 0 ? (
               <motion.div initial="hidden" animate="visible" variants={{ visible: { transition: { staggerChildren: 0.04 } } }} className="pt-6">
                 <motion.p variants={staggerItem} className="text-sm font-semibold text-foreground">想在画布上做什么？</motion.p>
@@ -339,6 +410,8 @@ export const CanvasAgentPanel = ({ open, board, messages, onMessagesChange, onCl
               </div>
             </div>
           </div>
+            </TabsContent>
+          </Tabs>
         </motion.aside>
       )}
     </AnimatePresence>

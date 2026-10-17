@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { BookmarkPlus, Download, Folder, FolderInput, FolderOpen, Maximize2, Pencil, Trash2 } from '@/lib/remixIconShim';
+import { Download, Folder, FolderInput, FolderOpen, Heart, Maximize2, Pencil, Trash2 } from '@/lib/remixIconShim';
 import { assetService } from '../../services/assetService';
 import type { AssetFolder } from '../../types/asset.types';
 import { AnchoredMenu, type ScreenPoint } from '../canvas/CanvasContextMenu';
@@ -49,6 +49,8 @@ export interface GeneratedImageMenuTarget {
   point: ScreenPoint;
   url: string;
   saved: boolean;
+  /** 已知资产 ID 时直接使用，不再调用 ensureAsset（例如资产库里的素材）。 */
+  assetId?: string;
 }
 
 /**
@@ -64,16 +66,21 @@ export const GeneratedImageMenu = ({
   onDelete,
   onNotice,
   onError,
+  headerLabel,
+  deleteLabel = '删除此图片',
 }: {
   target: GeneratedImageMenuTarget | null;
   onClose: () => void;
-  /** 返回这张图片对应的资产 ID；还没有资产时创建一个。 */
-  ensureAsset: (url: string) => Promise<string>;
+  /** 返回这张图片对应的资产 ID；还没有资产时创建一个。target 带 assetId 时可省略。 */
+  ensureAsset?: (url: string) => Promise<string>;
   onFullscreen: (url: string) => void;
   onSave: (url: string) => void;
   onDelete: (url: string, assetId: string | null) => void;
   onNotice: (message: string) => void;
   onError: (message: string) => void;
+  /** 菜单头文字；不传时显示资产名称。 */
+  headerLabel?: string;
+  deleteLabel?: string;
 }) => {
   const [assetId, setAssetId] = useState<string | null>(null);
   const [title, setTitle] = useState('');
@@ -83,6 +90,13 @@ export const GeneratedImageMenu = ({
   const [renaming, setRenaming] = useState<{ assetId: string; value: string } | null>(null);
   const [busy, setBusy] = useState(false);
   const url = target?.url || '';
+  const knownAssetId = target?.assetId;
+
+  const resolveAsset = async (imageUrl: string) => {
+    if (knownAssetId) return knownAssetId;
+    if (!ensureAsset) throw new Error('找不到这张图片对应的资产');
+    return ensureAsset(imageUrl);
+  };
 
   useEffect(() => {
     if (!url) return;
@@ -94,7 +108,7 @@ export const GeneratedImageMenu = ({
     setLoadError('');
     void (async () => {
       try {
-        const id = await ensureAsset(url);
+        const id = await resolveAsset(url);
         const [detail, folderList] = await Promise.all([assetService.detail(id), assetService.folders()]);
         if (!active) return;
         setAssetId(id);
@@ -106,9 +120,9 @@ export const GeneratedImageMenu = ({
       }
     })();
     return () => { active = false; };
-    // ensureAsset 每次渲染都是新函数，只在换了图片时重新读取。
+    // ensureAsset 每次渲染都是新函数，只在换了图片或资产时重新读取。
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [url]);
+  }, [url, knownAssetId]);
 
   const orderedFolders = useMemo(() => orderFolders(folders || []), [folders]);
 
@@ -119,7 +133,7 @@ export const GeneratedImageMenu = ({
     onClose();
     void (async () => {
       try {
-        await run(id || await ensureAsset(imageUrl));
+        await run(id || await resolveAsset(imageUrl));
       } catch (error) {
         onError(errorText(error, fallback));
       }
@@ -157,11 +171,11 @@ export const GeneratedImageMenu = ({
     <>
       <AnchoredMenu point={target?.point || null} onClose={onClose} label="图片操作" width={232}>
         <DropdownMenuLabel className="truncate font-normal" title={title}>
-          {loadError || title || '正在读取…'}
+          {loadError || headerLabel || title || '正在读取…'}
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
         <DropdownMenuItem icon={Maximize2} shortcut="双击" onSelect={() => onFullscreen(url)}>全屏显示</DropdownMenuItem>
-        <DropdownMenuItem icon={BookmarkPlus} disabled={target?.saved} onSelect={() => onSave(url)}>
+        <DropdownMenuItem icon={Heart} disabled={target?.saved} onSelect={() => onSave(url)}>
           {target?.saved ? '已收藏' : '添加至收藏'}
         </DropdownMenuItem>
         <DropdownMenuSub>
@@ -215,7 +229,7 @@ export const GeneratedImageMenu = ({
           destructive
           onSelect={() => { onClose(); onDelete(url, assetId); }}
         >
-          删除此图片
+          {deleteLabel}
         </DropdownMenuItem>
       </AnchoredMenu>
 

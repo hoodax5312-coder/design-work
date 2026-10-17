@@ -18,6 +18,7 @@ import { AiGenerate, Artboard, Clipboard, Copy, Focus, Layers, LayoutMasonry, Lo
 import { workspaceCacheService } from '../../services/workspaceCacheService';
 import { liveObjectUrls, useCanvasStore, type CanvasClipboard } from '../../stores/useCanvasStore';
 import { useProjectStore } from '../../stores/useProjectStore';
+import { useUIStore } from '../../stores/useUIStore';
 import { AnimatePresence, MotionConfig } from '../motion';
 import { DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, TooltipProvider } from '../ui';
 import { GroupNode } from '../nodes/GroupNode';
@@ -26,9 +27,10 @@ import { NoteNode } from '../nodes/NoteNode';
 import { TextNode } from '../nodes/TextNode';
 import { VideoNode } from '../nodes/VideoNode';
 import { AGENT_PANEL_WIDTH, CanvasAgentPanel } from './CanvasAgentPanel';
+import { type ParamNode } from './CanvasNodeParams';
+import { CanvasLayersPanel } from './CanvasLayersPanel';
 import { AnchoredMenu, NodePicker, type ScreenPoint } from './CanvasContextMenu';
 import { CanvasControls, FIT_OPTIONS } from './CanvasControls';
-import { CanvasHeader, CanvasTopActions } from './CanvasHeader';
 import {
   ALIGN_ACTIONS,
   CanvasEmptyState,
@@ -135,6 +137,7 @@ const CanvasInner = ({ onBack }: { onBack?: () => void }) => {
   const [picker, setPicker] = useState<PickerState | null>(null);
   const [menu, setMenu] = useState<MenuState | null>(null);
   const [agentOpen, setAgentOpen] = useState(false);
+  const [layersOpen, setLayersOpen] = useState(true);
   const [searchOpen, setSearchOpen] = useState(false);
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
   const [media, setMedia] = useState<MediaState | null>(null);
@@ -164,6 +167,30 @@ const CanvasInner = ({ onBack }: { onBack?: () => void }) => {
   const restoreSnapshot = useCanvasStore((state) => state.restoreSnapshot);
   const setZoom = useCanvasStore((state) => state.setZoom);
   const projectId = useProjectStore((state) => state.activeProjectId);
+  const setCanvasAgentOpen = useUIStore((state) => state.setCanvasAgentOpen);
+
+  const selectedNodes = useMemo(() => {
+    const picked = new Set(selectedIds);
+    return nodes.filter((node) => picked.has(node.id));
+  }, [nodes, selectedIds]);
+
+  const selectedNode = useMemo<ParamNode | null>(() => {
+    if (selectedNodes.length !== 1) return null;
+    const node = selectedNodes[0];
+    if (!isCanvasNodeKind(node.type)) return null;
+    return {
+      id: node.id,
+      kind: node.type,
+      data: node.data as Record<string, unknown>,
+    };
+  }, [selectedNodes]);
+
+  const selectedAnnotation = selectedNodes.length === 1 && isAnnotationKind(selectedNodes[0].type);
+
+  useEffect(() => {
+    setCanvasAgentOpen(agentOpen);
+    return () => setCanvasAgentOpen(false);
+  }, [agentOpen, setCanvasAgentOpen]);
 
   /* ---------- 提示条 ---------- */
 
@@ -941,7 +968,10 @@ const CanvasInner = ({ onBack }: { onBack?: () => void }) => {
               )}
             </AnimatePresence>
 
-            <CanvasHeader
+            <CanvasLayersPanel
+              open={layersOpen}
+              onOpen={() => setLayersOpen(true)}
+              onClose={() => setLayersOpen(false)}
               onBack={onBack}
               boards={boards}
               activeBoard={activeBoard}
@@ -950,7 +980,6 @@ const CanvasInner = ({ onBack }: { onBack?: () => void }) => {
               onRenameBoard={renameBoard}
               onDeleteBoard={deleteBoard}
             />
-            <CanvasTopActions agentOpen={agentOpen} agentWidth={AGENT_PANEL_WIDTH} onToggleAgent={() => setAgentOpen((open) => !open)} />
             <CanvasRail
               tool={tool}
               onToolChange={setTool}
@@ -962,6 +991,8 @@ const CanvasInner = ({ onBack }: { onBack?: () => void }) => {
               searchOpen={searchOpen}
               onSearchOpenChange={setSearchOpen}
               onFocusNode={(id) => focusNodes([id])}
+              agentOpen={agentOpen}
+              onToggleAgent={() => setAgentOpen((open) => !open)}
             />
             <CanvasAgentPanel
               open={agentOpen}
@@ -982,6 +1013,9 @@ const CanvasInner = ({ onBack }: { onBack?: () => void }) => {
                 if (present.length) focusNodes(present);
                 else notify('这些节点已不在当前画布上');
               }}
+              selectedNode={selectedNode}
+              selectedCount={selectedIds.length}
+              selectedAnnotation={selectedAnnotation}
             />
 
             <NodePicker

@@ -4,7 +4,8 @@ import {
   Download,
   Pencil,
   Plus,
-  Star,
+  Heart,
+  HeartFill,
   Trash2,
   X,
 } from '@/lib/remixIconShim';
@@ -271,7 +272,7 @@ export const AssetDetailPanel = ({
                 detail.favorite && 'bg-white/15 text-amber-300 hover:text-amber-200',
               )}
             >
-              <Star size={15} />
+              {detail.favorite ? <HeartFill size={15} /> : <Heart size={15} />}
             </Button>
             {detail.previewUrl || typeof detail.userMetadata?.generatedUrl === 'string' ? (
               <a

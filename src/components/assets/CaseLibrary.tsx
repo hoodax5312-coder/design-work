@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
-  BookmarkPlus,
+  Heart,
   Copy,
   Download,
   Globe2,
@@ -40,7 +40,7 @@ const caseModelMatches = (model: string, tabId: string) => {
 };
 
 const CaseActionIcon = ({ kind }: { kind: 'download' | 'save' | 'fullscreen' }) => {
-  const Icon = kind === 'download' ? Download : kind === 'save' ? BookmarkPlus : Maximize2;
+  const Icon = kind === 'download' ? Download : kind === 'save' ? Heart : Maximize2;
   const opticalScale = kind === 'save' ? 'scale-[1.15]' : kind === 'fullscreen' ? 'scale-[0.95]' : 'scale-[1.05]';
   return <span className="grid h-6 w-6 shrink-0 place-items-center"><Icon size={20} className={opticalScale} aria-hidden="true" /></span>;
 };
@@ -344,7 +344,7 @@ export const CaseDetailOverlay = ({ cases }: { cases: CaseLibraryState }) => {
           <div className="flex h-8 shrink-0 items-center gap-1 rounded-lg bg-white/10 text-white/85 backdrop-blur-xl">
             {selectedCase.coverUrl ? <>
               <Button type="button" variant="ghost" size="iconSm" onClick={() => downloadCaseImage(selectedCase)} aria-label={isCaseVideo(selectedCase) ? '下载视频' : '下载图片'} title={isCaseVideo(selectedCase) ? '下载视频' : '下载图片'} className="h-8 w-8 text-white hover:bg-white/10 hover:text-white"><Download size={15} /></Button>
-              <Button type="button" variant="ghost" size="iconSm" onClick={() => void saveCaseToAssets(selectedCase)} disabled={savedCaseIds.has(selectedCase.id)} aria-label={savedCaseIds.has(selectedCase.id) ? '已收藏' : '添加至收藏'} title={savedCaseIds.has(selectedCase.id) ? '已收藏' : '添加至收藏'} className="h-8 w-8 text-white hover:bg-white/10 hover:text-white"><BookmarkPlus size={15} /></Button>
+              <Button type="button" variant="ghost" size="iconSm" onClick={() => void saveCaseToAssets(selectedCase)} disabled={savedCaseIds.has(selectedCase.id)} aria-label={savedCaseIds.has(selectedCase.id) ? '已收藏' : '添加至收藏'} title={savedCaseIds.has(selectedCase.id) ? '已收藏' : '添加至收藏'} className="h-8 w-8 text-white hover:bg-white/10 hover:text-white"><Heart size={15} /></Button>
             </> : null}
             <Button type="button" variant="ghost" size="iconSm" onClick={() => setSelectedCase(null)} aria-label="关闭详情" title="关闭详情" className="h-8 w-8 text-white hover:bg-white/10 hover:text-white"><X size={16} /></Button>
           </div>

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type MouseEvent as ReactMouseEvent } from 'react';
 import {
   AudioLines,
-  BookmarkPlus,
+  Heart,
   Check,
   ChevronDown,
   ChevronLeft,
@@ -1180,7 +1180,7 @@ export const ImageGeneration = () => {
                       <Button variant="ghost" size="iconSm" type="button" onClick={() => editRecordPrompt(record)} aria-label={`编辑提示词：${record.prompt}`} title="编辑提示词" className="h-6 w-6 p-0"><Pencil size={13} /></Button>
                       <Button variant="ghost" size="iconSm" type="button" onClick={() => deleteRecord(record)} aria-label="删除生成记录" title="删除生成记录" className="h-6 w-6 p-0 text-muted-foreground hover:text-destructive"><Trash2 size={13} /></Button>
                       {selectedOutput && <>
-                        <Button variant="ghost" size="iconSm" type="button" onClick={() => void handleAddToAssets(selectedOutput, record.prompt, isVideoRecord ? 'video' : 'image')} disabled={savedAssetUrls.has(selectedOutput)} aria-label={savedAssetUrls.has(selectedOutput) ? '已收藏' : '添加至收藏'} title={savedAssetUrls.has(selectedOutput) ? '已收藏' : '添加至收藏'} className="h-6 w-6 p-0"><BookmarkPlus size={13} /></Button>
+                        <Button variant="ghost" size="iconSm" type="button" onClick={() => void handleAddToAssets(selectedOutput, record.prompt, isVideoRecord ? 'video' : 'image')} disabled={savedAssetUrls.has(selectedOutput)} aria-label={savedAssetUrls.has(selectedOutput) ? '已收藏' : '添加至收藏'} title={savedAssetUrls.has(selectedOutput) ? '已收藏' : '添加至收藏'} className="h-6 w-6 p-0"><Heart size={13} /></Button>
                         <Button variant="ghost" size="iconSm" type="button" onClick={() => downloadImage(selectedOutput)} aria-label={isVideoRecord ? '下载视频' : '下载图片'} title={isVideoRecord ? '下载视频' : '下载图片'} className="h-6 w-6 p-0"><Download size={13} /></Button>
                       </>}
                     </div>
