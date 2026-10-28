@@ -120,6 +120,7 @@ const normalizeItems = (value: unknown, sourceId: string, sourceUrl: string) => 
         prompt,
         description: String(object.description || ''),
         coverUrl: typeof object.coverUrl === 'string' ? object.coverUrl : null,
+        videoUrl: typeof object.videoUrl === 'string' ? object.videoUrl : null,
         tags: Array.isArray(object.tags)
           ? object.tags.filter((tag): tag is string => typeof tag === 'string')
           : [],

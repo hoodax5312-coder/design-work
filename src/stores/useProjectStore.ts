@@ -1,6 +1,13 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import type { Edge, Node } from '@xyflow/react';
+import type { ProjectBoards } from '../components/canvas/canvasModel';
+
+interface CanvasSession {
+  projectId: string;
+  originalCanvas: ProjectCanvasSnapshot;
+  originalBoards?: ProjectBoards;
+}
 
 export interface ProjectCanvasSnapshot {
   nodes: Node[];
@@ -20,6 +27,10 @@ export interface Project {
 interface ProjectState {
   projects: Project[];
   activeProjectId: string | null;
+  canvasSession: CanvasSession | null;
+  beginCanvasSession: (projectId: string) => void;
+  captureCanvasBoards: (projectId: string, boards: ProjectBoards) => void;
+  endCanvasSession: () => void;
   createProject: (name?: string) => string;
   setActiveProject: (id: string | null) => void;
   renameProject: (id: string, name: string) => void;
@@ -34,6 +45,21 @@ export const useProjectStore = create<ProjectState>()(
     (set, get) => ({
       projects: [],
       activeProjectId: null,
+      canvasSession: null,
+      beginCanvasSession: (projectId) => {
+        const project = get().projects.find((item) => item.id === projectId);
+        if (!project) return;
+        set({ activeProjectId: projectId, canvasSession: {
+          projectId,
+          originalCanvas: structuredClone(project.canvas || { nodes: [], edges: [] }),
+        } });
+      },
+      captureCanvasBoards: (projectId, boards) => set((state) => ({
+        canvasSession: state.canvasSession?.projectId === projectId && !state.canvasSession.originalBoards
+          ? { ...state.canvasSession, originalBoards: structuredClone(boards) }
+          : state.canvasSession,
+      })),
+      endCanvasSession: () => set({ canvasSession: null }),
       createProject: (name) => {
         const id = crypto.randomUUID();
         const now = Date.now();
@@ -89,6 +115,7 @@ export const useProjectStore = create<ProjectState>()(
         set((state) => ({
           projects: state.projects.filter((project) => project.id !== id),
           activeProjectId: state.activeProjectId === id ? null : state.activeProjectId,
+          canvasSession: state.canvasSession?.projectId === id ? null : state.canvasSession,
         })),
     }),
     { name: 'design-work-projects' },

@@ -7,7 +7,7 @@ import reactRefresh from 'eslint-plugin-react-refresh';
 
 export default [
   {
-    ignores: ['dist', '.vercel', 'node_modules', 'tapnow-ref', 'tapnow_ref'],
+    ignores: ['dist', 'dist-admin', '.vercel', 'node_modules', 'tapnow-ref', 'tapnow_ref'],
   },
   js.configs.recommended,
   {

@@ -3,7 +3,7 @@
  * 不依赖 DOM 与 React Flow 运行时，便于在 server 侧用 node:test 验证。
  */
 
-export type CanvasNodeKind = 'text' | 'imageGen' | 'video';
+export type CanvasNodeKind = 'text' | 'imageGen' | 'video' | 'audio';
 
 export interface CanvasNodeLike {
   id: string;
@@ -23,18 +23,19 @@ export interface CanvasEdgeLike {
   animated?: boolean;
 }
 
-export const NODE_KINDS: CanvasNodeKind[] = ['text', 'imageGen', 'video'];
+export const NODE_KINDS: CanvasNodeKind[] = ['text', 'imageGen', 'video', 'audio'];
 
 export const DEFAULT_NODE_SIZE: Record<CanvasNodeKind, { width: number; height?: number }> = {
   text: { width: 320, height: 200 },
   imageGen: { width: 320 },
   video: { width: 400 },
+  audio: { width: 360, height: 128 },
 };
 
-export const NODE_KIND_LABEL: Record<CanvasNodeKind, string> = { text: '文本', imageGen: '图片', video: '视频' };
+export const NODE_KIND_LABEL: Record<CanvasNodeKind, string> = { text: '文本', imageGen: '图片', video: '视频', audio: '音频' };
 
 export const isCanvasNodeKind = (value: unknown): value is CanvasNodeKind =>
-  value === 'text' || value === 'imageGen' || value === 'video';
+  value === 'text' || value === 'imageGen' || value === 'video' || value === 'audio';
 
 /** 标注类节点：便签与分组。不参与生成、连线、整理布局和 Agent 上下文。 */
 export type CanvasAnnotationKind = 'note' | 'group';
@@ -60,6 +61,7 @@ export const annotationData = (kind: CanvasAnnotationKind): Record<string, unkno
 export const defaultNodeData = (kind: CanvasNodeKind): Record<string, unknown> => {
   if (kind === 'text') return { content: '', prompt: '', mode: 'edit' };
   if (kind === 'video') return { prompt: '', model: '', aspectRatio: '16:9', resolution: '1080p', duration: 5 };
+  if (kind === 'audio') return { prompt: '', model: '', musicStyle: '', musicMood: '', musicInstruments: '', musicTempo: '', durationSeconds: 30, instrumental: true };
   return { prompt: '', model: '', style: '', resolution: '1k', aspectRatio: '1:1', quality: 'standard', isFocusMode: false };
 };
 
@@ -77,6 +79,23 @@ export const nodeSummary = (node: Pick<CanvasNodeLike, 'type' | 'data'>, max = 8
   return flat.length > max ? `${flat.slice(0, max)}…` : flat;
 };
 
+/** 音频资产原文件地址：本机网关提供，可持久保存，不随会话失效。 */
+export const audioMediaUrl = (assetId: string) => `/api/assets/${encodeURIComponent(assetId)}/media`;
+
+/** 音乐节点的结构化需求按固定标签拼接，用途描述放在最后。 */
+export const composeMusicPrompt = (data: Record<string, unknown>) => {
+  const fields: Array<[string, unknown]> = [
+    ['风格', data.musicStyle], ['情绪', data.musicMood], ['乐器', data.musicInstruments], ['节奏', data.musicTempo],
+  ];
+  const lines = fields
+    .map(([label, value]) => [label, typeof value === 'string' ? value.trim() : ''] as const)
+    .filter(([, value]) => value)
+    .map(([label, value]) => `${label}：${value}`);
+  const purpose = String(data.prompt || '').trim();
+  if (purpose) lines.push(lines.length ? `用途与描述：${purpose}` : purpose);
+  return lines.join('\n');
+};
+
 export const STALE_UPLOAD_ERROR = '本地素材只在放入时的会话内有效，刷新后已失效，请重新放入';
 
 /**
@@ -92,9 +111,12 @@ export const normalizeRestoredCanvas = <N extends CanvasNodeLike, E extends Canv
   nodes: (canvas.nodes || []).map((node) => {
     const data = { ...(node.data || {}) };
     if (data.isGenerating && !isRunning(node.id)) data.isGenerating = false;
-    if (data.uploading && !isRunning(node.id)) data.uploading = false;
+    if (data.uploading && !isRunning(node.id)) {
+      data.uploading = false;
+      if (node.type === 'imageGen' && !data.imageUrl && !data.assetId) data.error = '图片上传已中断，请重新放入图片';
+    }
     if (node.type === 'text' && data.prompt && data.prompt === data.content) data.prompt = '';
-    (['imageUrl', 'previewUrl'] as const).forEach((key) => {
+    (['imageUrl', 'previewUrl', 'audioUrl'] as const).forEach((key) => {
       const url = data[key];
       if (typeof url === 'string' && url.startsWith('blob:') && !isLiveObjectUrl(url)) {
         data[key] = undefined;
@@ -117,6 +139,22 @@ export const normalizeRestoredCanvas = <N extends CanvasNodeLike, E extends Canv
 
 /* ---------------- 生成结果与版本 ---------------- */
 
+export interface CanvasImageGenerationSnapshot {
+  version: 1;
+  providerId: string;
+  protocol: string;
+  model: string;
+  prompt: string;
+  ownPrompt: string;
+  aspectRatio: string;
+  size: string;
+  quality: string;
+  count: number;
+  requestCount: 1;
+  referenceImage?: { assetId: string; name: string; sourceNodeId?: string; sourceResultId?: string };
+  textReferences: Array<{ id: string; title: string; text: string }>;
+}
+
 export interface CanvasResult {
   id: string;
   url: string;
@@ -126,6 +164,9 @@ export interface CanvasResult {
   model?: string;
   createdAt: number;
   durationMs?: number;
+  width?: number;
+  height?: number;
+  generationSnapshot?: CanvasImageGenerationSnapshot;
 }
 
 export const MAX_RESULTS = 24;
@@ -147,7 +188,7 @@ export const readResults = (data: Record<string, unknown> | undefined): CanvasRe
 export const assetPreviewUrl = (assetId: string, size = 1024) => `/api/assets/${assetId}/preview?size=${size}`;
 
 /** 当前主结果：优先按 activeResultId，其次按地址匹配；都对不上时返回 undefined，由调用方决定退回哪一条。 */
-export const activeResultOf = (data: Record<string, unknown> | undefined, urlKey: 'imageUrl' | 'previewUrl') => {
+export const activeResultOf = (data: Record<string, unknown> | undefined, urlKey: 'imageUrl' | 'previewUrl' | 'audioUrl') => {
   const results = readResults(data);
   return results.find((result) => result.id === data?.activeResultId)
     || results.find((result) => result.url === data?.[urlKey])
@@ -169,12 +210,12 @@ export const carryGeneratedOutputs = <N extends CanvasNodeLike>(restored: N[], c
   const live = new Map(current.map((node) => [node.id, node]));
   return restored.map((node) => {
     const now = live.get(node.id);
-    if (!now || (node.type !== 'imageGen' && node.type !== 'video')) return node;
+    if (!now || (node.type !== 'imageGen' && node.type !== 'video' && node.type !== 'audio')) return node;
     const latest = readResults(now.data);
     if (!latest.length) return node;
     // 以当前结果为准合并：入库后结果地址会换成资产库地址，旧快照里的地址可能已失效。
     const results = mergeResults(readResults(node.data), latest);
-    const key = node.type === 'video' ? 'previewUrl' : 'imageUrl';
+    const key = node.type === 'video' ? 'previewUrl' : node.type === 'audio' ? 'audioUrl' : 'imageUrl';
     const keepActive = Boolean(node.data?.[key]);
     const active = keepActive ? results.find((result) => result.id === node.data?.activeResultId) : undefined;
     return {
@@ -183,8 +224,8 @@ export const carryGeneratedOutputs = <N extends CanvasNodeLike>(restored: N[], c
         ...node.data,
         results,
         ...(keepActive
-          ? active ? { [key]: active.url } : {}
-          : { [key]: now.data?.[key], activeResultId: now.data?.activeResultId }),
+          ? active ? { [key]: active.url, ...(node.type === 'audio' ? { audioAssetId: active.assetId } : {}) } : {}
+          : { [key]: now.data?.[key], activeResultId: now.data?.activeResultId, ...(node.type === 'audio' ? { audioAssetId: now.data?.audioAssetId } : {}) }),
       },
     };
   });
@@ -260,7 +301,7 @@ export const isInsideBox = (
   return cx > box.x && cx < box.x + box.width && cy > box.y && cy < box.y + box.height;
 };
 
-type SizedNode = Pick<CanvasNodeLike, 'id' | 'type' | 'position' | 'width' | 'height'> & { measured?: { width?: number; height?: number } };
+type SizedNode = Pick<CanvasNodeLike, 'id' | 'type' | 'position' | 'width' | 'height'> & { data?: Record<string, unknown>; measured?: { width?: number; height?: number } };
 
 /** 节点在画布坐标中的矩形：优先用渲染后的实际尺寸。 */
 export const nodeRect = (node: SizedNode) => ({
@@ -270,12 +311,35 @@ export const nodeRect = (node: SizedNode) => ({
   height: node.measured?.height ?? node.height ?? 240,
 });
 
-/** 分组内的节点：不使用 parentId，按位置判断，分组本身和其他分组不算在内。 */
+/** 优先使用已保存的成员；旧分组按位置恢复，分组本身和其他分组不算在内。 */
 export const groupMemberIds = (group: SizedNode, nodes: SizedNode[]) => {
+  if (Array.isArray(group.data?.memberIds)) {
+    const ids = new Set(group.data.memberIds.filter((id): id is string => typeof id === 'string'));
+    return nodes.filter((node) => node.type !== 'group' && ids.has(node.id)).map((node) => node.id);
+  }
   const box = nodeRect(group);
   return nodes
     .filter((node) => node.id !== group.id && node.type !== 'group' && isInsideBox(nodeRect(node), box))
     .map((node) => node.id);
+};
+
+export type GroupLayout = 'grid' | 'horizontal' | 'vertical';
+
+/** 按实际尺寸逐行排列，不缩放内容，也不让不同尺寸的节点互相覆盖。 */
+export const groupLayoutPositions = (items: SizedNode[], mode: GroupLayout, origin: { x: number; y: number }) => {
+  const columns = mode === 'horizontal' ? items.length : mode === 'vertical' ? 1 : Math.ceil(Math.sqrt(items.length));
+  const positions: Record<string, { x: number; y: number }> = {};
+  let x = origin.x;
+  let y = origin.y;
+  let rowHeight = 0;
+  items.forEach((node, index) => {
+    if (index && index % columns === 0) { x = origin.x; y += rowHeight + 40; rowHeight = 0; }
+    const rect = nodeRect(node);
+    positions[node.id] = { x, y };
+    x += rect.width + 40;
+    rowHeight = Math.max(rowHeight, rect.height);
+  });
+  return positions;
 };
 
 /** 沿连线收集链路：down 为自身及全部下游，up 为自身及全部上游。 */
@@ -500,6 +564,7 @@ const TYPE_ALIASES: Record<string, CanvasNodeKind> = {
   text: 'text', 文本: 'text', copy: 'text',
   image: 'imageGen', imagegen: 'imageGen', 图片: 'imageGen', 图像: 'imageGen', picture: 'imageGen',
   video: 'video', 视频: 'video',
+  audio: 'audio', music: 'audio', 音频: 'audio', 音乐: 'audio', 配乐: 'audio',
 };
 
 /** 生成发给文本模型的单条指令：说明 JSON 协议、当前画布与用户需求。 */
@@ -510,10 +575,10 @@ export const buildAgentPrompt = (request: string, context: { board: string; node
   return [
     '你是「栗作」创作画布里的助手，负责把用户需求拆成画布节点。',
     '只输出一个 JSON 对象，不要输出解释、Markdown 或代码块标记。格式：',
-    '{"reply":"给用户的简短答复","nodes":[{"type":"text | image | video","title":"节点标题，12 字以内","prompt":"图片或视频的生成提示词","content":"文本节点的正文","from":[上游节点在 nodes 数组中的序号，从 0 开始]}]}',
+    '{"reply":"给用户的简短答复","nodes":[{"type":"text | image | video | music","title":"节点标题，12 字以内","prompt":"图片、视频或音乐的生成提示词","content":"文本节点的正文","from":[上游节点在 nodes 数组中的序号，从 0 开始]}]}',
     '规则：',
     `- 最多 ${AGENT_MAX_NODES} 个节点；只需要回答问题时 nodes 为空数组。`,
-    '- 文本节点直接写好 content；图片、视频节点写清 prompt（主体、风格、构图、光线、镜头）。',
+    '- 文本节点直接写好 content；图片、视频节点写清 prompt（主体、风格、构图、光线、镜头）；音乐节点写清风格、情绪、乐器、节奏与用途，只用于配乐，不用于朗读配音。',
     '- 一个节点以另一个节点为依据时，用 from 指向它；只能指向排在前面的节点。',
     '- 使用与用户相同的语言。',
     '',

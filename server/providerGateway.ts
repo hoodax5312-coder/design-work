@@ -1,6 +1,12 @@
 import type { NextFunction, Request, Response } from 'express';
 import { Router } from 'express';
 import { Agent, fetch as undiciFetch } from 'undici';
+import { assertImageEditSupported } from '../src/lib/imageEditSupport';
+import { resolveCanvasImageParameters } from '../src/lib/canvasImageCapabilities';
+import { assertMusicModelSupported } from '../src/lib/musicModels';
+import { MAX_AUDIO_BYTES, storeAudioAsset } from './audioAssetStorage';
+import { readReferenceImageAsset } from './referenceImageAsset';
+import type { LibraryRuntime } from './libraryRuntime';
 import type { ModelCategory, ProviderModelInfo, ProviderProtocol } from '../src/types/provider';
 import {
   createProviderConfigStore,
@@ -37,7 +43,7 @@ export const normalizeOpenAiBaseUrl = (value: string) => {
 
   try {
     const url = new URL(normalized);
-    const endpointSuffix = /\/(?:response|responses|models|messages|chat\/completions|images(?:\/360ai)?\/generations|video\/generations)$/;
+    const endpointSuffix = /\/(?:response|responses|models|messages|chat\/completions|images\/edits|images(?:\/360ai)?\/generations|video\/generations|audio\/speech)$/;
     url.pathname = url.pathname.replace(endpointSuffix, '');
     if (url.pathname === '' || url.pathname === '/') {
       url.pathname = '/v1';
@@ -75,7 +81,7 @@ export const sanitizeProviderError = (message: unknown, apiKey = '') => {
     .replace(/\b[A-Za-z0-9][A-Za-z0-9._*-]{23,}\b/g, '[REDACTED]');
 };
 
-const readJson = async (response: globalThis.Response) => {
+const readJson = async (response: Pick<globalThis.Response, 'text'>) => {
   const text = await response.text();
   if (!text) return {};
 
@@ -362,6 +368,7 @@ const configRoute =
 
 export const createProviderRouter = (
   configStore: ProviderConfigStore = createProviderConfigStore(defaultProviderConfigPath()),
+  getRuntime?: () => Promise<LibraryRuntime>,
 ) => {
   const router = Router();
   router.use(requireLocalRequest);
@@ -464,10 +471,54 @@ export const createProviderRouter = (
         throw new Error('当前图像工具支持 OpenAI 的 Responses 或 Chat Completions 格式，请选择支持 /images/generations 的 Provider');
       }
 
-      const upstream = await fetch(`${config.baseUrl}/images/generations`, {
+      // 画布声明的参数必须经共享能力表校验；其他生成入口保留原有请求合同。
+      if (request.body?.canvasParameters !== undefined) {
+        const parameters = request.body.canvasParameters;
+        try {
+          if (!parameters || typeof parameters !== 'object' || Array.isArray(parameters)) throw new Error('画布图片参数无效');
+          const resolved = resolveCanvasImageParameters(config.protocol, config.model, parameters);
+          request.body.size = resolved.size;
+          request.body.quality = resolved.quality;
+        } catch (error) {
+          throw Object.assign(error instanceof Error ? error : new Error('画布图片参数无效'), { status: 400 });
+        }
+      }
+
+      const hasReference = request.body?.referenceImage !== undefined;
+      let editBody: FormData | undefined;
+      if (hasReference) {
+        assertImageEditSupported(config.protocol, config.model);
+        const reference = request.body.referenceImage;
+        if (!reference || typeof reference !== 'object' || Array.isArray(reference)
+          || Object.keys(reference).some((key) => key !== 'assetId')) {
+          throw Object.assign(new Error('参考图请求只接受资产 ID，不接受路径或 URL'), { status: 400 });
+        }
+        if (!getRuntime) throw new Error('本机资产服务未连接，无法读取参考图');
+        const image = await readReferenceImageAsset(await getRuntime(), reference.assetId);
+        const size = request.body?.size || '1024x1024';
+        const quality = request.body?.quality || 'standard';
+        if (!['1024x1024', '1536x1024', '1024x1536', 'auto'].includes(size)) {
+          throw Object.assign(new Error('标准图生图不支持此尺寸'), { status: 400 });
+        }
+        const editQuality = quality === 'standard' ? 'medium' : quality === 'hd' ? 'high' : quality;
+        if (!['auto', 'low', 'medium', 'high'].includes(editQuality)) {
+          throw Object.assign(new Error('标准图生图不支持此质量'), { status: 400 });
+        }
+        editBody = new FormData();
+        editBody.set('image', new Blob([new Uint8Array(image.bytes)], { type: image.mimeType }), image.name);
+        editBody.set('model', config.model);
+        editBody.set('prompt', String(request.body?.prompt || ''));
+        editBody.set('size', size);
+        editBody.set('quality', editQuality);
+        editBody.set('n', '1');
+      }
+      // A failed edit is never retried as generation (or with different paid parameters).
+      const multipartHeaders = new Headers(openAiHeaders(config));
+      multipartHeaders.delete('Content-Type');
+      const upstream = await fetch(`${config.baseUrl}/images/${hasReference ? 'edits' : 'generations'}`, {
         method: 'POST',
-        headers: openAiHeaders(config),
-        body: JSON.stringify({
+        headers: hasReference ? multipartHeaders : openAiHeaders(config),
+        body: editBody || JSON.stringify({
           model: config.model,
           prompt: String(request.body?.prompt || ''),
           size: request.body?.size || '1024x1024',
@@ -477,8 +528,22 @@ export const createProviderRouter = (
       });
       const payload = await readJson(upstream);
       if (!upstream.ok) throw upstreamError(upstream.status, payload);
+      assertJsonPayload(upstream, payload);
       const image = payload?.data?.[0];
-      const url = image?.url || (image?.b64_json ? `data:image/png;base64,${image.b64_json}` : '');
+      let url = image?.url || (image?.b64_json ? `data:image/png;base64,${image.b64_json}` : '');
+      // Some OpenAI-compatible providers name the result URL response_url.
+      // Do not fetch it here or forward the provider key to a result host.
+      if (!url && typeof image?.response_url === 'string') {
+        try {
+          const resultUrl = new URL(image.response_url);
+          if (!['https:', 'http:'].includes(resultUrl.protocol) || resultUrl.username || resultUrl.password) {
+            throw new Error('Invalid image result URL');
+          }
+          url = resultUrl.href;
+        } catch {
+          throw Object.assign(new Error('图像供应商返回的 response_url 不是有效的 HTTP 图片结果地址'), { status: 502 });
+        }
+      }
       if (!url) throw new Error('图像供应商没有返回图片');
       response.json({ url, revisedPrompt: image?.revised_prompt });
     }),
@@ -487,6 +552,9 @@ export const createProviderRouter = (
   router.post(
     '/video',
     asyncRoute(async (request, response) => {
+      if (request.body?.referenceImage !== undefined) {
+        throw Object.assign(new Error('当前视频网关尚无真实 image 字段协议，不支持参考图；不会忽略参考图发起收费请求'), { status: 400 });
+      }
       const config = await resolveRequestConfig(request, response);
       assertConfig(config);
       const upstream = await undiciFetch(`${config.baseUrl}/video/generations`, {
@@ -514,6 +582,99 @@ export const createProviderRouter = (
     }),
   );
 
+  /**
+   * 文本生成音乐：只对登记过真实协议的模型发请求（见 src/lib/musicModels.ts），不回退为 TTS。
+   * 单次提交、不自动重试；结果在网关直接写入本机资产库，浏览器只拿资产 ID。
+   */
+  router.post(
+    '/music',
+    asyncRoute(async (request, response) => {
+      const config = await resolveRequestConfig(request, response);
+      if (config.category !== 'music') throw Object.assign(new Error('音乐生成必须使用音乐类型的模型连接'), { status: 400 });
+      const capability = assertMusicModelSupported(config.protocol, config.model);
+      assertConfig(config);
+      if (!getRuntime) throw new Error('本机资产服务未连接，无法保存音乐结果');
+      const prompt = typeof request.body?.prompt === 'string' ? request.body.prompt.trim() : '';
+      if (!prompt) throw Object.assign(new Error('请先填写音乐描述'), { status: 400 });
+      if (prompt.length > 4100) throw Object.assign(new Error('音乐描述不能超过 4100 个字符'), { status: 400 });
+      const seconds = Number(request.body?.durationSeconds);
+      if (!Number.isInteger(seconds) || seconds < capability.minSeconds || seconds > capability.maxSeconds) {
+        throw Object.assign(new Error(`时长需为 ${capability.minSeconds}–${capability.maxSeconds} 秒的整数`), { status: 400 });
+      }
+      const instrumental = capability.instrumentalToggle ? request.body?.instrumental !== false : true;
+      const upstream = await undiciFetch(`${config.baseUrl}/audio/speech`, {
+        method: 'POST',
+        headers: openAiHeaders(config),
+        body: JSON.stringify({
+          model: config.model,
+          input: prompt,
+          response_format: 'mp3',
+          metadata: {
+            music_length_ms: seconds * 1000,
+            force_instrumental: instrumental,
+            respect_sections_durations: true,
+            output_format: 'mp3_44100_128',
+          },
+        }),
+        dispatcher: videoDispatcher,
+      });
+      const contentType = (upstream.headers.get('content-type') || '').toLowerCase();
+      let bytes: Uint8Array | undefined;
+      if (!upstream.ok) {
+        throw upstreamError(upstream.status, await readJson(upstream as unknown as globalThis.Response));
+      }
+      if (!contentType.includes('application/json')) {
+        bytes = new Uint8Array(await upstream.arrayBuffer());
+      } else {
+        const payload = await upstream.json() as any;
+        const first = Array.isArray(payload?.data) ? payload.data[0] : undefined;
+        const audioObject = payload?.audio && typeof payload.audio === 'object' ? payload.audio : {};
+        const resultUrl = [payload?.url, payload?.audio_url, payload?.audioUrl, audioObject.url, first?.url, first?.audio_url, first?.audioUrl]
+          .find((value): value is string => typeof value === 'string' && Boolean(value.trim()));
+        const base64 = [first?.b64_json, first?.audio, payload?.b64_json, typeof payload?.audio === 'string' ? payload.audio : undefined]
+          .find((value): value is string => typeof value === 'string' && Boolean(value.trim()));
+        if (base64) {
+          bytes = Buffer.from(base64.replace(/^data:[^,]*,/, ''), 'base64');
+        } else if (resultUrl) {
+          let parsed: URL;
+          try {
+            parsed = new URL(resultUrl);
+          } catch {
+            throw Object.assign(new Error('音乐供应商返回的结果地址无效'), { status: 502 });
+          }
+          if (!['http:', 'https:'].includes(parsed.protocol) || parsed.username || parsed.password) {
+            throw Object.assign(new Error('音乐供应商返回的结果地址不是有效的 HTTP 地址'), { status: 502 });
+          }
+          // 结果地址可能在别的域名，不带供应商 Key 下载；只下载一次。
+          const download = await undiciFetch(parsed.href, { dispatcher: videoDispatcher });
+          if (!download.ok) throw Object.assign(new Error(`下载音乐结果失败（HTTP ${download.status}）`), { status: 502 });
+          if (Number(download.headers.get('content-length') || 0) > MAX_AUDIO_BYTES) throw Object.assign(new Error('音乐结果超过 100 MB'), { status: 502 });
+          bytes = new Uint8Array(await download.arrayBuffer());
+        }
+      }
+      if (!bytes?.length) throw Object.assign(new Error('音乐供应商没有返回音频内容或下载地址'), { status: 502 });
+      let stored: Awaited<ReturnType<typeof storeAudioAsset>>;
+      try {
+        stored = await storeAudioAsset(await getRuntime(), bytes, {
+          title: `画布音乐 · ${new Date().toLocaleDateString('zh-CN')}`,
+          description: prompt,
+          userMetadata: {
+            source: 'canvas',
+            kind: 'music',
+            prompt,
+            model: config.model,
+            requestedSeconds: seconds,
+            instrumental,
+            ...(typeof request.body?.canvasNodeId === 'string' ? { canvasNodeId: request.body.canvasNodeId } : {}),
+          },
+        });
+      } catch (error) {
+        throw Object.assign(new Error(`供应商已返回结果，但保存到本机资产库失败：${(error as Error).message}`), { status: 502 });
+      }
+      response.json({ assetId: stored.asset.id, title: stored.asset.title, mimeType: stored.mimeType, requestedSeconds: seconds, instrumental });
+    }),
+  );
+
   router.use(
     (
       error: Error & { status?: number },
@@ -526,6 +687,7 @@ export const createProviderRouter = (
         language: '文本',
         image: '生图',
         video: '视频',
+        music: '音乐',
       };
       // 只读取模型列表的请求不带类型，按通用连接标注。
       const label = config?.category && categoryLabels[config.category]

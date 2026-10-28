@@ -2,7 +2,7 @@ import { forwardRef, type HTMLAttributes } from 'react';
 import { cva, type VariantProps } from 'class-variance-authority';
 import { cn } from '../../lib/utils';
 
-const cardVariants = cva('theme-card text-[var(--surface-card-foreground)] transition-[background-color,border-color,box-shadow,transform]', {
+const cardVariants = cva('theme-card text-[var(--surface-card-foreground)] transition-[background-color,border-color,box-shadow,transform] duration-[250ms] ease-out', {
   variants: {
     variant: {
       default: '',

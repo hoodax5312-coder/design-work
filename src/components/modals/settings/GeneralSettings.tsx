@@ -1,3 +1,4 @@
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '../../ui/Select';
 import { Check, Palette, PanelLeft, Settings2, Sun, Moon, Monitor } from '@/lib/remixIconShim';
 import {
   FONT_PRESETS,
@@ -11,7 +12,7 @@ import {
   type ThemePreset,
 } from '../../../stores/useUIStore';
 import { cn } from '../../../lib/utils';
-import { Select } from '../../ui';
+
 
 const themeModeOptions = [
   { value: 'light', label: '浅色模式', icon: Sun },
@@ -288,10 +289,10 @@ export function GeneralSettings() {
                       setThemeMode(value);
                     }}
                     className={cn(
-                      'group relative h-[136px] overflow-hidden rounded-[var(--surface-card-radius)] border bg-[var(--surface-card-bg)] text-left shadow-[var(--surface-card-shadow)] transition-[border-color,box-shadow,transform] duration-150 active:scale-[0.96]',
+                      'group relative h-[136px] overflow-hidden rounded-[var(--surface-card-radius)] border bg-[var(--surface-card-bg)] text-left [box-shadow:var(--surface-card-shadow)] transition-[border-color,box-shadow,transform] duration-150 active:scale-[0.96]',
                       selected
-                        ? 'border-primary shadow-[var(--surface-card-hover-shadow)]'
-                        : 'border-[var(--surface-card-border)] hover:border-foreground/30 hover:shadow-[var(--surface-card-hover-shadow)]',
+                        ? '[box-shadow:var(--surface-card-hover-shadow)] border-primary'
+                        : 'border-[var(--surface-card-border)] hover:border-foreground/30 hover:[box-shadow:var(--surface-card-hover-shadow)]',
                     )}
                   >
                     <div className="h-full">
@@ -323,10 +324,10 @@ export function GeneralSettings() {
                       aria-selected={selected}
                       onClick={() => setThemePreset(preset)}
                       className={cn(
-                        'group relative h-[136px] overflow-hidden rounded-[var(--surface-card-radius)] border bg-[var(--surface-card-bg)] text-left shadow-[var(--surface-card-shadow)] transition-[border-color,box-shadow,transform] duration-150 active:scale-[0.96]',
+                        'group relative h-[136px] overflow-hidden rounded-[var(--surface-card-radius)] border bg-[var(--surface-card-bg)] text-left [box-shadow:var(--surface-card-shadow)] transition-[border-color,box-shadow,transform] duration-150 active:scale-[0.96]',
                         selected
-                          ? 'border-primary shadow-[var(--surface-card-hover-shadow)]'
-                          : 'border-[var(--surface-card-border)] hover:border-foreground/30 hover:shadow-[var(--surface-card-hover-shadow)]',
+                          ? '[box-shadow:var(--surface-card-hover-shadow)] border-primary'
+                          : 'border-[var(--surface-card-border)] hover:border-foreground/30 hover:[box-shadow:var(--surface-card-hover-shadow)]',
                       )}
                     >
                       <div className="h-full">
@@ -393,14 +394,20 @@ export function GeneralSettings() {
       <SettingsModule icon={Settings2} title="其他设置">
         <SettingsGroup>
           <SettingRow title="字体">
-            <Select
-              aria-label="字体"
-              value={fontPreset}
-              onChange={(event) => setFontPreset(event.target.value as FontPreset)}
-              options={(Object.entries(FONT_PRESETS) as Array<[FontPreset, (typeof FONT_PRESETS)[FontPreset]]>)
-                .map(([value, preset]) => ({ value, label: preset.label }))}
-              className="settings-font-select h-9"
-            />
+            <Select value={fontPreset} onValueChange={(value) => setFontPreset(value as FontPreset)}>
+              <SelectTrigger aria-label="字体" className="settings-font-select h-9">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {(Object.entries(FONT_PRESETS) as Array<[FontPreset, (typeof FONT_PRESETS)[FontPreset]]>)
+                  .map(([value, preset]) => ({ value, label: preset.label }))
+                  .map((option) => (
+                    <SelectItem key={option.value} value={option.value}>
+                      {option.label}
+                    </SelectItem>
+                  ))}
+              </SelectContent>
+            </Select>
           </SettingRow>
           <SettingRow title="语言">
             <div className="space-y-1.5">

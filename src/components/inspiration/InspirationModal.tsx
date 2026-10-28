@@ -1,6 +1,8 @@
-import { useState, useEffect } from 'react';
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '../ui/Select';
+import { Label } from '../ui/Label';
+import { useId, useState, useEffect } from 'react';
 import { Upload, Save, User, MapPin, Box, Palette, Wrench, MoreHorizontal } from '@/lib/remixIconShim';
-import { Button, Dialog, DialogContent, DialogTitle, Input, Select, Tabs, TabsList, TabsTrigger, Textarea } from '../ui';
+import { Button, Dialog, DialogContent, DialogTitle, Input, Tabs, TabsList, TabsTrigger, Textarea } from '../ui';
 
 interface InspirationModalProps {
   isOpen: boolean;
@@ -10,6 +12,10 @@ interface InspirationModalProps {
 }
 
 export const InspirationModal = ({ isOpen, onClose, initialData, onSave }: InspirationModalProps) => {
+  const fieldId1 = useId();
+  const fieldId2 = useId();
+  const fieldId3 = useId();
+  const fieldId4 = useId();
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   
@@ -49,13 +55,19 @@ export const InspirationModal = ({ isOpen, onClose, initialData, onSave }: Inspi
 
               {/* Form Fields */}
               <div className="space-y-4">
-                <Input label="标题 *"
-                    type="text" 
+                <div className="w-full">
+                  <Label htmlFor={fieldId1} className="mb-1.5 block text-sm font-medium text-foreground">
+                    标题 *
+                  </Label>
+                  <Input
+                    id={fieldId1}
+                    type="text"
                     value={title}
                     onChange={(e) => setTitle(e.target.value)}
                     placeholder="创意标题"
                     className="text-sm"
                   />
+                </div>
 
                 <div className="space-y-2">
                   <label className="text-xs font-medium text-muted-foreground">分类</label>
@@ -73,11 +85,17 @@ export const InspirationModal = ({ isOpen, onClose, initialData, onSave }: Inspi
                   </div>
                 </div>
 
-                <Input label="作者"
-                    type="text" 
+                <div className="w-full">
+                  <Label htmlFor={fieldId2} className="mb-1.5 block text-sm font-medium text-foreground">
+                    作者
+                  </Label>
+                  <Input
+                    id={fieldId2}
+                    type="text"
                     defaultValue={initialData?.author || '@ 作者名称'}
                     className="text-sm"
                   />
+                </div>
 
                 <div className="space-y-1">
                   <label className="text-xs font-medium text-muted-foreground">模式</label>
@@ -85,8 +103,44 @@ export const InspirationModal = ({ isOpen, onClose, initialData, onSave }: Inspi
                 </div>
 
                 <div className="grid grid-cols-2 gap-3">
-                  <Select label="宽高比" defaultValue="1:1" options={['1:1','16:9','9:16'].map((value) => ({ value, label: value }))} />
-                  <Select label="分辨率" defaultValue="2K" options={['2K','4K'].map((value) => ({ value, label: value }))} />
+                  <div className="w-full">
+                    <Label htmlFor={fieldId3} className="mb-1.5 block text-sm font-medium text-foreground">
+                      宽高比
+                    </Label>
+                    <Select defaultValue="1:1">
+                      <SelectTrigger id={fieldId3}>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {['1:1', '16:9', '9:16']
+                          .map((value) => ({ value, label: value }))
+                          .map((option) => (
+                            <SelectItem key={option.value} value={option.value}>
+                              {option.label}
+                            </SelectItem>
+                          ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="w-full">
+                    <Label htmlFor={fieldId4} className="mb-1.5 block text-sm font-medium text-foreground">
+                      分辨率
+                    </Label>
+                    <Select defaultValue="2K">
+                      <SelectTrigger id={fieldId4}>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {['2K', '4K']
+                          .map((value) => ({ value, label: value }))
+                          .map((option) => (
+                            <SelectItem key={option.value} value={option.value}>
+                              {option.label}
+                            </SelectItem>
+                          ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
                 </div>
               </div>
             </div>

@@ -17,7 +17,7 @@ test('prompt source CRUD, sync and cached case reads are durable', async () => {
     if (!healthy) { response.statusCode = 503; response.end('offline'); return; }
     response.setHeader('content-type', 'application/json');
     response.end(request.url === '/prompts.json'
-      ? JSON.stringify({ prompts: [{ id: 'one', sourceId: 'banana', title: '杯子', prompt: '白色陶瓷杯', tags: ['产品'] }] })
+      ? JSON.stringify({ prompts: [{ id: 'one', sourceId: 'banana', title: '杯子', prompt: '白色陶瓷杯', tags: ['产品'], videoUrl: 'https://example.com/clip.mp4' }] })
       : JSON.stringify({ promptsPath: '/prompts.json', sources: [{ id: 'banana', name: 'Banana Prompt', homepage: 'https://banana.example.com' }] }));
   });
   const app = createApiApp(root);
@@ -46,8 +46,9 @@ test('prompt source CRUD, sync and cached case reads are durable', async () => {
     assert.equal(reenabled.enabled, true);
     const reordered = await fetch(`${origin}/api/prompt-sources/catalog/order`, { method: 'PATCH', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ ids: [catalogId] }) });
     assert.equal(reordered.status, 200);
-    const cases = await (await fetch(`${origin}/api/cases?query=陶瓷`)).json() as { total: number };
+    const cases = await (await fetch(`${origin}/api/cases?query=陶瓷`)).json() as { total: number; items: Array<{ videoUrl: string }> };
     assert.equal(cases.total, 1);
+    assert.equal(cases.items[0].videoUrl, 'https://example.com/clip.mp4');
     const edited = await (await fetch(`${origin}/api/prompt-sources/${created.id}`, { method: 'PATCH', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ name: '已编辑来源', manifestUrl: upstreamUrl }) })).json() as { name: string };
     assert.equal(edited.name, '已编辑来源');
     healthy = false;

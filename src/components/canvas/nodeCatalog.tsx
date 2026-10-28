@@ -1,6 +1,6 @@
 import type { ElementType } from 'react';
 import type { Node, XYPosition } from '@xyflow/react';
-import { Artboard, Film, ImagePlus, StickyNote, Type } from '@/lib/remixIconShim';
+import { Artboard, Film, ImagePlus, Music, StickyNote, Type } from '@/lib/remixIconShim';
 import {
   ANNOTATION_LABEL,
   ANNOTATION_SIZE,
@@ -26,6 +26,7 @@ export const NODE_CATALOG: Record<CanvasNodeKind, NodeKindMeta> = {
   text: { kind: 'text', label: NODE_KIND_LABEL.text, hint: '脚本、广告词、提示词草稿', icon: Type, shortcut: 'T' },
   imageGen: { kind: 'imageGen', label: NODE_KIND_LABEL.imageGen, hint: '海报、分镜、角色与场景', icon: ImagePlus, shortcut: 'I' },
   video: { kind: 'video', label: NODE_KIND_LABEL.video, hint: '镜头、动态海报与短片', icon: Film, shortcut: 'M' },
+  audio: { kind: 'audio', label: NODE_KIND_LABEL.audio, hint: 'AI 生成配乐，或上传本地音频', icon: Music, shortcut: 'A' },
 };
 
 export const NODE_CATALOG_LIST = Object.values(NODE_CATALOG);

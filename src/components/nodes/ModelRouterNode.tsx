@@ -1,17 +1,23 @@
-import { memo } from 'react';
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '../ui/Select';
+import { Label } from '../ui/Label';
+import { useId, memo } from 'react';
 import { Node, NodeProps } from '@xyflow/react';
 import { Ban, CheckCircle2, KeyRound, Network } from '@/lib/remixIconShim';
 import { BaseNode } from './BaseNode';
 import { ModelRouterNodeData } from '../../types/node.types';
 import { useCanvasStore } from '../../stores/useCanvasStore';
 import { cn } from '../../lib/utils';
-import { Card, Input, Select, Textarea } from '../ui';
+import { Card, Input, Textarea } from '../ui';
 
 type ModelRouterNode = Node<ModelRouterNodeData>;
 
 const providers: ModelRouterNodeData['provider'][] = ['Jimeng', 'ComfyUI', 'Runway', 'OpenAI', 'Custom'];
 
 export const ModelRouterNode = memo(({ id, data, selected }: NodeProps<ModelRouterNode>) => {
+  const fieldId1 = useId();
+  const fieldId2 = useId();
+  const fieldId3 = useId();
+  const fieldId4 = useId();
   const updateNode = useCanvasStore((state) => state.updateNode);
 
   return (
@@ -26,36 +32,80 @@ export const ModelRouterNode = memo(({ id, data, selected }: NodeProps<ModelRout
     >
       <div className="p-4 space-y-3">
         <div className="grid grid-cols-2 gap-2">
-          <Select
-              label="Provider"
+          <div className="w-full">
+            <Label htmlFor={fieldId1} className="mb-1.5 block text-sm font-medium text-foreground">
+              Provider
+            </Label>
+            <Select
               value={data.provider || 'Jimeng'}
-              onChange={(event) => updateNode(id, { provider: event.target.value })}
-              selectSize="sm"
-              className="nodrag text-xs"
-              options={providers.map((provider) => ({ value: provider, label: provider }))}
-          />
-          <Select
-              label="请求模式"
+              onValueChange={(value) => updateNode(id, { provider: value })}
+            >
+              <SelectTrigger id={fieldId1} className="h-8 text-xs nodrag text-xs">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {providers
+                  .map((provider) => ({ value: provider, label: provider }))
+                  .map((option) => (
+                    <SelectItem key={option.value} value={option.value}>
+                      {option.label}
+                    </SelectItem>
+                  ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="w-full">
+            <Label htmlFor={fieldId2} className="mb-1.5 block text-sm font-medium text-foreground">
+              请求模式
+            </Label>
+            <Select
               value={data.requestMode || 'async'}
-              onChange={(event) => updateNode(id, { requestMode: event.target.value })}
-              selectSize="sm" className="nodrag text-xs"
-              options={[{ value: 'async', label: '异步轮询' }, { value: 'sync', label: '同步返回' }]}
-          />
+              onValueChange={(value) => updateNode(id, { requestMode: value })}
+            >
+              <SelectTrigger id={fieldId2} className="h-8 text-xs nodrag text-xs">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {[
+                  { value: 'async', label: '异步轮询' },
+                  { value: 'sync', label: '同步返回' },
+                ].map((option) => (
+                  <SelectItem key={option.value} value={option.value}>
+                    {option.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
         </div>
 
-        <Input label="模型 ID" inputSize="sm"
+        <div className="w-full">
+          <Label htmlFor={fieldId3} className="mb-1.5 block text-sm font-medium text-foreground">
+            模型 ID
+          </Label>
+          <Input
+            id={fieldId3}
+            inputSize="sm"
             value={data.model || ''}
             onChange={(event) => updateNode(id, { model: event.target.value })}
             placeholder="例如 jimeng-4.5 / runway-gen3 / comfy-workflow"
             className="nodrag text-xs"
           />
+        </div>
 
-        <Input label="Base URL / Endpoint" inputSize="sm"
+        <div className="w-full">
+          <Label htmlFor={fieldId4} className="mb-1.5 block text-sm font-medium text-foreground">
+            Base URL / Endpoint
+          </Label>
+          <Input
+            id={fieldId4}
+            inputSize="sm"
             value={data.endpoint || ''}
             onChange={(event) => updateNode(id, { endpoint: event.target.value })}
             placeholder="https://api.example.com/v1"
             className="nodrag text-xs"
           />
+        </div>
 
         <div className="grid grid-cols-3 gap-2">
           <Metric icon={KeyRound} label="Key 轮换" value={data.keyRotation ? '开启' : '关闭'} active={!!data.keyRotation} />

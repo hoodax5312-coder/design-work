@@ -4,6 +4,7 @@ import { Globe2, GripVertical, Pencil, Plus, RefreshCw, Trash2 } from '@/lib/rem
 import { Button } from '../../ui/Button';
 import { Input } from '../../ui/Input';
 import { Switch } from '../../ui/Switch';
+import { confirmAction } from '../../ui/confirmation';
 import {
   Dialog,
   DialogContent,
@@ -137,7 +138,7 @@ export function PromptSourcesSettings() {
     }
   };
   const deleteSource = async (catalogSource: CatalogSource) => {
-    if (!window.confirm(`确定删除来源“${catalogSource.name}”吗？`)) return;
+    if (!await confirmAction(`确定删除来源“${catalogSource.name}”吗？`)) return;
     setBusy(true);
     setError('');
     try {
@@ -247,7 +248,8 @@ export function PromptSourcesSettings() {
                 </span>
                 <span className="flex shrink-0 items-center gap-2">
                   <Button
-                    size="sm"
+                    size="iconSm"
+                    className="h-8 w-8 shrink-0 p-0 [&_svg]:h-[14px] [&_svg]:w-[14px] [&_svg]:shrink-0"
                     variant="ghost"
                     onClick={() => void sync(catalogSource.manifestId)}
                     disabled={busy}
@@ -256,7 +258,8 @@ export function PromptSourcesSettings() {
                     <RefreshCw size={14} />
                   </Button>
                   <Button
-                    size="sm"
+                    size="iconSm"
+                    className="h-8 w-8 shrink-0 p-0 [&_svg]:h-[14px] [&_svg]:w-[14px] [&_svg]:shrink-0"
                     variant="ghost"
                     onClick={() => {
                       setError('');
@@ -271,7 +274,8 @@ export function PromptSourcesSettings() {
                     <Pencil size={14} />
                   </Button>
                   <Button
-                    size="sm"
+                    size="iconSm"
+                    className="h-8 w-8 shrink-0 p-0 [&_svg]:h-[14px] [&_svg]:w-[14px] [&_svg]:shrink-0"
                     variant="ghost"
                     onClick={() => void deleteSource(catalogSource)}
                     disabled={busy}

@@ -702,8 +702,8 @@ export const ProjectGallery = () => {
 
           <div className="h-[118px] shrink-0 border-0 bg-card text-card-foreground">
             <div className="flex h-8 items-center justify-between border-0 px-3">
-              <div className="flex items-center gap-2 text-xs uppercase tracking-[0.15em] text-muted-foreground"><Layers3 size={13} className="text-foreground" /> 片段组合 · V1</div>
-              <div className="font-mono text-xs text-muted-foreground">{timelineClips.length} shots · {timelineClips.length * 8}s</div>
+              <div className="flex items-center gap-2 text-xs uppercase tracking-[0.15em] text-muted-foreground"><Layers3 size={13} className="text-foreground" /> 片段组合 / V1</div>
+              <div className="font-mono text-xs text-muted-foreground">{timelineClips.length} shots / {timelineClips.length * 8}s</div>
             </div>
             <div className="flex h-[86px] items-center gap-1 overflow-x-auto px-3">
               <div className="mr-1 flex h-14 w-8 shrink-0 items-center justify-center rounded-sm bg-primary font-mono text-xs text-primary-foreground">V1</div>

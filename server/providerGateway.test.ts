@@ -217,6 +217,48 @@ const withProviderRouter = async (
   }
 };
 
+test('image route supports response_url without extra requests and preserves standard results', async () => {
+  let calls = 0;
+  let image: Record<string, unknown> = {};
+  await withProviderRouter(async (_input, init) => {
+    calls += 1;
+    assert.equal(init?.method, 'POST');
+    return Response.json({ data: [image] });
+  }, async (post) => {
+    const body = { config: { ...config, category: 'image' }, prompt: 'test image' };
+    for (const [result, expected] of [
+      [{ response_url: 'https://cdn.example.com/image?signature=example' }, 'https://cdn.example.com/image?signature=example'],
+      [{ url: 'https://cdn.example.com/standard', response_url: 'https://cdn.example.com/other' }, 'https://cdn.example.com/standard'],
+      [{ b64_json: 'aW1hZ2U=', response_url: 'https://cdn.example.com/other' }, 'data:image/png;base64,aW1hZ2U='],
+    ] as const) {
+      image = result;
+      const response = await post('/api/provider/image', body);
+      assert.equal(response.status, 200);
+      assert.deepEqual(await response.json(), { url: expected });
+    }
+    assert.equal(calls, 3);
+  });
+});
+
+test('image route rejects malformed response_url and still fails when no image is returned', async () => {
+  let image: Record<string, unknown> = {};
+  await withProviderRouter(async () => Response.json({ data: [image] }), async (post) => {
+    const body = { config: { ...config, category: 'image' }, prompt: 'test image' };
+    for (const value of ['javascript:alert(1)', '/relative', 'https://user:pass@example.com/image']) {
+      image = { response_url: value };
+      const response = await post('/api/provider/image', body);
+      assert.equal(response.status, 502);
+      assert.match((await response.json() as { error: string }).error, /response_url/);
+    }
+    for (const result of [{}, { response_url: { url: 'https://example.com/image' } }]) {
+      image = result;
+      const response = await post('/api/provider/image', body);
+      assert.equal(response.status, 500);
+      assert.match((await response.json() as { error: string }).error, /图像供应商没有返回图片/);
+    }
+  });
+});
+
 /** fetch 不方便改 Host，用 node:http 模拟局域网和其他网站发来的请求。 */
 const rawRequest = (url: string, headers: Record<string, string>, method = 'GET') =>
   new Promise<{ status: number; body: string }>((resolve, reject) => {

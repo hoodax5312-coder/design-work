@@ -1,5 +1,6 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
+import tailwindcss from '@tailwindcss/vite'
 import path from 'path'
 import { createApiApp } from './server/createApiApp'
 
@@ -8,6 +9,7 @@ export default defineConfig({
   base: './',
   plugins: [
     react(),
+    tailwindcss(),
     {
       name: 'design-work-provider-api',
       configureServer(server) {

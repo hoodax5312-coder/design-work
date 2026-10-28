@@ -43,7 +43,7 @@ export function ProviderModelPicker({ models, provider, category, categoryLabels
         <div className="min-w-0 flex-1">
           <p className="text-xs font-semibold">
             模型列表
-            <span className="ml-2 font-normal tabular-nums text-muted-foreground">共 {models.length} 个 · 已加入{label} {includedCount} 个</span>
+            <span className="ml-2 font-normal tabular-nums text-muted-foreground">共 {models.length} 个 / 已加入{label} {includedCount} 个</span>
           </p>
           {!collapsed && <p className="mt-1 text-[11px] text-muted-foreground">点选加入“{label}”；切换上方类型可把模型加入其他类型。</p>}
         </div>
@@ -75,7 +75,7 @@ export function ProviderModelPicker({ models, provider, category, categoryLabels
                   .map((item) => categoryLabels[item]);
                 const tooltip = [model.name, model.id, context && `上下文 ${context}`, others.length && `已在${others.join('、')}`]
                   .filter(Boolean)
-                  .join(' · ');
+                  .join(' / ');
                 return (
                   <button
                     key={model.id}
@@ -93,7 +93,7 @@ export function ProviderModelPicker({ models, provider, category, categoryLabels
                     {included && <Check aria-hidden="true" size={13} className="shrink-0" />}
                     <span className="truncate">{model.name || model.id}</span>
                     {context && <span className={cn('shrink-0 rounded px-1 text-[10px] tabular-nums', included ? 'bg-background/20' : 'bg-muted')}>{context}</span>}
-                    {others.length > 0 && <span className={cn('shrink-0 text-[10px]', included ? 'text-background/70' : 'text-muted-foreground')}>{others.join('·')}</span>}
+                    {others.length > 0 && <span className={cn('shrink-0 text-[10px]', included ? 'text-background/70' : 'text-muted-foreground')}>{others.join(' / ')}</span>}
                   </button>
                 );
               })}

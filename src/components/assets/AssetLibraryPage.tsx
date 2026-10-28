@@ -1,3 +1,6 @@
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '../ui/Select';
+import { FavoriteIcon } from '../ui/FavoriteIcon';
+import { confirmAction } from '../ui/confirmation';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Archive,
@@ -21,7 +24,6 @@ import {
   Search,
   Sparkles,
   Heart,
-  HeartFill,
   Trash2,
   Upload,
   UploadCloud,
@@ -47,11 +49,14 @@ import {
   AlertTitle,
   Button,
   Card,
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuTrigger,
   Input,
-  Select,
   Separator,
-  Skeleton,
-} from '../ui';
+  Skeleton } from '../ui';
 import { CaseDetailOverlay, CaseFilterSections, CaseGrid, CaseTabs, useCaseLibrary } from './CaseLibrary';
 import { GeneratedImageMenu, type GeneratedImageMenuTarget } from '../image-gen/GeneratedImageMenu';
 import { MediaLightbox } from '../canvas/CanvasOverlays';
@@ -377,7 +382,7 @@ export const AssetLibraryPage = ({
 
   const removeSelected = async () => {
     const ids = [...selectedIds];
-    if (!ids.length || !window.confirm(`将 ${ids.length} 项资产移入回收站？`)) return;
+    if (!ids.length || !(await confirmAction(`将 ${ids.length} 项资产移入回收站？`))) return;
     await Promise.all(ids.map(assetService.remove));
     setSelectedIds(new Set());
     if (selectedId && ids.includes(selectedId)) {
@@ -428,7 +433,7 @@ export const AssetLibraryPage = ({
       showNotice('这张图片还没有存入资产库，请到生成页删除');
       return;
     }
-    if (!window.confirm(`将“${asset.title}”移入回收站？`)) return;
+    if (!(await confirmAction(`将“${asset.title}”移入回收站？`))) return;
     try {
       await assetService.remove(asset.id);
       setSelectedIds((current) => {
@@ -506,7 +511,7 @@ export const AssetLibraryPage = ({
   };
 
   const deleteFolder = async (folder: AssetFolder) => {
-    if (!window.confirm(`删除文件夹「${folder.name}」？\n子文件夹会一并删除，其中的素材不会被删除，将转为未分类。`)) return;
+    if (!(await confirmAction(`删除文件夹「${folder.name}」？\n子文件夹会一并删除，其中的素材不会被删除，将转为未分类。`))) return;
     try {
       const removedFolderIds = new Set([folder.id]);
       let foundDescendant = true;
@@ -651,7 +656,7 @@ export const AssetLibraryPage = ({
                   {expanded ? <ChevronDown size={20} /> : <ChevronRight size={20} />}
                   {expanded ? <FolderOpen size={24} /> : <Folder size={24} />}
                 </span>
-                <span className="min-w-0 flex-1 truncate">{folder.name}</span>
+                <span className="min-w-0 flex-1 truncate text-foreground">{folder.name}</span>
                 <span className="shrink-0 text-[11px] tabular-nums opacity-55">{folder.assetCount}</span>
               </button>
             </div>}
@@ -727,7 +732,7 @@ export const AssetLibraryPage = ({
               value={query}
               onChange={(event) => setQuery(event.target.value)}
               placeholder="搜索标题、描述和提取文字…"
-              className="module-search-input h-8 border border-neutral-border bg-neutral-surface py-0 pl-9 pr-9 text-neutral-foreground placeholder:text-muted-foreground shadow-none focus-visible:ring-1 focus-visible:ring-neutral-border"
+              className="module-search-input h-8 border border-neutral-border bg-neutral-surface py-0 pl-9 pr-9 text-neutral-foreground placeholder:text-muted-foreground shadow-none focus-visible:ring-1 focus-visible:ring-[color:var(--field-focus-ring)]"
             />
             {query && (
               <Button variant="ghost" size="iconSm" onClick={() => setQuery('')} aria-label="清空搜索" className="absolute right-0.5 top-1/2 h-6 w-6 -translate-y-1/2"><X size={13} /></Button>
@@ -831,7 +836,7 @@ export const AssetLibraryPage = ({
             {source === 'uploaded' && <h1 className="min-w-0 truncate text-sm font-semibold tracking-[-0.01em]">{assetViewTitle}</h1>}
           </div>
           <div className="flex items-center gap-2">
-            <Button
+            {(origin === 'all' || origin === 'uploaded') && <Button
               type="button"
               variant="ghost"
               size="iconSm"
@@ -842,7 +847,7 @@ export const AssetLibraryPage = ({
               className="h-8 w-8 text-muted-foreground hover:bg-accent hover:text-accent-foreground"
             >
               <Upload size={16} aria-hidden="true" />
-            </Button>
+            </Button>}
             <div className="relative">
               <Button
                 type="button"
@@ -883,22 +888,25 @@ export const AssetLibraryPage = ({
               )}
             </div>
             {source === 'uploaded' && <div className="w-[104px]">
-              <Select
-                value={type}
-                onChange={(event) => {
-                  setType(event.target.value as AssetTypeFilter);
-                  setFolderId('');
-                  setTagIds([]);
-                  setOffset(0);
-                }}
-                options={[
-                  { value: '', label: '全部类型' },
-                  ...assetTypeOptions.map((option) => ({ value: option.id, label: option.label })),
-                ]}
-                aria-label="按文件类型筛选"
-                selectSize="sm"
-                className="border-transparent bg-transparent pl-2 pr-7 font-medium text-muted-foreground hover:bg-accent hover:text-accent-foreground focus-visible:bg-accent"
-              />
+              <DropdownMenu onOpenChange={(open) => { if (open) setSortOpen(false); }}>
+                <DropdownMenuTrigger asChild>
+                  <Button type="button" variant="ghost" aria-label="按文件类型筛选" className="h-8 w-full justify-between gap-2 border-0 px-3 text-xs font-medium text-muted-foreground hover:bg-accent hover:text-accent-foreground data-[state=open]:bg-accent data-[state=open]:text-accent-foreground">
+                    <span className="truncate">{assetTypeOptions.find((option) => option.id === type)?.label || '全部类型'}</span>
+                    <ChevronDown size={16} className="shrink-0" aria-hidden="true" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuRadioGroup value={type} onValueChange={(value) => {
+                    setType(value as AssetTypeFilter);
+                    setFolderId('');
+                    setTagIds([]);
+                    setOffset(0);
+                  }} aria-label="文件类型">
+                    <DropdownMenuRadioItem value="">全部类型</DropdownMenuRadioItem>
+                    {assetTypeOptions.map((option) => <DropdownMenuRadioItem key={option.id} value={option.id}>{option.label}</DropdownMenuRadioItem>)}
+                  </DropdownMenuRadioGroup>
+                </DropdownMenuContent>
+              </DropdownMenu>
             </div>}
           </div>
         </header>
@@ -984,16 +992,22 @@ export const AssetLibraryPage = ({
             </Button>
             {folders.length > 0 && (
               <Select
-                  defaultValue=""
-                  onChange={(event) => {
-                    if (event.target.value)
-                      assetService.bulkMove([...selectedIds], event.target.value).then(refresh);
-                    event.target.value = '';
-                  }}
-                  selectSize="sm"
-                  className="h-7 min-w-28 text-xs"
-                  options={[{ value: '', label: '移动到…', disabled: true }, ...folders.map((folder) => ({ value: folder.id, label: folder.name }))]}
-                />
+                value=""
+                onValueChange={(value) => {
+                  if (value) assetService.bulkMove([...selectedIds], value).then(refresh);
+                }}
+              >
+                <SelectTrigger aria-label="移动到文件夹" className="h-7 min-w-28 text-xs">
+                  <SelectValue placeholder="移动到…" />
+                </SelectTrigger>
+                <SelectContent>
+                  {folders.map((folder) => (
+                    <SelectItem key={folder.id} value={folder.id}>
+                      {folder.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             )}
             <Button variant="ghost" size="sm"
               onClick={removeSelected}
@@ -1230,8 +1244,8 @@ const AssetCard = ({
         <CheckSquare2 size={12} />
       </Button>
       {asset.favorite && (
-        <span className="absolute right-2.5 top-2.5 z-10 grid h-6 w-6 place-items-center rounded-lg bg-white/85 text-amber-500 backdrop-blur-md dark:bg-black/55">
-          <HeartFill size={12} />
+        <span className="absolute right-2.5 top-2.5 z-10 grid h-6 w-6 place-items-center rounded-lg bg-white/85 backdrop-blur-md dark:bg-black/55">
+          <FavoriteIcon saved size={12} />
         </span>
       )}
       <div className="pointer-events-none absolute inset-x-0 bottom-0 translate-y-2 bg-gradient-to-t from-black/80 via-black/55 to-transparent px-3 pb-3 pt-10 text-white opacity-0 transition-all duration-200 group-hover:translate-y-0 group-hover:opacity-100 group-focus-within:translate-y-0 group-focus-within:opacity-100">
@@ -1316,7 +1330,7 @@ export const AssetRow = ({
     <span className="rounded-md bg-muted px-2 py-1 text-xs font-semibold uppercase text-muted-foreground">
       {asset.type}
     </span>
-    {asset.favorite && <HeartFill size={12} className="text-amber-400" />}
+    {asset.favorite && <FavoriteIcon saved size={12} />}
     <span className="w-20 text-right text-xs text-muted-foreground">{formatDate(asset.updatedAt)}</span>
   </Button>
 );

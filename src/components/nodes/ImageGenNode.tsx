@@ -1,24 +1,26 @@
-import { memo } from 'react';
+import { memo, useState } from 'react';
 import { type Node, type NodeProps } from '@xyflow/react';
-import { Copy, Download, ImagePlus, Maximize, RefreshCw } from '@/lib/remixIconShim';
+import { Copy, Download, ImagePlus, Maximize, RefreshCw, Settings2, Scissors } from '@/lib/remixIconShim';
 import { cn } from '../../lib/utils';
 import { useCanvasStore } from '../../stores/useCanvasStore';
 import { type ImageGenNodeData } from '../../types/node.types';
 import { AuroraVeil, ShimmerText, ThinkingOrb } from '../motion';
-import { CanvasPromptOverlay } from '../canvas/CanvasPromptOverlay';
 import { activeResultOf, clampCount, nodeTitle, ratioToCss } from '../canvas/canvasModel';
-import { downloadMedia, useCanvasActions } from '../canvas/canvasContext';
+import { useCanvasActions } from '../canvas/canvasContext';
+import { downloadOriginalImage, imageAspectRatio, recordImageDimensions } from '../canvas/imageAsset';
 import { isNodeRunnable, runNodeGeneration } from '../canvas/generation';
+import { derivedImageNode } from '../canvas/imageInputs';
 import { NodeFrame, type NodeAction } from './NodeFrame';
 import { ResultHistory } from './ResultHistory';
 import { useMediaFallback } from './useMediaFallback';
+import { Dialog, DialogContent, DialogDescription, DialogTitle } from '../ui';
+import { ImageToolsDialog, type ImageTool } from './ImageToolsDialog';
 
 type ImageNode = Node<ImageGenNodeData>;
 
-const extensionOf = (url: string) => (url.includes('/api/assets/') ? 'webp' : url.startsWith('data:image/jpeg') ? 'jpg' : 'png');
-
 export const ImageGenNode = memo(({ id, data, selected }: NodeProps<ImageNode>) => {
-  const single = useCanvasStore((state) => state.selectedNodes.length <= 1);
+  const [showParameters, setShowParameters] = useState(false);
+  const [imageTool, setImageTool] = useState<ImageTool>();
   const runnable = useCanvasStore((state) => {
     const node = state.nodes.find((item) => item.id === id);
     return Boolean(node) && isNodeRunnable(node as Node, state.nodes, state.edges);
@@ -31,11 +33,34 @@ export const ImageGenNode = memo(({ id, data, selected }: NodeProps<ImageNode>) 
   const isSelected = Boolean(selected);
   const title = nodeTitle({ type: 'imageGen', data });
   const active = activeResultOf(data, 'imageUrl');
-  const media = useMediaFallback(imageUrl, active?.assetId || (typeof data.assetId === 'string' ? data.assetId : undefined));
+  const assetId = active ? active.assetId : typeof data.assetId === 'string' ? data.assetId : undefined;
+  const media = useMediaFallback(imageUrl, assetId);
   const shown = media.dead ? '' : media.src;
   const count = clampCount(data.count);
+  const snapshot = active?.generationSnapshot;
 
   const actions: NodeAction[] = [
+    {
+      id: 'image-tools', icon: Scissors, label: '图片工具：裁切、遮罩、切图、超分', disabled: uploading || generating || !assetId,
+      onSelect: () => setImageTool('crop'),
+    },
+    {
+      id: 'continue-edit', icon: ImagePlus, label: '继续改图', disabled: uploading || generating || !assetId,
+      onSelect: () => {
+        try {
+          const { nodes, addNodes } = useCanvasStore.getState();
+          const source = nodes.find((node) => node.id === id);
+          if (!source) return;
+          const derived = derivedImageNode(source, nodes);
+          addNodes([derived.node], [derived.edge]);
+          notify('已新建下游图片节点，请填写修改要求；生成时使用上游当前选中的图片');
+        } catch (error) { notify(error instanceof Error ? error.message : '无法继续改图'); }
+      },
+    },
+    {
+      id: 'parameters', icon: Settings2, label: '查看生成参数', disabled: !snapshot,
+      onSelect: () => setShowParameters(true),
+    },
     {
       id: 'regenerate',
       icon: RefreshCw,
@@ -47,9 +72,9 @@ export const ImageGenNode = memo(({ id, data, selected }: NodeProps<ImageNode>) 
     {
       id: 'download',
       icon: Download,
-      label: '下载',
-      disabled: !shown,
-      onSelect: () => void downloadMedia(shown, `${title}.${extensionOf(shown)}`).then((ok) => { if (!ok) notify('已在新标签页打开图片，可在那里另存'); }),
+      label: '下载原图',
+      disabled: !imageUrl && !assetId,
+      onSelect: () => void downloadOriginalImage(assetId, imageUrl, title).catch((error: unknown) => notify(error instanceof Error ? error.message : '原图下载失败')),
     },
     {
       id: 'copy-prompt',
@@ -67,9 +92,8 @@ export const ImageGenNode = memo(({ id, data, selected }: NodeProps<ImageNode>) 
       data={data}
       selected={isSelected}
       resize="width"
-      cardStyle={{ aspectRatio: ratioToCss(data.aspectRatio) }}
+      cardStyle={{ aspectRatio: imageAspectRatio(active ? active.width : data.imageWidth, active ? active.height : data.imageHeight, ratioToCss(data.aspectRatio)) }}
       actions={actions}
-      panel={<CanvasPromptOverlay id={id} kind="imageGen" data={data} visible={isSelected && single} />}
     >
       {shown ? (
         <img
@@ -78,8 +102,9 @@ export const ImageGenNode = memo(({ id, data, selected }: NodeProps<ImageNode>) 
           alt={prompt || title}
           draggable={false}
           onError={media.onError}
+          onLoad={(event) => { if (shown === imageUrl) recordImageDimensions(id, imageUrl, event.currentTarget.naturalWidth, event.currentTarget.naturalHeight); }}
           onDoubleClick={() => openMedia({ kind: 'image', url: shown, title })}
-          className={cn('canvas-media-enter h-full w-full object-cover transition-[filter,opacity] duration-300', (generating || uploading) && 'opacity-70 blur-[2px]')}
+          className={cn('canvas-media-enter h-full w-full object-contain transition-[filter,opacity] duration-300', (generating || uploading) && 'opacity-70 blur-[2px]')}
         />
       ) : !generating && (
         <div className="flex h-full w-full flex-col items-center justify-center gap-2 bg-muted/40 text-muted-foreground">
@@ -110,6 +135,24 @@ export const ImageGenNode = memo(({ id, data, selected }: NodeProps<ImageNode>) 
         </>
       )}
       <ResultHistory id={id} kind="imageGen" data={data} />
+      {imageTool && assetId && <ImageToolsDialog key={`${imageTool}:${assetId}`} nodeId={id} assetId={assetId} tool={imageTool} onToolChange={setImageTool} onClose={() => setImageTool(undefined)} onSaved={notify} />}
+      <Dialog open={showParameters} onOpenChange={setShowParameters}>
+        <DialogContent className="nodrag nopan max-h-[80dvh] overflow-y-auto" onPointerDown={(event) => event.stopPropagation()}>
+          <DialogTitle>本次生成参数</DialogTitle>
+          <DialogDescription>记录提交时的参数与参考，不随当前编辑改变；供应商及模型变化后不保证逐像素复现。</DialogDescription>
+          {snapshot && <>
+            <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 break-all text-sm">
+              {[
+                ['模型', snapshot.model], ['厂商 / 协议', `${snapshot.providerId} / ${snapshot.protocol}`],
+                ['请求尺寸 / 比例', `${snapshot.size} / ${snapshot.aspectRatio}`],
+                ['质量', ({ standard: '标准', hd: '高清', medium: '中', high: '高', low: '低', auto: '自动' } as Record<string, string>)[snapshot.quality] || snapshot.quality], ['本批数量', `${snapshot.count} 张（每张独立请求）`],
+                ['参考图', snapshot.referenceImage ? `${snapshot.referenceImage.name} / ${snapshot.referenceImage.assetId}` : '无'],
+              ].map(([label, value]) => <div key={label} className="contents"><dt className="text-muted-foreground">{label}</dt><dd>{value}</dd></div>)}
+            </dl>
+            <div className="text-sm"><p className="mb-2 text-muted-foreground">实际发送提示词（含上游文本）</p><p className="whitespace-pre-wrap break-words">{snapshot.prompt}</p></div>
+          </>}
+        </DialogContent>
+      </Dialog>
     </NodeFrame>
   );
 });

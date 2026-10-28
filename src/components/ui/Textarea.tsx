@@ -3,7 +3,7 @@ import { cva, type VariantProps } from 'class-variance-authority';
 import { cn } from '../../lib/utils';
 
 const textareaVariants = cva(
-  'flex min-h-[80px] w-full rounded-md border border-neutral-border bg-neutral-surface px-3 py-2 text-sm text-neutral-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-neutral-border disabled:cursor-not-allowed disabled:opacity-50 resize-none',
+  'flex min-h-[80px] w-full rounded-md border border-neutral-border bg-neutral-surface px-3 py-2 text-sm text-neutral-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[color:var(--field-focus-ring)] disabled:cursor-not-allowed disabled:opacity-50 resize-none',
   {
     variants: {
       variant: {
@@ -13,6 +13,11 @@ const textareaVariants = cva(
           'border-transparent bg-transparent focus-visible:ring-0',
         filled:
           'border-transparent bg-neutral-surface-subtle',
+      },
+      textareaSize: {
+        sm: 'min-h-[64px] text-xs',
+        md: 'min-h-[80px] text-sm',
+        lg: 'min-h-[112px] text-base',
       },
     },
     defaultVariants: {
@@ -27,10 +32,12 @@ export interface TextareaProps
   label?: string;
   error?: string;
   helperText?: string;
+  /** shadcn-compatible alias; textareaSize remains available for explicit callers. */
+  size?: 'sm' | 'md' | 'lg';
 }
 
 export const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>(
-  ({ className, variant, label, error, helperText, ...props }, ref) => {
+  ({ className, variant, textareaSize, size, label, error, helperText, ...props }, ref) => {
     return (
       <div className="w-full">
         {label && (
@@ -41,7 +48,7 @@ export const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>(
         <textarea
           ref={ref}
           className={cn(
-            textareaVariants({ variant }),
+            textareaVariants({ variant, textareaSize: size ?? textareaSize }),
             error && 'border-red-500 focus:border-red-500 focus:ring-red-500',
             className
           )}

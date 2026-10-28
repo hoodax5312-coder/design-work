@@ -51,7 +51,7 @@ export const GeneratedImageSet = ({
         <div
           {...interactions(active)}
           className={cn(
-            'group relative flex max-h-[680px] min-h-[240px] cursor-default items-center justify-center overflow-hidden rounded-lg bg-[#0b0b0b] transition-shadow',
+            'group relative flex max-h-[680px] min-h-0 cursor-default items-center justify-center overflow-hidden rounded-lg bg-[#0b0b0b] transition-shadow',
             selected && 'ring-2 ring-inset ring-foreground',
           )}
           style={{ aspectRatio: ratios[active] || DEFAULT_RATIO }}

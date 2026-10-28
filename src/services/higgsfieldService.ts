@@ -130,8 +130,8 @@ export const fallbackProjects: HiggsfieldProject[] = [
 ];
 
 export const fallbackFolders: HiggsfieldFolder[] = [
-  { id: '7b08fc37-6a07-431d-93d9-afce029b11e8', name: 'SCENE 1 · 海盗船', count: 740, color: 'lime' },
-  { id: 'cdc7f7f3-bb9e-4d8a-a6fa-c6959c4cdac0', name: 'SCENE 2 · 沙漠', count: 431, color: 'amber' },
-  { id: '5f17b189-db0c-40c4-920d-a925fb0f60e4', name: 'SCENE 3 · 丛林', count: 3763, color: 'emerald' },
-  { id: '5340fba6-cdb4-4cbf-a6d5-2340fe0f85e0', name: 'SCENE 4 · 房间', count: 364, color: 'cyan' },
+  { id: '7b08fc37-6a07-431d-93d9-afce029b11e8', name: 'SCENE 1 / 海盗船', count: 740, color: 'lime' },
+  { id: 'cdc7f7f3-bb9e-4d8a-a6fa-c6959c4cdac0', name: 'SCENE 2 / 沙漠', count: 431, color: 'amber' },
+  { id: '5f17b189-db0c-40c4-920d-a925fb0f60e4', name: 'SCENE 3 / 丛林', count: 3763, color: 'emerald' },
+  { id: '5340fba6-cdb4-4cbf-a6d5-2340fe0f85e0', name: 'SCENE 4 / 房间', count: 364, color: 'cyan' },
 ];

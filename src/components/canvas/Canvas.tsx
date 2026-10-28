@@ -6,6 +6,7 @@ import {
   ReactFlowProvider,
   SelectionMode,
   useReactFlow,
+  useViewport,
   type Connection,
   type Edge,
   type FinalConnectionState,
@@ -16,19 +17,20 @@ import '@xyflow/react/dist/style.css';
 import './canvas.css';
 import { AiGenerate, Artboard, Clipboard, Copy, Focus, Layers, LayoutMasonry, Lock, SelectAll, StopFill, Trash2, Unlink, Unlock, Upload } from '@/lib/remixIconShim';
 import { workspaceCacheService } from '../../services/workspaceCacheService';
-import { liveObjectUrls, useCanvasStore, type CanvasClipboard } from '../../stores/useCanvasStore';
+import { flushCanvasSave, liveObjectUrls, useCanvasStore, type CanvasClipboard } from '../../stores/useCanvasStore';
 import { useProjectStore } from '../../stores/useProjectStore';
 import { useUIStore } from '../../stores/useUIStore';
 import { AnimatePresence, MotionConfig } from '../motion';
-import { DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, TooltipProvider } from '../ui';
+import { Button, Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, TooltipProvider } from '../ui';
+import { AudioNode } from '../nodes/AudioNode';
 import { GroupNode } from '../nodes/GroupNode';
 import { ImageGenNode } from '../nodes/ImageGenNode';
 import { NoteNode } from '../nodes/NoteNode';
 import { TextNode } from '../nodes/TextNode';
 import { VideoNode } from '../nodes/VideoNode';
 import { AGENT_PANEL_WIDTH, CanvasAgentPanel } from './CanvasAgentPanel';
-import { type ParamNode } from './CanvasNodeParams';
 import { CanvasLayersPanel } from './CanvasLayersPanel';
+import { CanvasPromptOverlay } from './CanvasPromptOverlay';
 import { AnchoredMenu, NodePicker, type ScreenPoint } from './CanvasContextMenu';
 import { CanvasControls, FIT_OPTIONS } from './CanvasControls';
 import {
@@ -42,7 +44,7 @@ import {
   isDistributeMode,
   type CanvasToastState,
 } from './CanvasOverlays';
-import { CanvasRail, type CanvasTool } from './CanvasToolbar';
+import { CanvasRail, CanvasViewControls, type CanvasTool } from './CanvasToolbar';
 import { CanvasActionsContext, type CanvasActions, type PickerConnect } from './canvasContext';
 import {
   ANNOTATION_LABEL,
@@ -61,10 +63,12 @@ import {
   type StoredChatMessage,
 } from './canvasModel';
 import { FlowEdge } from './FlowEdge';
+import { AUDIO_ACCEPT, isAudioFile, uploadAudioToNode } from './audioUpload';
+import { uploadImageToNode } from './imageAsset';
 import { describeRunSummary, isNodeRunnable, runNodeGeneration, runNodesInOrder, stopNodeGenerations } from './generation';
 import { ANNOTATION_CATALOG_LIST, NODE_CATALOG, NODE_CATALOG_LIST, makeAnnotationNode, makeCanvasNode } from './nodeCatalog';
 
-const nodeTypes = { text: TextNode, imageGen: ImageGenNode, video: VideoNode, note: NoteNode, group: GroupNode };
+const nodeTypes = { text: TextNode, imageGen: ImageGenNode, video: VideoNode, audio: AudioNode, note: NoteNode, group: GroupNode };
 const edgeTypes = { flow: FlowEdge };
 const defaultEdgeOptions = { type: 'flow' };
 const SNAP_GRID: [number, number] = [20, 20];
@@ -124,6 +128,7 @@ type GroupFollower = { group: string; origin: XYPosition; start: XYPosition };
 
 const CanvasInner = ({ onBack }: { onBack?: () => void }) => {
   const flow = useReactFlow();
+  const { zoom: viewportZoom } = useViewport();
   const wrapperRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const pointerRef = useRef<ScreenPoint | null>(null);
@@ -137,8 +142,7 @@ const CanvasInner = ({ onBack }: { onBack?: () => void }) => {
   const [picker, setPicker] = useState<PickerState | null>(null);
   const [menu, setMenu] = useState<MenuState | null>(null);
   const [agentOpen, setAgentOpen] = useState(false);
-  const [layersOpen, setLayersOpen] = useState(true);
-  const [searchOpen, setSearchOpen] = useState(false);
+  const [layersOpen, setLayersOpen] = useState(false);
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
   const [media, setMedia] = useState<MediaState | null>(null);
   const [toast, setToast] = useState<CanvasToastState | null>(null);
@@ -166,35 +170,36 @@ const CanvasInner = ({ onBack }: { onBack?: () => void }) => {
   const redo = useCanvasStore((state) => state.redo);
   const restoreSnapshot = useCanvasStore((state) => state.restoreSnapshot);
   const setZoom = useCanvasStore((state) => state.setZoom);
-  const projectId = useProjectStore((state) => state.activeProjectId);
+  const showMinimap = useCanvasStore((state) => state.showMinimap);
+  const toggleMinimap = useCanvasStore((state) => state.toggleMinimap);
+  const projectId = useCanvasStore((state) => state.projectId);
+  const [exitOpen, setExitOpen] = useState(false);
+  const [exitBusy, setExitBusy] = useState(false);
+  const [exitError, setExitError] = useState('');
   const setCanvasAgentOpen = useUIStore((state) => state.setCanvasAgentOpen);
-
-  const selectedNodes = useMemo(() => {
-    const picked = new Set(selectedIds);
-    return nodes.filter((node) => picked.has(node.id));
-  }, [nodes, selectedIds]);
-
-  const selectedNode = useMemo<ParamNode | null>(() => {
-    if (selectedNodes.length !== 1) return null;
-    const node = selectedNodes[0];
-    if (!isCanvasNodeKind(node.type)) return null;
-    return {
-      id: node.id,
-      kind: node.type,
-      data: node.data as Record<string, unknown>,
-    };
-  }, [selectedNodes]);
-
-  const selectedAnnotation = selectedNodes.length === 1 && isAnnotationKind(selectedNodes[0].type);
 
   useEffect(() => {
     setCanvasAgentOpen(agentOpen);
     return () => setCanvasAgentOpen(false);
   }, [agentOpen, setCanvasAgentOpen]);
 
+  /* ---------- 右侧浮层互斥 ----------
+     Agent 面板固定在右侧，小地图移到右下角，两者共用同一块区域，只能显示一个。 */
+  const toggleAgentPanel = useCallback(() => {
+    const opening = !agentOpen;
+    setAgentOpen(opening);
+    if (opening && showMinimap) toggleMinimap();
+  }, [agentOpen, showMinimap, toggleMinimap]);
+
+  const toggleMinimapPanel = useCallback(() => {
+    const opening = !showMinimap;
+    toggleMinimap();
+    if (opening && agentOpen) setAgentOpen(false);
+  }, [agentOpen, showMinimap, toggleMinimap]);
+
   /* ---------- 提示条 ---------- */
 
-  const toastTimer = useRef<number>();
+  const toastTimer = useRef<number | undefined>(undefined);
   const notify = useCallback((message: string, action?: CanvasToastState['action']) => {
     window.clearTimeout(toastTimer.current);
     setToast({ id: Date.now(), message, action });
@@ -288,13 +293,22 @@ const CanvasInner = ({ onBack }: { onBack?: () => void }) => {
 
   const importFiles = useCallback(async (files: File[], at: XYPosition) => {
     const created: Node[] = [];
+    const audioUploads: Array<[string, File]> = [];
+    const imageUploads: Array<[string, File]> = [];
     let skipped = 0;
     for (const [index, file] of files.entries()) {
       const point = { x: at.x + index * 40, y: at.y + index * 40 };
       if (file.type.startsWith('image/')) {
-        created.push(makeCanvasNode('imageGen', point, { title: file.name, imageUrl: sessionObjectUrl(file), source: 'upload' }, { centered: true }));
+        const node = makeCanvasNode('imageGen', point, { title: file.name, uploading: true, source: 'upload' }, { centered: true });
+        created.push(node);
+        imageUploads.push([node.id, file]);
       } else if (file.type.startsWith('video/')) {
         created.push(makeCanvasNode('video', point, { title: file.name, previewUrl: sessionObjectUrl(file), source: 'upload' }, { centered: true }));
+      } else if (isAudioFile(file)) {
+        // 音频先建节点，再上传入库；节点只引用资产 ID，不保存 blob 地址。
+        const node = makeCanvasNode('audio', point, { title: file.name, source: 'upload', uploading: true }, { centered: true });
+        created.push(node);
+        audioUploads.push([node.id, file]);
       } else if (/\.(txt|md)$/i.test(file.name) || file.type.startsWith('text/')) {
         created.push(makeCanvasNode('text', point, { title: file.name, content: await file.text() }, { centered: true }));
       } else {
@@ -302,7 +316,13 @@ const CanvasInner = ({ onBack }: { onBack?: () => void }) => {
       }
     }
     if (created.length) addNodes(created);
-    if (skipped) notify(`有 ${skipped} 个文件类型不支持，只能放入图片、视频或文本`);
+    imageUploads.forEach(([id, file]) => {
+      void uploadImageToNode(id, file).then((ok) => { if (!ok) notify(`「${file.name}」入库失败，详见节点提示`); });
+    });
+    audioUploads.forEach(([id, file]) => {
+      void uploadAudioToNode(id, file).then((ok) => { if (!ok) notify(`「${file.name}」上传失败，详见节点提示`); });
+    });
+    if (skipped) notify(`有 ${skipped} 个文件类型不支持，只能放入图片、视频、音频或文本`);
     else if (created.length) notify(`已放入 ${created.length} 个素材`);
   }, [addNodes, notify]);
 
@@ -585,15 +605,40 @@ const CanvasInner = ({ onBack }: { onBack?: () => void }) => {
   const cacheRef = useRef<CanvasWorkspaceCache>({ version: 2, projects: {} });
   const loadedProjectRef = useRef<string | null>(null);
   const writableRef = useRef(false);
-  const pendingWriteRef = useRef<CanvasWorkspaceCache | null>(null);
-  const writeTimerRef = useRef<number>();
+  const writeTimerRef = useRef<number | undefined>(undefined);
 
-  const flushWrite = useCallback(() => {
+  const flushWrite = useCallback(async () => {
     window.clearTimeout(writeTimerRef.current);
-    const payload = pendingWriteRef.current;
-    pendingWriteRef.current = null;
-    if (payload) void workspaceCacheService.write(CACHE_KEY, payload).catch(() => undefined);
+    flushCanvasSave();
+    const board = boardRef.current;
+    const id = loadedProjectRef.current;
+    if (!board || !id || !writableRef.current) return;
+    const live = useCanvasStore.getState();
+    const payload: CanvasWorkspaceCache = {
+      ...cacheRef.current,
+      projects: { ...cacheRef.current.projects, [id]: {
+        ...board, snapshots: { ...board.snapshots, [board.activeBoard]: { nodes: live.nodes, edges: live.edges } },
+      } },
+    };
+    cacheRef.current = payload;
+    return workspaceCacheService.write(CACHE_KEY, payload);
   }, []);
+
+  const saveInBackground = useCallback(() => {
+    void flushWrite().catch(() => notify('画布同步失败，请勿清理浏览器数据；请重试保存后再返回'));
+  }, [flushWrite, notify]);
+
+  useEffect(() => {
+    const onHidden = () => { if (document.visibilityState === 'hidden') saveInBackground(); };
+    window.addEventListener('pagehide', saveInBackground);
+    window.addEventListener('beforeunload', saveInBackground);
+    document.addEventListener('visibilitychange', onHidden);
+    return () => {
+      window.removeEventListener('pagehide', saveInBackground);
+      window.removeEventListener('beforeunload', saveInBackground);
+      document.removeEventListener('visibilitychange', onHidden);
+    };
+  }, [saveInBackground]);
 
   useEffect(() => {
     if (!projectId) return undefined;
@@ -616,28 +661,49 @@ const CanvasInner = ({ onBack }: { onBack?: () => void }) => {
       // 读取失败时不回写，避免用空缓存覆盖其他项目的画布页。
       writableRef.current = ok;
       loadedProjectRef.current = projectId;
+      useProjectStore.getState().captureCanvasBoards(projectId, resolved.boards);
       commitBoards(resolved.boards);
+      if (!ok) notify('画布页缓存读取失败，暂不覆盖缓存；请恢复网关后重试');
     });
     return () => {
       cancelled = true;
-      flushWrite();
+      saveInBackground();
     };
-  }, [commitBoards, flushWrite, projectId, restoreSnapshot]);
+  }, [commitBoards, notify, projectId, restoreSnapshot, saveInBackground]);
 
   useEffect(() => {
     if (!boardState || !projectId || loadedProjectRef.current !== projectId || !writableRef.current) return;
-    const payload: CanvasWorkspaceCache = {
-      ...cacheRef.current,
-      projects: {
-        ...cacheRef.current.projects,
-        [projectId]: { ...boardState, snapshots: { ...boardState.snapshots, [boardState.activeBoard]: { nodes, edges } } },
-      },
-    };
-    cacheRef.current = payload;
-    pendingWriteRef.current = payload;
     window.clearTimeout(writeTimerRef.current);
-    writeTimerRef.current = window.setTimeout(flushWrite, 400);
-  }, [boardState, edges, flushWrite, nodes, projectId]);
+    writeTimerRef.current = window.setTimeout(saveInBackground, 400);
+  }, [boardState, edges, nodes, projectId, saveInBackground]);
+
+  const leaveCanvas = async (discard: boolean) => {
+    if (exitBusy || !projectId) return;
+    setExitBusy(true);
+    setExitError('');
+    try {
+      if (!writableRef.current || !boardRef.current) throw new Error('画布尚未完成读取，请稍后重试');
+      if (discard) {
+        const session = useProjectStore.getState().canvasSession;
+        if (session?.projectId !== projectId || !session.originalBoards) throw new Error('缺少进入项目时的版本，不能安全放弃编辑');
+        stopNodeGenerations(useCanvasStore.getState().nodes.map((node) => node.id));
+        window.clearTimeout(writeTimerRef.current);
+        writableRef.current = false;
+        const payload = { ...cacheRef.current, projects: { ...cacheRef.current.projects, [projectId]: session.originalBoards } };
+        await workspaceCacheService.write(CACHE_KEY, payload);
+        restoreSnapshot(session.originalCanvas.nodes, session.originalCanvas.edges);
+        flushCanvasSave();
+      } else {
+        await flushWrite();
+      }
+      onBack?.();
+    } catch (error) {
+      writableRef.current = true;
+      setExitError(error instanceof Error ? error.message : '保存失败，请重试');
+    } finally {
+      setExitBusy(false);
+    }
+  };
 
   const activeBoard = boardState?.activeBoard || '画布 1';
   const boards = boardState?.boards || [activeBoard];
@@ -772,7 +838,7 @@ const CanvasInner = ({ onBack }: { onBack?: () => void }) => {
       // ⌘J 与 Esc 在输入框里也生效，便于收起 Agent。
       if (mod && key === 'j') {
         event.preventDefault();
-        setAgentOpen((open) => !open);
+        toggleAgentPanel();
         return;
       }
       if (isEditableTarget(event.target)) return;
@@ -789,7 +855,6 @@ const CanvasInner = ({ onBack }: { onBack?: () => void }) => {
         if (key === 'c') { copySelection(false); return; }
         if (key === 'x') { event.preventDefault(); copySelection(true); return; }
         if (key === 'd') { event.preventDefault(); const ids = useCanvasStore.getState().selectedNodes; if (ids.length) duplicateNodes(ids); return; }
-        if (key === 'f') { event.preventDefault(); setSearchOpen(true); return; }
         if (key === 'enter') { event.preventDefault(); runSelected(); return; }
         if (key === '=' || key === '+') { event.preventDefault(); void flow.zoomIn({ duration: 160 }); return; }
         if (key === '-') { event.preventDefault(); void flow.zoomOut({ duration: 160 }); return; }
@@ -817,7 +882,6 @@ const CanvasInner = ({ onBack }: { onBack?: () => void }) => {
       const annotation = ANNOTATION_CATALOG_LIST.find((item) => item.shortcut?.toLowerCase() === key)?.kind;
       if (annotation) { event.preventDefault(); addAnnotationAt(annotation, insertionPoint()); return; }
       if (key === 'escape') {
-        setSearchOpen(false);
         if (useCanvasStore.getState().selectedNodes.length) selectNodes([]);
       }
     };
@@ -833,7 +897,7 @@ const CanvasInner = ({ onBack }: { onBack?: () => void }) => {
       window.removeEventListener('keyup', onKeyUp);
       window.removeEventListener('blur', onBlur);
     };
-  }, [addAnnotationAt, addFromShortcut, alignSelection, copySelection, duplicateNodes, flow, groupSelection, insertionPoint, redo, runSelected, selectNodes, toggleLockSelection, undo, ungroupSelection]);
+  }, [addAnnotationAt, addFromShortcut, alignSelection, copySelection, duplicateNodes, flow, groupSelection, insertionPoint, redo, runSelected, selectNodes, toggleAgentPanel, toggleLockSelection, undo, ungroupSelection]);
 
   /* ---------- 右键菜单 ---------- */
 
@@ -844,6 +908,12 @@ const CanvasInner = ({ onBack }: { onBack?: () => void }) => {
     setMenu({ screen, flow: flow.screenToFlowPosition(screen), kind, nodeId });
   };
 
+  const selectedPromptNode = selectedIds.length === 1
+    ? nodes.find((node) => node.id === selectedIds[0] && isCanvasNodeKind(node.type))
+    : undefined;
+  const selectedPromptKind = selectedPromptNode && isCanvasNodeKind(selectedPromptNode.type)
+    ? selectedPromptNode.type
+    : undefined;
   const menuNode = menu?.nodeId ? nodes.find((node) => node.id === menu.nodeId) : undefined;
   const menuIds = menu?.kind === 'selection' ? selectedIds : menu?.nodeId ? [menu.nodeId] : [];
   const menuNodes = nodes.filter((node) => menuIds.includes(node.id));
@@ -939,7 +1009,7 @@ const CanvasInner = ({ onBack }: { onBack?: () => void }) => {
               className="design-work-flow h-full w-full"
             >
               <Background variant={BackgroundVariant.Dots} gap={20} size={1.8} color="var(--canvas-dot)" />
-              <CanvasControls snapToGrid={snapToGrid} onSnapToGridChange={setSnapToGrid} />
+              <CanvasControls />
               <SelectionToolbar
                 ids={selectedIds}
                 runnable={selectionStats.runnable}
@@ -957,13 +1027,26 @@ const CanvasInner = ({ onBack }: { onBack?: () => void }) => {
               />
             </ReactFlow>
 
+            {selectedPromptNode && selectedPromptKind && (
+              <div className="pointer-events-none absolute inset-x-0 bottom-[44px] z-30 flex justify-center px-3">
+                <div className="pointer-events-auto w-full max-w-[640px]">
+                  <CanvasPromptOverlay
+                    key={selectedPromptNode.id}
+                    id={selectedPromptNode.id}
+                    kind={selectedPromptKind}
+                    data={selectedPromptNode.data as Record<string, unknown>}
+                  />
+                </div>
+              </div>
+            )}
+
             <AnimatePresence>
               {boardState && nodes.length === 0 && (
                 <CanvasEmptyState
                   key="empty"
                   onAdd={(kind) => addNodeAt(kind, visibleCenter())}
                   onUpload={() => openUpload(visibleCenter())}
-                  onOpenAgent={() => setAgentOpen(true)}
+                  onOpenAgent={() => { if (!agentOpen) toggleAgentPanel(); }}
                 />
               )}
             </AnimatePresence>
@@ -972,7 +1055,7 @@ const CanvasInner = ({ onBack }: { onBack?: () => void }) => {
               open={layersOpen}
               onOpen={() => setLayersOpen(true)}
               onClose={() => setLayersOpen(false)}
-              onBack={onBack}
+              onBack={onBack ? () => setExitOpen(true) : undefined}
               boards={boards}
               activeBoard={activeBoard}
               onSwitchBoard={switchBoard}
@@ -986,13 +1069,18 @@ const CanvasInner = ({ onBack }: { onBack?: () => void }) => {
               onAdd={(kind) => addNodeAt(kind, visibleCenter())}
               onAddAnnotation={addAnnotation}
               onUpload={() => openUpload()}
+              onToggleAgent={toggleAgentPanel}
+              agentOpen={agentOpen}
+            />
+            <CanvasViewControls
               onTidy={() => tidy()}
               onShowShortcuts={() => setShortcutsOpen(true)}
-              searchOpen={searchOpen}
-              onSearchOpenChange={setSearchOpen}
-              onFocusNode={(id) => focusNodes([id])}
-              agentOpen={agentOpen}
-              onToggleAgent={() => setAgentOpen((open) => !open)}
+              onToggleMinimap={toggleMinimapPanel}
+              zoom={viewportZoom}
+              onFitView={() => void flow.fitView(FIT_OPTIONS)}
+              onZoomTo={(value) => void flow.zoomTo(value, { duration: 200 })}
+              snapToGrid={snapToGrid}
+              onSnapToGridChange={setSnapToGrid}
             />
             <CanvasAgentPanel
               open={agentOpen}
@@ -1013,9 +1101,6 @@ const CanvasInner = ({ onBack }: { onBack?: () => void }) => {
                 if (present.length) focusNodes(present);
                 else notify('这些节点已不在当前画布上');
               }}
-              selectedNode={selectedNode}
-              selectedCount={selectedIds.length}
-              selectedAnnotation={selectedAnnotation}
             />
 
             <NodePicker
@@ -1037,7 +1122,7 @@ const CanvasInner = ({ onBack }: { onBack?: () => void }) => {
                   {ANNOTATION_CATALOG_LIST.map((item) => (
                     <DropdownMenuItem key={item.kind} icon={item.icon} shortcut={item.shortcut} onSelect={() => addAnnotationAt(item.kind, menu.flow)}>{item.label}</DropdownMenuItem>
                   ))}
-                  <DropdownMenuItem icon={Upload} onSelect={() => openUpload(menu.flow)}>上传图片或视频</DropdownMenuItem>
+                  <DropdownMenuItem icon={Upload} onSelect={() => openUpload(menu.flow)}>上传图片、视频或音频</DropdownMenuItem>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem icon={Clipboard} shortcut="⌘V" disabled={!clipboardRef.current} onSelect={() => pasteClipboard(clipboardRef.current, menu.flow)}>粘贴</DropdownMenuItem>
                   <DropdownMenuItem icon={SelectAll} shortcut="⌘A" disabled={!nodes.length} onSelect={() => selectNodes(nodes.map((node) => node.id))}>全选</DropdownMenuItem>
@@ -1102,7 +1187,7 @@ const CanvasInner = ({ onBack }: { onBack?: () => void }) => {
               ref={fileInputRef}
               type="file"
               multiple
-              accept="image/*,video/*,.txt,.md"
+              accept={`image/*,video/*,${AUDIO_ACCEPT},.txt,.md`}
               className="sr-only"
               onChange={(event) => {
                 const files = [...(event.target.files || [])];
@@ -1115,6 +1200,20 @@ const CanvasInner = ({ onBack }: { onBack?: () => void }) => {
             <CanvasToast toast={toast} onDismiss={() => setToast(null)} />
             <MediaLightbox media={media} onClose={() => setMedia(null)} />
             <ShortcutsDialog open={shortcutsOpen} onOpenChange={setShortcutsOpen} />
+            <Dialog open={exitOpen} onOpenChange={(open) => { if (!exitBusy) setExitOpen(open); }}>
+              <DialogContent onEscapeKeyDown={(event) => { if (exitBusy) event.preventDefault(); }}>
+                <DialogHeader>
+                  <DialogTitle>返回项目列表？</DialogTitle>
+                  <DialogDescription>编辑内容会自动保存。选择“不保存并返回”将放弃本次编辑，恢复进入项目时的所有画布页内容；取消则继续编辑。</DialogDescription>
+                </DialogHeader>
+                {exitError && <p role="alert" className="text-sm text-destructive">{exitError}</p>}
+                <DialogFooter>
+                  <Button variant="ghost" disabled={exitBusy} onClick={() => setExitOpen(false)}>取消</Button>
+                  <Button variant="secondary" disabled={exitBusy} onClick={() => void leaveCanvas(true)}>不保存并返回</Button>
+                  <Button disabled={exitBusy} onClick={() => void leaveCanvas(false)}>{exitBusy ? '正在处理…' : '保存并返回'}</Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
             <span className="sr-only" aria-live="polite">{connecting ? '正在连线，松开到节点上完成连接，松开到空白处新建节点' : ''}</span>
             {connecting && (
               <div className="pointer-events-none absolute bottom-20 left-1/2 z-30 -translate-x-1/2 rounded-full bg-foreground/85 px-3 py-1.5 text-[11px] font-medium text-background">

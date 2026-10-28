@@ -128,7 +128,7 @@ export const StoryboardNode = memo(({ id, data, selected }: NodeProps<Storyboard
                 <p className="line-clamp-2 text-xs leading-4 text-muted-foreground">{shot.prompt}</p>
                 <div className="mt-2 flex items-center gap-2 text-xs text-muted-foreground">
                   <Sparkles className="h-3 w-3" />
-                  {shot.camera}{shot.duration ? ` · ${shot.duration}s` : ''}
+                  {shot.camera}{shot.duration ? ` / ${shot.duration}s` : ''}
                 </div>
               </Card>
             ))}

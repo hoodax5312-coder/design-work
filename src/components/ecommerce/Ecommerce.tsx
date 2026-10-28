@@ -1,4 +1,5 @@
-import { useMemo, useRef, useState, type ChangeEvent, type DragEvent } from 'react';
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '../ui/Select';
+import { useId, useMemo, useRef, useState, type ChangeEvent, type DragEvent } from 'react';
 import {
   Download,
   FileText,
@@ -39,7 +40,7 @@ import {
   TypographyStyle,
   VisualStyle,
 } from '../../types/kvmaster.types';
-import { Badge, Button, Card, Input, Label, Select, Switch, Textarea } from '../ui';
+import { Badge, Button, Card, Input, Label, Switch, Textarea } from '../ui';
 
 const fileToDataUrl = (file: File) => (
   new Promise<string>((resolve, reject) => {
@@ -105,6 +106,9 @@ const EmptyState = ({ title, desc, icon: Icon }: { title: string; desc: string; 
 );
 
 export const Ecommerce = () => {
+  const fieldId1 = useId();
+  const fieldId2 = useId();
+  const fieldId3 = useId();
   const [leftOpen, setLeftOpen] = useState(true);
   const [leftTab, setLeftTab] = useState<'upload' | 'config'>('upload');
   const [workspaceTab, setWorkspaceTab] = useState<EcommerceWorkspaceTab>('generation');
@@ -388,7 +392,17 @@ export const Ecommerce = () => {
                     </div>
                   )}
 
-                  <Input label="产品名称" value={manualInfo.name} onChange={(event) => setManualInfo((prev) => ({ ...prev, name: event.target.value }))} placeholder="例如：草本修护膏" />
+                  <div className="w-full">
+                    <Label htmlFor={fieldId1} className="mb-1.5 block text-sm font-medium text-foreground">
+                      产品名称
+                    </Label>
+                    <Input
+                      id={fieldId1}
+                      value={manualInfo.name}
+                      onChange={(event) => setManualInfo((prev) => ({ ...prev, name: event.target.value }))}
+                      placeholder="例如：草本修护膏"
+                    />
+                  </div>
                   <Textarea label="核心卖点补充" value={manualInfo.description} onChange={(event) => setManualInfo((prev) => ({ ...prev, description: event.target.value }))} className="h-24" placeholder="补充产品功效、品牌调性、禁忌信息..." />
 
                   <div className="grid grid-cols-2 gap-2">
@@ -405,7 +419,29 @@ export const Ecommerce = () => {
                 </div>
               ) : (
                 <div className="space-y-4">
-                  <div className="grid grid-cols-2 gap-3"><Input label="文案模型" value={settings.textModel} onChange={(event) => setSettings((prev) => ({ ...prev, textModel: event.target.value }))} inputSize="sm" className="text-xs" /><Input label="图像模型" value={settings.imageModel} onChange={(event) => setSettings((prev) => ({ ...prev, imageModel: event.target.value }))} inputSize="sm" className="text-xs" /></div>
+                  <div className="grid grid-cols-2 gap-3"><div className="w-full">
+                    <Label htmlFor={fieldId2} className="mb-1.5 block text-sm font-medium text-foreground">
+                      文案模型
+                    </Label>
+                    <Input
+                      id={fieldId2}
+                      value={settings.textModel}
+                      onChange={(event) => setSettings((prev) => ({ ...prev, textModel: event.target.value }))}
+                      inputSize="sm"
+                      className="text-xs"
+                    />
+                  </div><div className="w-full">
+  <Label htmlFor={fieldId3} className="mb-1.5 block text-sm font-medium text-foreground">
+    图像模型
+  </Label>
+  <Input
+    id={fieldId3}
+    value={settings.imageModel}
+    onChange={(event) => setSettings((prev) => ({ ...prev, imageModel: event.target.value }))}
+    inputSize="sm"
+    className="text-xs"
+  />
+</div></div>
 
                   <OptionGrid title="视觉风格" options={VISUAL_STYLES} value={config.visualStyle} onChange={(value) => setConfig((prev) => ({ ...prev, visualStyle: value }))} />
                   <OptionGrid title="排版风格" options={TYPO_STYLES} value={config.typographyStyle} onChange={(value) => setConfig((prev) => ({ ...prev, typographyStyle: value }))} />
@@ -490,7 +526,7 @@ export const Ecommerce = () => {
                     <Card key={poster.id} padding="none" className="overflow-hidden">
                       <div className="flex items-center justify-between border-b px-4 py-3">
                         <div>
-                          <h3 className="text-sm font-bold">{String(poster.id + 1).padStart(2, '0')} · {poster.title}</h3>
+                          <h3 className="text-sm font-bold">{String(poster.id + 1).padStart(2, '0')} / {poster.title}</h3>
                           <p className="mt-1 text-xs text-muted-foreground">参考图：{poster.referenceImageIndices?.join(', ') || '0'}</p>
                         </div>
                         <Button type="button" variant="primary" size="sm" onClick={() => generateImage(poster)} disabled={loading}>
@@ -704,9 +740,28 @@ const SelectField = ({
   value: string;
   options: { id: string; label: string }[];
   onChange: (value: string) => void;
-}) => (
-  <Select label={label} value={value} onChange={(event) => onChange(event.target.value)} selectSize="sm" className="text-xs" options={options.map((option) => ({ value: option.id, label: option.label }))} />
-);
+}) => {
+  const fieldId4 = useId();
+  return (
+    <div className="w-full">
+      <Label htmlFor={fieldId4} className="mb-1.5 block text-sm font-medium text-foreground">
+        {label}
+      </Label>
+      <Select value={value} onValueChange={(value) => onChange(value)}>
+        <SelectTrigger id={fieldId4} className="h-8 text-xs">
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          {options.map((option) => (
+            <SelectItem key={option.id} value={option.id}>
+              {option.label}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    </div>
+  );
+};
 
 const ReportCard = ({ title, items }: { title: string; items: Array<string | undefined> }) => {
   const visibleItems = items.filter((item): item is string => Boolean(item?.trim()));

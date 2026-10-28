@@ -120,9 +120,7 @@ export const KnowledgeSources = () => {
     <div className="h-full overflow-y-auto bg-background text-foreground">
       <div className="module-surface mx-auto max-w-6xl p-6 lg:p-8">
         <Header
-          eyebrow="Sources"
           title="资源来源"
-          description="统一查看素材来自哪里、是否可访问，以及哪些文件需要重新定位或归档。"
           icon={Database}
         />
 
@@ -177,7 +175,7 @@ export const KnowledgeSources = () => {
                 <div className="min-w-0 flex-1">
                   <div className="truncate text-xs font-semibold">{asset.fileName}</div>
                   <div className="mt-1 truncate text-xs text-muted-foreground">
-                    {asset.assetTitle} · {asset.absolutePath}
+                    {asset.assetTitle} / {asset.absolutePath}
                   </div>
                 </div>
                 <span className="text-xs font-medium text-amber-600">{asset.status}</span>
@@ -232,7 +230,7 @@ export const SourceCenter = ({ initialSection = 'notes' }: { initialSection?: 'n
         <TabsList aria-label="知识中心内容" className="h-8 gap-1 rounded-none border-0 bg-transparent p-0 shadow-none"><TabsTrigger value="notes" className="h-8 border-0 bg-transparent px-4 py-0 text-sm text-muted-foreground shadow-none focus-visible:ring-offset-0 data-[state=inactive]:hover:text-foreground data-[state=active]:!bg-[var(--surface-control)] data-[state=active]:!text-[var(--surface-control-foreground)] data-[state=active]:!shadow-none">词库</TabsTrigger><TabsTrigger value="documents" className="h-8 border-0 bg-transparent px-4 py-0 text-sm text-muted-foreground shadow-none focus-visible:ring-offset-0 data-[state=inactive]:hover:text-foreground data-[state=active]:!bg-[var(--surface-control)] data-[state=active]:!text-[var(--surface-control-foreground)] data-[state=active]:!shadow-none">笔记</TabsTrigger></TabsList>
         <div className="relative ml-auto w-[240px] shrink-0">
           <Search size={16} className="pointer-events-none absolute left-3 top-1/2 z-10 -translate-y-1/2 text-secondary-foreground/60" />
-          <Input value={query} onChange={(event) => setQuery(event.target.value)} aria-label="搜索知识内容" placeholder={activeSection === 'documents' ? '搜索笔记和文件夹…' : '搜索标题、描述和提取文字…'} className="module-search-input h-8 border border-neutral-border bg-neutral-surface py-0 pl-9 text-neutral-foreground placeholder:text-muted-foreground shadow-none focus:placeholder:text-transparent focus-visible:ring-1 focus-visible:ring-neutral-border" />
+          <Input value={query} onChange={(event) => setQuery(event.target.value)} aria-label="搜索知识内容" placeholder={activeSection === 'documents' ? '搜索笔记和文件夹…' : '搜索标题、描述和提取文字…'} className="module-search-input h-8 border border-neutral-border bg-neutral-surface py-0 pl-9 text-neutral-foreground placeholder:text-muted-foreground shadow-none focus:placeholder:text-transparent focus-visible:ring-1 focus-visible:ring-[color:var(--field-focus-ring)]" />
         </div>
       </Tabs>
       <div className="mx-3 mb-3 min-h-0 flex-1 overflow-visible bg-transparent p-0">
@@ -278,9 +276,7 @@ export const ExportCenter = () => {
     <div className="module-workspace h-full overflow-y-auto bg-background p-4 text-foreground lg:p-6">
       <div className="mx-auto max-w-6xl">
         <Header
-          eyebrow="Delivery"
           title="导出中心"
-          description="在一个地方完成交付前检查、格式设置和导出队列管理。"
           icon={PackageCheck}
         />
         <div className="mt-7 grid gap-5 lg:grid-cols-[1fr_340px]">
@@ -313,8 +309,8 @@ export const ExportCenter = () => {
                   </h2>
                   <p className="mt-1 text-xs text-muted-foreground">
                     {kind === 'pptx'
-                      ? '8 页 · 1920×1080 · 可编辑文本'
-                      : '00:24 · 1920×1080 · 24 fps'}
+                      ? '8 页 / 1920×1080 / 可编辑文本'
+                      : '00:24 / 1920×1080 / 24 fps'}
                   </p>
                 </div>
                 <Badge variant={blocked ? 'secondary' : 'default'} className={cn('text-xs', blocked && 'bg-amber-500/10 text-amber-700 dark:text-amber-300')}>
@@ -329,7 +325,7 @@ export const ExportCenter = () => {
                 />
                 <Setting
                   label="输出规格"
-                  value={kind === 'pptx' ? '16:9 · 可编辑' : '1080p · 高质量'}
+                  value={kind === 'pptx' ? '16:9 / 可编辑' : '1080p / 高质量'}
                 />
                 <Setting label="文件位置" value="~/LIZUO/Exports" />
                 <Setting
@@ -422,8 +418,8 @@ export const ExportCenter = () => {
               <div className="text-xs font-semibold">最近导出</div>
               <div className="mt-3 space-y-3">
                 {[
-                  ['夏季提案.pptx', '今天 14:32 · 18.4 MB'],
-                  ['KV-preview.png', '昨天 19:06 · 4.1 MB'],
+                  ['夏季提案.pptx', '今天 14:32 / 18.4 MB'],
+                  ['KV-preview.png', '昨天 19:06 / 4.1 MB'],
                 ].map(([name, meta]) => (
                   <Button key={name} variant="ghost" className="h-auto w-full justify-start gap-3 px-0 text-left">
                     <span className="grid h-8 w-8 place-items-center rounded-md bg-muted text-muted-foreground">
@@ -446,14 +442,10 @@ export const ExportCenter = () => {
 };
 
 const Header = ({
-  eyebrow,
   title,
-  description,
   icon: Icon,
 }: {
-  eyebrow: string;
   title: string;
-  description: string;
   icon: React.ElementType;
 }) => (
   <header className="flex items-start gap-4">
@@ -461,11 +453,7 @@ const Header = ({
       <Icon size={21} />
     </span>
     <div>
-      <div className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-        {eyebrow}
-      </div>
-      <h1 className="mt-1 text-2xl font-semibold tracking-[-0.035em]">{title}</h1>
-      <p className="mt-1.5 text-sm text-muted-foreground">{description}</p>
+      <h1 className="text-2xl font-semibold tracking-[-0.035em]">{title}</h1>
     </div>
   </header>
 );

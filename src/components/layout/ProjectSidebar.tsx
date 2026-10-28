@@ -14,6 +14,7 @@ import {
   Pin,
   Presentation,
   Trash2,
+  User,
 } from '@/lib/remixIconShim';
 import {
   RiArchiveStackFill,
@@ -33,6 +34,9 @@ import { useProjectStore } from '../../stores/useProjectStore';
 import { useCanvasStore } from '../../stores/useCanvasStore';
 import { ModuleType, type WorkspaceMode, useUIStore } from '../../stores/useUIStore';
 import { Button, Card, Separator } from '../ui';
+import { AuthDialog } from '../auth/AuthDialog';
+import { useAuthStore } from '../../stores/useAuthStore';
+import { confirmAction, promptAction } from '../ui/confirmation';
 
 const navigationGroups: Array<{
   title: string;
@@ -54,8 +58,8 @@ const navigationGroups: Array<{
   {
     title: '管理',
     items: [
-      { module: 'assets', label: '资产', lineIcon: RiArchiveStackLine, fillIcon: RiArchiveStackFill },
       { module: 'magic-canvas', label: '画布', lineIcon: RiInfinityLine, fillIcon: RiInfinityFill },
+      { module: 'assets', label: '资产', lineIcon: RiArchiveStackLine, fillIcon: RiArchiveStackFill },
       { module: 'tools', label: '工具', lineIcon: RiToolsLine, fillIcon: RiToolsFill },
       { module: 'settings', label: '设置', lineIcon: RiSettings3Line, fillIcon: RiSettings3Fill },
     ],
@@ -181,6 +185,10 @@ export const ProjectSidebar = () => {
     y: number;
   } | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [loginOpen, setLoginOpen] = useState(false);
+  const user = useAuthStore((state) => state.user);
+  const refreshUser = useAuthStore((state) => state.refreshUser);
+  const loginTriggerRef = useRef<HTMLButtonElement>(null);
   const [edgePreviewOpen, setEdgePreviewOpen] = useState(false);
   const horizontal = navigationPosition === 'top';
   const onRight = navigationPosition === 'right';
@@ -203,6 +211,10 @@ export const ProjectSidebar = () => {
     setWorkspaceMode(mode);
     setActiveModule(module);
   };
+
+  useEffect(() => {
+    void refreshUser();
+  }, [refreshUser]);
 
   useEffect(() => {
     if (!projects.length) {
@@ -436,6 +448,32 @@ export const ProjectSidebar = () => {
         ))}
       </nav>
 
+      {(!sidebarHidden || temporarilyRevealed) && (
+        <div className={cn('shrink-0', horizontal ? 'flex h-full items-center px-2' : cn('px-2 pb-3', !visuallyExpanded && 'px-1'))}>
+          <Button
+            type="button"
+            variant="ghost"
+            ref={loginTriggerRef}
+            onClick={() => {
+              useAuthStore.getState().clearError();
+              setLoginOpen(true);
+              void refreshUser();
+            }}
+            aria-label={user ? `账户：${user.email}` : '登录'}
+            title={user ? user.email : '登录'}
+            className={cn(
+              horizontal
+                ? 'h-8 min-w-[84px] justify-center gap-2 px-3 text-xs'
+                : visuallyExpanded ? 'h-10 w-full justify-start gap-3 px-3 text-sm' : 'h-12 w-14 flex-col justify-center gap-1 px-0 text-[10px] leading-none',
+              'text-sidebar-foreground/70 hover:bg-[var(--sidebar-accent-hover)] hover:text-sidebar-accent-foreground',
+            )}
+          >
+            <User size={18} className="shrink-0" />
+            {showNavigationLabels && <span className="truncate">{user ? '账户' : '登录'}</span>}
+          </Button>
+        </div>
+      )}
+
       {contextMenu && contextProject && (
         <Card
           ref={contextMenuRef}
@@ -467,8 +505,8 @@ export const ProjectSidebar = () => {
             {
               label: '重命名项目',
               icon: Pencil,
-              action: () => {
-                const name = window.prompt('输入新的项目名称', contextProject.name);
+              action: async () => {
+                const name = await promptAction('输入新的项目名称', contextProject.name);
                 if (name?.trim()) renameProject(contextProject.id, name);
               },
             },
@@ -476,9 +514,9 @@ export const ProjectSidebar = () => {
             <Button type="button" variant="ghost" size="sm"
               key={label}
               role="menuitem"
-              onClick={() => {
-                action();
+              onClick={async () => {
                 setContextMenu(null);
+                await action();
               }}
               className="h-9 w-full justify-start gap-2.5 px-2.5 text-left text-xs"
             >
@@ -489,12 +527,12 @@ export const ProjectSidebar = () => {
           <Separator className="my-1" />
           <Button type="button" variant="ghost" size="sm"
             role="menuitem"
-            onClick={() => {
-              if (window.confirm(`确定移除项目“${contextProject.name}”吗？`)) {
+            onClick={async () => {
+              setContextMenu(null);
+              if (await confirmAction(`确定移除项目“${contextProject.name}”吗？`)) {
                 if (contextProject.id === activeProjectId) initializedProjectRef.current = null;
                 removeProject(contextProject.id);
               }
-              setContextMenu(null);
             }}
             className="h-9 w-full justify-start gap-2.5 px-2.5 text-left text-xs text-destructive hover:bg-destructive/10 hover:text-destructive"
           >
@@ -509,6 +547,8 @@ export const ProjectSidebar = () => {
           {notice}
         </div>
       )}
+
+      {loginOpen && <AuthDialog onOpenChange={setLoginOpen} onCloseAutoFocus={() => loginTriggerRef.current?.focus()} />}
     </aside>
   </>;
 };

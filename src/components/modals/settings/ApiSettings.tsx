@@ -1,4 +1,7 @@
-import { useEffect, useRef, useState } from 'react';
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '../../ui/Select';
+import { confirmAction } from '../../ui/confirmation';
+import { Label } from '../../ui/Label';
+import { useId, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Check, ChevronDown, Download, Eye, EyeOff, Pencil, Plus, Power, Server, Trash2, Wifi } from '@/lib/remixIconShim';
 import {
@@ -24,7 +27,7 @@ import {
   type ProviderProtocol,
 } from '../../../stores/useProviderStore';
 import type { ProviderModelInfo } from '../../../types/provider';
-import { Badge, Button, Card, Input, Select } from '../../ui';
+import { Badge, Button, Card, Input } from '../../ui';
 import { ProviderModelCard } from './ProviderModelCard';
 import { ProviderModelPicker } from './ProviderModelPicker';
 
@@ -32,6 +35,7 @@ const categories: Array<{ id: ModelCategory; label: string }> = [
   { id: 'language', label: '文本' },
   { id: 'image', label: '生图' },
   { id: 'video', label: '视频' },
+  { id: 'music', label: '音乐' },
 ];
 
 const categoryLabels = Object.fromEntries(categories.map(({ id, label }) => [id, label])) as Record<ModelCategory, string>;
@@ -277,12 +281,12 @@ function ApiSettingsContent({ onEditingChange }: ApiSettingsProps) {
     }
   };
 
-  const activateProvider = (provider: ProviderConfig, category: ModelCategory) => {
+  const activateProvider = async (provider: ProviderConfig, category: ModelCategory) => {
     const selected = provider.models.find((model) => model.id === getSelectedModel(provider, category));
     const status = selected?.verification?.status || 'pending';
     if (status !== 'healthy') {
       const label = categories.find((item) => item.id === category)?.label;
-      const confirmed = window.confirm(
+      const confirmed = await confirmAction(
         `${provider.name} 的${label}默认模型当前为“${statusLabels[status]}”。\nHost：${providerHost(selected?.baseUrlOverride || provider.baseUrl)}\n\n仍要启用并允许实际请求继续吗？`,
       );
       if (!confirmed) return;
@@ -291,7 +295,7 @@ function ApiSettingsContent({ onEditingChange }: ApiSettingsProps) {
     setMessage({ type: 'success', text: `${provider.name} 已设为当前${categories.find((item) => item.id === category)?.label}厂商` });
   };
 
-  const activateProviderForAllCategories = (provider: ProviderConfig) => {
+  const activateProviderForAllCategories = async (provider: ProviderConfig) => {
     const configuredCategories = categories.filter(({ id }) => getConfiguredModels(provider, id).length > 0);
     const unverifiedCategories = configuredCategories.filter(({ id }) => {
       const selected = provider.models.find((model) => model.id === getSelectedModel(provider, id));
@@ -299,7 +303,7 @@ function ApiSettingsContent({ onEditingChange }: ApiSettingsProps) {
     });
 
     if (unverifiedCategories.length) {
-      const confirmed = window.confirm(
+      const confirmed = await confirmAction(
         `${provider.name} 的${unverifiedCategories.map(({ label }) => label).join('、')}默认模型尚未全部验证。\nHost：${providerHost(provider.baseUrl)}\n\n仍要启用并允许实际请求继续吗？`,
       );
       if (!confirmed) return;
@@ -402,7 +406,7 @@ function ApiSettingsContent({ onEditingChange }: ApiSettingsProps) {
                   <span className="grid h-10 w-10 shrink-0 place-items-center rounded-md bg-muted"><Server aria-hidden="true" size={18} /></span>
                   <div className="min-w-0 flex-1">
                     <h5 className="truncate text-sm font-semibold">{provider.name}</h5>
-                    <p className="mt-1 truncate text-xs text-muted-foreground">{providerHost(provider.baseUrl)} · {provider.models.length} 个模型</p>
+                    <p className="mt-1 truncate text-xs text-muted-foreground">{providerHost(provider.baseUrl)} / {provider.models.length} 个模型</p>
                   </div>
                   <Button
                     type="button"
@@ -418,7 +422,7 @@ function ApiSettingsContent({ onEditingChange }: ApiSettingsProps) {
                     {providerEnabled ? '已启用' : '启用'}
                   </Button>
                   <Button type="button" variant="ghost" size="iconSm" onClick={() => beginEdit(provider)} aria-label={`编辑 ${provider.name}`} title={`编辑 ${provider.name}`} className="h-8 w-8"><Pencil aria-hidden="true" size={13} /></Button>
-                  <Button type="button" variant="ghost" size="iconSm" onClick={() => { if (window.confirm(`确定删除 API 厂商“${provider.name}”吗？`)) removeProvider(provider.id); }} aria-label={`删除 ${provider.name}`} title={`删除 ${provider.name}`} className="h-8 w-8 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"><Trash2 aria-hidden="true" size={14} /></Button>
+                  <Button type="button" variant="ghost" size="iconSm" onClick={async () => { if (await confirmAction(`确定删除 API 厂商“${provider.name}”吗？`)) removeProvider(provider.id); }} aria-label={`删除 ${provider.name}`} title={`删除 ${provider.name}`} className="h-8 w-8 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"><Trash2 aria-hidden="true" size={14} /></Button>
                   <Button type="button" variant="ghost" size="iconSm" onClick={() => toggleProvider(provider.id)} aria-label={expanded ? '收起模型类型' : '展开模型类型'} aria-expanded={expanded} className="h-8 w-8"><ChevronDown aria-hidden="true" size={15} className={cn('transition-transform', expanded && 'rotate-180')} /></Button>
                 </div>
                 {expanded && (
@@ -429,7 +433,7 @@ function ApiSettingsContent({ onEditingChange }: ApiSettingsProps) {
                       return (
                         <div key={id} className="flex min-h-11 items-center gap-3 border-b border-border py-2 last:border-0">
                           <span className="w-10 shrink-0 text-xs font-semibold">{label}</span>
-                          <span className="min-w-0 flex-1 truncate text-xs text-muted-foreground">{models.length ? `${models.length} 个模型 · ${getSelectedModel(provider, id)}` : '未配置'}</span>
+                          <span className="min-w-0 flex-1 truncate text-xs text-muted-foreground">{models.length ? `${models.length} 个模型 / ${getSelectedModel(provider, id)}` : '未配置'}</span>
                           {models.length > 0 && (active
                             ? <Badge variant="secondary" className="text-xs">当前使用</Badge>
                             : <Button type="button" variant="ghost" size="sm" onClick={() => activateProvider(provider, id)} className="h-7 px-2 text-xs"><Power aria-hidden="true" size={12} /> 启用</Button>)}
@@ -476,6 +480,9 @@ interface FetchedModels {
 }
 
 function ProviderEditor({ draft, setDraft, saving, testingTarget, message, onTestCommon, onTestModel, onSave, onCancel }: ProviderEditorProps) {
+  const fieldId1 = useId();
+  const fieldId2 = useId();
+  const fieldId3 = useId();
   const [activeCategory, setActiveCategory] = useState<ModelCategory>('language');
   const [newModelId, setNewModelId] = useState('');
   const [showKey, setShowKey] = useState(false);
@@ -615,10 +622,56 @@ function ProviderEditor({ draft, setDraft, saving, testingTarget, message, onTes
 
       <section className="space-y-4 rounded-[var(--radius)] bg-muted/45 p-4" aria-label="厂商通用配置">
         <div className="grid grid-cols-1 gap-4 [&>div>label]:mb-2 [&>div>label]:leading-none sm:grid-cols-2">
-          <Input label="厂商名称" value={draft.name} onChange={(event) => setDraft({ ...draft, name: event.target.value })} placeholder="例如：通用模型服务" className="text-sm" />
-          <Select label="上游格式" value={draft.protocol} onChange={(event) => changeProtocol(event.target.value as ProviderProtocol)} options={[{ value: 'responses', label: 'Responses' }, { value: 'chat-completions', label: 'Chat Completions' }, { value: 'anthropic-messages', label: 'Anthropic Messages' }]} className="text-sm" />
+          <div className="w-full">
+            <Label htmlFor={fieldId1} className="mb-1.5 block text-sm font-medium text-foreground">
+              厂商名称
+            </Label>
+            <Input
+              id={fieldId1}
+              value={draft.name}
+              onChange={(event) => setDraft({ ...draft, name: event.target.value })}
+              placeholder="例如：通用模型服务"
+              className="text-sm"
+            />
+          </div>
+          <div className="w-full">
+            <Label htmlFor={fieldId2} className="mb-1.5 block text-sm font-medium text-foreground">
+              上游格式
+            </Label>
+            <Select
+              value={draft.protocol}
+              onValueChange={(value) => changeProtocol(value as ProviderProtocol)}
+            >
+              <SelectTrigger id={fieldId2} className="text-sm">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {[
+                  { value: 'responses', label: 'Responses' },
+                  { value: 'chat-completions', label: 'Chat Completions' },
+                  { value: 'anthropic-messages', label: 'Anthropic Messages' },
+                ].map((option) => (
+                  <SelectItem key={option.value} value={option.value}>
+                    {option.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
         </div>
-        <Input label="通用 Base URL" type="url" value={draft.baseUrl} onChange={(event) => changeDefault('baseUrl', event.target.value)} placeholder="https://api.example.com/v1" className="text-xs" />
+        <div className="w-full">
+          <Label htmlFor={fieldId3} className="mb-1.5 block text-sm font-medium text-foreground">
+            通用 Base URL
+          </Label>
+          <Input
+            id={fieldId3}
+            type="url"
+            value={draft.baseUrl}
+            onChange={(event) => changeDefault('baseUrl', event.target.value)}
+            placeholder="https://api.example.com/v1"
+            className="text-xs"
+          />
+        </div>
         <label className="block space-y-2">
           <span className="text-xs font-medium">通用 API Key</span>
           <span className="relative block">

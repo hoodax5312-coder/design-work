@@ -1,4 +1,6 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '../ui/Select';
+import { Label } from '../ui/Label';
+import { useId, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Camera,
   CheckCircle2,
@@ -34,7 +36,7 @@ import { assetService, waitForTask } from '../../services/assetService';
 import type { AssetSummary, ImportSession } from '../../types/asset.types';
 import { ImportCenter } from '../assets/ImportCenter';
 import { TaskDrawer } from '../assets/TaskDrawer';
-import { Badge, Button, Card, Input, Select, Switch, Tabs, TabsList, TabsTrigger, Textarea } from '../ui';
+import { Badge, Button, Card, Input, Switch, Tabs, TabsList, TabsTrigger, Textarea } from '../ui';
 
 type PipelineStageId = 'script' | 'storyboard' | 'image' | 'camera' | 'video';
 type StageStatus = 'idle' | 'running' | 'done';
@@ -137,7 +139,7 @@ const VideoStudio = ({ onOpenLibrary }: { onOpenLibrary: () => void }) => {
     return [
       { label: '分镜', value: shots.length ? `${shots.length} 个` : '待生成' },
       { label: '时长', value: shots.length ? `${shotDuration}s` : duration },
-      { label: '规格', value: `${ratio} · ${resolution}` },
+      { label: '规格', value: `${ratio} / ${resolution}` },
       { label: '风格', value: style },
     ];
   }, [duration, ratio, resolution, shots, style]);
@@ -263,7 +265,7 @@ const VideoStudio = ({ onOpenLibrary }: { onOpenLibrary: () => void }) => {
               </span>
               <Switch checked={smartAudio} onCheckedChange={setSmartAudio} aria-label="智能配音" />
             </div>
-            <p className="text-xs leading-5 text-muted-foreground">{smartAudio ? `${voice} · 自动字幕` : '仅生成无声画面'}</p>
+            <p className="text-xs leading-5 text-muted-foreground">{smartAudio ? `${voice} / 自动字幕` : '仅生成无声画面'}</p>
           </Card>
         </div>
 
@@ -572,7 +574,7 @@ const VideoAssetLibrary = ({ onCreate }: { onCreate: () => void }) => {
             value={query}
             onChange={(event) => setQuery(event.target.value)}
             placeholder={activeTab === 'assets' ? '搜索视频标题和描述…' : '搜索视频工程…'}
-            className="h-8 border border-neutral-border bg-neutral-surface py-0 pl-9 pr-9 text-neutral-foreground placeholder:text-muted-foreground shadow-none focus-visible:ring-1 focus-visible:ring-neutral-border"
+            className="h-8 border border-neutral-border bg-neutral-surface py-0 pl-9 pr-9 text-neutral-foreground placeholder:text-muted-foreground shadow-none focus-visible:ring-1 focus-visible:ring-[color:var(--field-focus-ring)]"
           />
           {query && <Button type="button" variant="ghost" size="iconSm" onClick={() => setQuery('')} aria-label="清空搜索" className="absolute right-0.5 top-1/2 h-6 w-6 -translate-y-1/2"><X size={13} /></Button>}
         </div>
@@ -1180,9 +1182,28 @@ const SelectControl = ({
   value: string;
   options: string[];
   onChange: (value: string) => void;
-}) => (
-  <Select label={label} value={value} onChange={(event) => onChange(event.target.value)} options={options.map((option) => ({ value: option, label: option }))} />
-);
+}) => {
+  const fieldId1 = useId();
+  return (
+    <div className="w-full">
+      <Label htmlFor={fieldId1} className="mb-1.5 block text-sm font-medium text-foreground">
+        {label}
+      </Label>
+      <Select value={value} onValueChange={(value) => onChange(value)}>
+        <SelectTrigger id={fieldId1}>
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          {options.map((option) => (
+            <SelectItem key={option} value={option}>
+              {option}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    </div>
+  );
+};
 
 const InlineSelector = ({
   label,

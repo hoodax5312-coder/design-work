@@ -2,8 +2,12 @@
 export { Button, buttonVariants, type ButtonProps } from './Button';
 export { IconButton, iconButtonVariants, type IconButtonProps } from './IconButton';
 export { Input, inputVariants, type InputProps } from './Input';
+export { NumberField } from './NumberField';
 export { Textarea, textareaVariants, type TextareaProps } from './Textarea';
-export { Select, type SelectProps, type SelectOption } from './Select';
+export { Select, SelectGroup, SelectValue, SelectTrigger, SelectContent, SelectLabel, SelectItem, SelectSeparator, SelectScrollUpButton, SelectScrollDownButton } from './Select';
+export { Slider } from './Slider';
+export { Toggle, toggleVariants } from './Toggle';
+export { ToggleGroup, ToggleGroupItem } from './ToggleGroup';
 export { Label } from './Label';
 export { Badge, badgeVariants } from './Badge';
 export { Separator } from './Separator';

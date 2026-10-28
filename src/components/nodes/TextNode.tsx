@@ -4,7 +4,6 @@ import { Clipboard, Copy } from '@/lib/remixIconShim';
 import { cn } from '../../lib/utils';
 import { useCanvasStore } from '../../stores/useCanvasStore';
 import { type TextNodeData } from '../../types/node.types';
-import { CanvasPromptOverlay } from '../canvas/CanvasPromptOverlay';
 import { useCanvasActions } from '../canvas/canvasContext';
 import { NodeFrame, useEditHistory, type NodeAction } from './NodeFrame';
 
@@ -14,7 +13,6 @@ const SKELETON = ['92%', '100%', '84%', '96%', '62%'];
 
 export const TextNode = memo(({ id, data, selected }: NodeProps<CanvasTextNode>) => {
   const updateNode = useCanvasStore((state) => state.updateNode);
-  const single = useCanvasStore((state) => state.selectedNodes.length <= 1);
   const { notify } = useCanvasActions();
   const editHistory = useEditHistory();
   const content = String(data.content || '');
@@ -46,7 +44,6 @@ export const TextNode = memo(({ id, data, selected }: NodeProps<CanvasTextNode>)
       selected={isSelected}
       resize="free"
       actions={actions}
-      panel={<CanvasPromptOverlay id={id} kind="text" data={data} visible={isSelected && single} />}
     >
       {generating && !content ? (
         <div className="space-y-2.5 p-4" aria-label="正在生成文本">

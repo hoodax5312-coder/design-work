@@ -84,7 +84,8 @@ test('Agent 规划解析：代码块、别名、越界引用与非 JSON 回复',
   const fenced = parseAgentPlan('好的\n```json\n{"reply":"已拆分","nodes":[{"type":"文本","title":"脚本","content":"第一幕"},{"type":"image","prompt":"海边日落","from":[0,0,3,-1]},{"type":"audio"}]}\n```');
   assert.equal(fenced.structured, true);
   assert.equal(fenced.plan.reply, '已拆分');
-  assert.deepEqual(fenced.plan.nodes.map((item) => item.type), ['text', 'imageGen']);
+  // 音频（音乐）已是可规划节点；未知类型仍被丢弃。
+  assert.deepEqual(fenced.plan.nodes.map((item) => item.type), ['text', 'imageGen', 'audio']);
   assert.deepEqual(fenced.plan.nodes[1].from, [0]);
   assert.equal(fenced.plan.nodes[0].content, '第一幕');
 

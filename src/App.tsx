@@ -1,13 +1,13 @@
 import { useEffect, useState } from 'react';
 import {
   ArrowRight,
-  FileText,
   Image as ImageIcon,
   Presentation,
   Scissors,
   Sparkles,
 } from '@/lib/remixIconShim';
 import { AppShell } from './components/layout/AppShell';
+import { ConfirmationHost } from './components/ui/confirmation';
 import { CanvasProjectPage } from './components/canvas/CanvasProjectPage';
 import { ImageGeneration } from './components/image-gen/ImageGeneration';
 import { VideoGeneration } from './components/video-gen/VideoGeneration';
@@ -41,13 +41,6 @@ const toolCards: Array<{
   icon: React.ElementType;
   tag: string;
 }> = [
-  {
-    title: '文档编辑器',
-    description: '整理笔记、创作资料与项目文档，支持文件夹管理和富文本编辑。',
-    module: 'document-editor',
-    icon: FileText,
-    tag: '内容工具',
-  },
   {
     title: '电商详情页',
     description: '生成适配电商场景的商品详情内容与视觉素材。',
@@ -135,7 +128,7 @@ const AssetWorkspace = () => {
         <div role="tablist" aria-label="资产内容" className="flex h-8 items-center gap-1">
           {([
             ['assets', '素材库'],
-            ['prompts', '提示词库'],
+            ['prompts', '助手库'],
           ] as const).map(([value, label]) => (
             <button
               key={value}
@@ -161,6 +154,10 @@ const AssetWorkspace = () => {
 
 function App() {
   const { activeModule } = useUIStore();
+
+  useEffect(() => {
+    if ((activeModule as string) === 'admin') useUIStore.getState().setActiveModule('image-gen');
+  }, [activeModule]);
 
   // API 配置保存在本机网关，启动时读取一次；生成页和设置页都依赖它。
   useEffect(() => {
@@ -193,6 +190,7 @@ function App() {
           <ModulePlaceholder title="模块建设中" description="这个入口还没有接入具体页面。" />
         )}
         <WorkflowModal />
+        <ConfirmationHost />
     </AppShell>
   );
 }

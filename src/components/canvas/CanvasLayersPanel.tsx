@@ -16,7 +16,7 @@ import {
   PopoverTrigger,
   Tooltip,
 } from '../ui';
-import { isCanvasNodeKind, nodeTitle } from './canvasModel';
+import { isCanvasNodeKind, groupMemberIds, nodeTitle } from './canvasModel';
 import { ANNOTATION_CATALOG, NODE_CATALOG } from './nodeCatalog';
 
 export const LAYERS_PANEL_WIDTH = 220;
@@ -27,7 +27,7 @@ const PROJECT_EMOJIS = ['😀', '✨', '🌱', '🎨', '🚀', '🧩', '🌈', '
 type RenameTarget = { kind: 'project' } | { kind: 'board'; board: string } | null;
 
 /** 行内改名输入框：Enter / 失焦提交，Esc 取消。 */
-const InlineRename = ({ value, label, onCommit, onCancel }: { value: string; label: string; onCommit: (value: string) => void; onCancel: () => void }) => {
+const InlineRename = ({ value, label, onCommit, onCancel, className }: { value: string; label: string; className?: string; onCommit: (value: string) => void; onCancel: () => void }) => {
   const [draft, setDraft] = useState(value);
   const inputRef = useRef<HTMLInputElement>(null);
   useEffect(() => { inputRef.current?.select(); }, []);
@@ -43,7 +43,7 @@ const InlineRename = ({ value, label, onCommit, onCancel }: { value: string; lab
         if (event.key === 'Enter') onCommit(draft);
         if (event.key === 'Escape') onCancel();
       }}
-      className="nokey h-7 w-full min-w-0 flex-1 rounded-md border border-border bg-background px-2 text-xs font-medium text-foreground outline-none focus:border-ring"
+      className={cn("canvas-inline-edit nokey h-7 w-full min-w-0 flex-1 rounded-md border border-border bg-background px-2 text-xs font-medium text-foreground outline-none", className)}
     />
   );
 };
@@ -98,8 +98,11 @@ export const CanvasLayersPanel = ({
   const activeProject = useProjectStore((state) => state.projects.find((project) => project.id === state.activeProjectId));
   const renameProject = useProjectStore((state) => state.renameProject);
   const setProjectEmoji = useProjectStore((state) => state.setProjectEmoji);
+  const updateNode = useCanvasStore((state) => state.updateNode);
+  const removeNodes = useCanvasStore((state) => state.removeNodes);
   const [emojiOpen, setEmojiOpen] = useState(false);
   const [renaming, setRenaming] = useState<RenameTarget>(null);
+  const [renamingNodeId, setRenamingNodeId] = useState<string | null>(null);
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
 
   const projectName = activeProject?.name || '创作空间';
@@ -112,9 +115,26 @@ export const CanvasLayersPanel = ({
       return next;
     });
 
-  // 顶层节点：没有 parentId（不属于任何分组）
-  const topLevel = nodes.filter((node) => !node.parentId);
-  const childrenOf = (groupId: string) => nodes.filter((node) => node.parentId === groupId);
+  // 顶层：所有分组节点 + 不在任何分组内的非分组节点；分组内的非分组节点会出现在对应分组的 children 里。
+  // 多个分组画框重叠时，节点只归属于按画布顺序最先出现的那一个分组。
+  const groupNodes = nodes.filter((node) => node.type === 'group');
+  const memberByGroup = new Map<string, string[]>();
+  const claimed = new Set<string>();
+  groupNodes.forEach((group) => {
+    const members: string[] = [];
+    groupMemberIds(group, nodes).forEach((id) => {
+      if (claimed.has(id)) return;
+      claimed.add(id);
+      members.push(id);
+    });
+    memberByGroup.set(group.id, members);
+  });
+  const topLevel = nodes.filter((node) => node.type === 'group' || !claimed.has(node.id));
+  const childrenOf = (groupId: string) => {
+    const ids = memberByGroup.get(groupId) || [];
+    const set = new Set(ids);
+    return nodes.filter((node) => set.has(node.id));
+  };
 
   return (
     <AnimatePresence>
@@ -127,7 +147,7 @@ export const CanvasLayersPanel = ({
           transition={springs.smooth}
           style={{ width: LAYERS_PANEL_WIDTH, border: 'none' }}
           aria-label="画布与图层"
-          className="canvas-chrome pointer-events-auto absolute bottom-0 left-0 top-0 z-20 flex flex-col overflow-hidden"
+          className="canvas-chrome canvas-side-panel pointer-events-auto absolute bottom-8 left-0 top-0 z-20 flex flex-col overflow-hidden"
         >
           {/* 标题行：返回 + 项目图标 + 项目名 + 收起 */}
           <div className="flex items-center gap-1 px-2 pb-2 pt-2">
@@ -272,6 +292,48 @@ export const CanvasLayersPanel = ({
                 <p className="px-1 py-2 text-[11px] text-muted-foreground">暂无节点</p>
               ) : (
                 topLevel.map((node) => {
+                  const isRenaming = renamingNodeId === node.id;
+                  const onCommitRename = (value: string) => {
+                    const title = value.trim();
+                    if (title) updateNode(node.id, { title });
+                    setRenamingNodeId(null);
+                  };
+                  const nodeRow = (children: React.ReactNode) => (
+                    <div className="group/layer relative flex items-center gap-1.5 rounded-lg px-2 py-1.5 hover:bg-accent/50">
+                      {children}
+                      <DropdownMenu>
+                        <Tooltip content="节点操作" side="bottom">
+                          <DropdownMenuTrigger asChild>
+                            <button
+                              type="button"
+                              aria-label={`${nodeTitle(node)} 的操作`}
+                              className="ml-auto grid h-5 w-5 shrink-0 place-items-center rounded-md text-muted-foreground opacity-0 transition-opacity hover:text-foreground focus-visible:opacity-100 group-hover/layer:opacity-100 data-[state=open]:opacity-100"
+                            >
+                              <MoreHorizontal size={13} />
+                            </button>
+                          </DropdownMenuTrigger>
+                        </Tooltip>
+                        <DropdownMenuContent align="start" side="bottom" className="w-[188px]">
+                          <DropdownMenuItem icon={Pencil} onSelect={() => window.setTimeout(() => setRenamingNodeId(node.id), 0)}>重命名</DropdownMenuItem>
+                          <DropdownMenuItem icon={Trash2} destructive onSelect={() => removeNodes([node.id])}>删除</DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </div>
+                  );
+
+                  if (isRenaming) {
+                    return (
+                      <div key={node.id} className="px-2 py-1">
+                        <InlineRename
+                          value={nodeTitle(node)}
+                          label="节点名称"
+                          onCancel={() => setRenamingNodeId(null)}
+                          onCommit={onCommitRename}
+                        />
+                      </div>
+                    );
+                  }
+
                   if (node.type === 'group') {
                     const expanded = expandedGroups.has(node.id);
                     const children = childrenOf(node.id);
@@ -302,7 +364,7 @@ export const CanvasLayersPanel = ({
                           children.map((child) => (
                             <div
                               key={child.id}
-                              className="flex items-center gap-1.5 rounded-lg py-1.5 pl-8 pr-2"
+                              className="group/child flex items-center gap-1.5 rounded-lg py-1.5 pl-8 pr-2 hover:bg-accent/50"
                             >
                               <span className="grid h-5 w-5 shrink-0 place-items-center">
                                 <NodeIcon type={child.type} />
@@ -310,17 +372,38 @@ export const CanvasLayersPanel = ({
                               <span className="flex-1 truncate text-xs text-foreground/80">
                                 {nodeTitle(child)}
                               </span>
+                              <DropdownMenu>
+                                <Tooltip content="节点操作" side="bottom">
+                                  <DropdownMenuTrigger asChild>
+                                    <button
+                                      type="button"
+                                      aria-label={`${nodeTitle(child)} 的操作`}
+                                      className="grid h-5 w-5 shrink-0 place-items-center rounded-md text-muted-foreground opacity-0 transition-opacity hover:text-foreground focus-visible:opacity-100 group-hover/child:opacity-100 data-[state=open]:opacity-100"
+                                    >
+                                      <MoreHorizontal size={13} />
+                                    </button>
+                                  </DropdownMenuTrigger>
+                                </Tooltip>
+                                <DropdownMenuContent align="start" side="bottom" className="w-[188px]">
+                                  <DropdownMenuItem icon={Pencil} onSelect={() => window.setTimeout(() => setRenamingNodeId(child.id), 0)}>重命名</DropdownMenuItem>
+                                  <DropdownMenuItem icon={Trash2} destructive onSelect={() => removeNodes([child.id])}>删除</DropdownMenuItem>
+                                </DropdownMenuContent>
+                              </DropdownMenu>
                             </div>
                           ))}
                       </div>
                     );
                   }
                   return (
-                    <div key={node.id} className="flex items-center gap-1.5 rounded-lg px-2 py-1.5">
-                      <span className="grid h-5 w-5 shrink-0 place-items-center">
-                        <NodeIcon type={node.type} />
-                      </span>
-                      <span className="flex-1 truncate text-xs text-foreground">{nodeTitle(node)}</span>
+                    <div key={node.id}>
+                      {nodeRow(
+                        <>
+                          <span className="grid h-5 w-5 shrink-0 place-items-center">
+                            <NodeIcon type={node.type} />
+                          </span>
+                          <span className="flex-1 truncate text-xs text-foreground">{nodeTitle(node)}</span>
+                        </>,
+                      )}
                     </div>
                   );
                 })
@@ -329,20 +412,16 @@ export const CanvasLayersPanel = ({
           </div>
         </motion.aside>
       ) : (
-        /* 收起态：悬浮胶囊，展开 / 返回 / 项目标识 */
+        /* 收起态：悬浮胶囊，返回 / 项目标识 / 展开。展开按钮固定在最右，与展开态的收起按钮同位。 */
         <motion.div
           key="layers-pill"
           initial={{ opacity: 0, x: -12 }}
           animate={{ opacity: 1, x: 0 }}
           exit={{ opacity: 0, x: -12 }}
           transition={springs.smooth}
-          className="canvas-chrome pointer-events-auto absolute left-2 top-2 z-20 flex h-9 items-center gap-1 rounded-xl pl-0.5 pr-2"
+          className="canvas-chrome pointer-events-auto absolute left-2 top-2 z-20 flex h-10 items-center gap-1 rounded-[8px] px-1.5 py-0.5"
+          style={{ width: LAYERS_PANEL_WIDTH - 13 }}
         >
-          <Tooltip content="展开画布与图层" side="bottom">
-            <button type="button" className="canvas-icon-button" aria-label="展开画布与图层" onClick={onOpen}>
-              <SidebarUnfold size={16} />
-            </button>
-          </Tooltip>
           {onBack && (
             <Tooltip content="返回项目列表" side="bottom">
               <button type="button" className="canvas-icon-button" aria-label="返回项目列表" onClick={onBack}>
@@ -351,10 +430,33 @@ export const CanvasLayersPanel = ({
             </Tooltip>
           )}
           <span aria-hidden="true" className="mx-0.5 h-5 w-px bg-border" />
-          <span aria-hidden="true" className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-muted text-sm leading-none">
+          <span aria-hidden="true" className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-muted text-base leading-none">
             {activeProject?.emoji || '😀'}
           </span>
-          <span className="max-w-[120px] truncate text-xs font-semibold text-foreground">{projectName}</span>
+          {renaming?.kind === 'project' ? (
+            <InlineRename
+              value={projectName}
+              label="项目名称"
+              className="h-8"
+              onCancel={() => setRenaming(null)}
+              onCommit={(value) => { if (activeProject && value.trim()) renameProject(activeProject.id, value); setRenaming(null); }}
+            />
+          ) : (
+            <Tooltip content="双击重命名" side="bottom">
+              <button
+                type="button"
+                onDoubleClick={() => setRenaming({ kind: 'project' })}
+                className="h-8 min-w-0 flex-1 truncate text-left text-xs font-semibold text-foreground"
+              >
+                {projectName}
+              </button>
+            </Tooltip>
+          )}
+          <Tooltip content="展开画布与图层" side="bottom">
+            <button type="button" className="canvas-icon-button" aria-label="展开画布与图层" onClick={onOpen}>
+              <SidebarUnfold size={16} />
+            </button>
+          </Tooltip>
         </motion.div>
       )}
     </AnimatePresence>

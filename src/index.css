@@ -1,9 +1,85 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@config "../tailwind.config.js";
+@import "tailwindcss";
+@source not "../DESIGN.md";
+
+/* Keep the existing semantic token contract available to Tailwind v4 utilities. */
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-success: var(--success);
+  --color-success-foreground: var(--success-foreground);
+  --color-warning: var(--warning);
+  --color-warning-foreground: var(--warning-foreground);
+  --color-info: var(--info);
+  --color-info-foreground: var(--info-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-neutral-surface: var(--neutral-surface);
+  --color-neutral-surface-subtle: var(--neutral-surface-subtle);
+  --color-neutral-foreground: var(--neutral-foreground);
+  --color-neutral-border: var(--neutral-border);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+  --radius-sm: max(0px, calc(var(--radius) - 4px));
+  --radius-md: max(0px, calc(var(--radius) - 2px));
+  --radius-lg: var(--radius);
+  --font-sans: var(--font-pingfang);
+  --font-serif: var(--font-pingfang);
+  --font-mono: var(--font-pingfang);
+}
 
 @layer base {
   :root {
+    /* Radix Gray scale is the neutral foundation for shared UI roles. */
+    --radix-gray-1: #fcfcfc;
+    --radix-gray-2: #f9f9f9;
+    --radix-gray-3: #f0f0f0;
+    --radix-gray-4: #e8e8e8;
+    --radix-gray-5: #e0e0e0;
+    --radix-gray-6: #d9d9d9;
+    --radix-gray-7: #cecece;
+    --radix-gray-8: #bcbcbc;
+    --radix-gray-9: #8d8d8d;
+    --radix-gray-10: #838383;
+    --radix-gray-11: #646464;
+    --radix-gray-12: #202020;
+    --radix-blue-9: #3e63dd;
+    --radix-blue-10: #3358d4;
+    --radix-blue-11: #3a5ccc;
+    --radix-blue-12: #1f2d5c;
+    --radix-red-9: #e5484d;
+    --radix-red-10: #dc3e42;
+    --radix-red-11: #ce2c31;
+    --radix-red-12: #641723;
+    --radix-amber-9: #f2b90d;
+    --radix-amber-10: #ecad00;
+    --radix-amber-11: #ab6400;
+    --radix-amber-12: #4f3422;
+    --radix-green-9: #30a46c;
+    --radix-green-10: #299764;
+    --radix-green-11: #218358;
+    --radix-green-12: #193b2d;
     --background: lab(98.84% .0000298023 -.0000119209);
     --foreground: lab(0% 0 0);
     --card: lab(100% 0 0);
@@ -18,8 +94,16 @@
     --muted-foreground: lab(35.04% -.0000149012 0);
     --accent: lab(93.04% .0000298023 -.0000119209);
     --accent-foreground: lab(0% 0 0);
-    --destructive: hsl(0 72% 51%);
-    --destructive-foreground: hsl(0 0% 100%);
+    --destructive: var(--radix-red-9);
+    --destructive-foreground: var(--radix-gray-1);
+    /* Status roles are component contracts; themes may override them without
+       changing Badge callers or page-level markup. */
+    --success: var(--radix-green-9);
+    --success-foreground: var(--radix-gray-1);
+    --warning: var(--radix-amber-9);
+    --warning-foreground: var(--radix-amber-12);
+    --info: var(--radix-blue-9);
+    --info-foreground: var(--radix-gray-1);
     --border: lab(90.72% .0000298023 -.0000119209);
     --input: lab(93.04% .0000298023 -.0000119209);
     --ring: lab(0% 0 0);
@@ -58,11 +142,28 @@
     --ui-control-gap: 12px;
     --ui-card-gap: 24px;
     --ui-control-height: 32px;
+    --ui-control-height-sm: 36px;
+    --ui-control-height-md: 40px;
+    --ui-control-height-lg: 44px;
     --ui-control-radius: var(--radius);
     --ui-border-width: 1px;
     --ui-border-color: var(--border);
     --ui-radius: var(--radius);
+    --ui-focus-ring: var(--ring);
     --ui-shadow: none;
+    /* Shared component contracts. Existing components keep their current
+       defaults; these aliases give new callers one semantic vocabulary. */
+    --ui-control-border: var(--input);
+    --ui-control-background: var(--neutral-field-surface);
+    --ui-control-focus-ring: var(--ui-focus-ring);
+    --ui-card-background: var(--surface-card-bg);
+    --ui-card-foreground: var(--surface-card-foreground);
+    --ui-card-border: var(--surface-card-border);
+    --ui-card-radius: var(--surface-card-radius);
+    --ui-popover-background: var(--popover);
+    --ui-popover-foreground: var(--popover-foreground);
+    --ui-popover-border: var(--popover-border);
+    --ui-popover-shadow: var(--popover-shadow);
     --font-pingfang: var(--theme-font);
     --neutral-surface: lab(100% 0 0);
     --neutral-surface-subtle: lab(96% 0 0);
@@ -71,6 +172,10 @@
     --neutral-surface-hover: lab(94.5% 0 0);
     --neutral-foreground: lab(0% 0 0);
     --neutral-border: lab(90% 0 0);
+    /* 输入聚焦环与浮层边界/阴影；各主题可单独覆盖，默认保持原有表现。 */
+    --field-focus-ring: var(--neutral-border);
+    --popover-border: var(--border);
+    --popover-shadow: 0 12px 32px color-mix(in srgb, var(--radix-gray-12) 16%, transparent);
     --generation-control-border-width: 0px;
     --generation-control-border: transparent;
     --generation-control-bg: var(--neutral-surface-subtle);
@@ -308,22 +413,59 @@
   }
 
   :root.dark[data-theme='nature'] {
-    --background: lab(0% 0 0); --foreground: lab(100% 0 0); --card: lab(2.47865% 0 0); --card-foreground: lab(100% 0 0);
-    --popover: lab(5.26802% 0 0); --popover-foreground: lab(100% 0 0);
-    --primary: lab(100% 0 0); --primary-foreground: lab(0% 0 0);
-    --secondary: lab(13% 0 0); --secondary-foreground: lab(100% 0 0);
-    --muted: lab(10.68% .00000745058 -.00000298023); --muted-foreground: lab(67.52% -.0000298023 0);
-    --accent: lab(21.12% 0 0); --accent-foreground: lab(100% 0 0);
-    --border: lab(14.16% 0 0); --input: lab(21.12% 0 0); --ring: lab(67.52% -.0000298023 0);
-    --sidebar: oklch(0.18 0 0); --sidebar-foreground: oklch(1 0 0);
-    --sidebar-primary: oklch(1 0 0); --sidebar-primary-foreground: oklch(0 0 0);
-    --sidebar-accent: oklch(0.32 0 0); --sidebar-accent-foreground: oklch(1 0 0);
-    --sidebar-border: oklch(0.32 0 0); --sidebar-ring: oklch(0.72 0 0);
-    --surface-control: lab(13% 0 0);
-    --surface-control-foreground: lab(100% 0 0);
-    /* 与浅色模式镜像：浅色里内容区最白、导航与外壳偏灰；暗色里内容区最深、导航与外壳是浅一点的黑。 */
-    --workspace-bg: lab(7% 0 0);
-    --module-workspace-bg: lab(0% 0 0);
+    /*
+     * Default 暗黑语义色板（唯一事实源，规则见仓库 DESIGN.md）。
+     * 表面按 画布/内容 → 外壳 → 卡片 → 输入 → 浮层 → hover → 上下文选中 逐级提亮；
+     * 下方 shadcn 与项目别名只引用这些值，组件不再另写暗色。
+     */
+    --lz-canvas: #0A0A0B;
+    --lz-shell: #1A1A1C;
+    --lz-card: #1C1C1E;
+    --lz-field: #242426;
+    --lz-overlay: #272729;
+    --lz-hover: #303033;
+    --lz-selected: #38383C;
+    --lz-text: #F4F4F5;
+    --lz-text-secondary: #B4B4BA;
+    --lz-text-muted: #A1A1AA;
+    --lz-divider: #2E2E31;
+    --lz-control-border: #74747A;
+    --lz-focus: #D4D4D8;
+    --lz-edge: #6A6A70;
+
+    --background: var(--lz-canvas); --foreground: var(--lz-text); --card: var(--lz-card); --card-foreground: var(--lz-text);
+    --popover: var(--lz-overlay); --popover-foreground: var(--lz-text);
+    --primary: var(--lz-text); --primary-foreground: var(--lz-canvas);
+    --secondary: var(--lz-field); --secondary-foreground: var(--lz-text);
+    --muted: var(--lz-field); --muted-foreground: var(--lz-text-muted);
+    --accent: var(--lz-hover); --accent-foreground: var(--lz-text);
+    --border: var(--lz-divider); --input: var(--lz-control-border); --ring: var(--lz-focus);
+    --sidebar: var(--lz-shell); --sidebar-foreground: var(--lz-text);
+    --sidebar-primary: var(--lz-text); --sidebar-primary-foreground: var(--lz-canvas);
+    --sidebar-accent: var(--lz-selected); --sidebar-accent-foreground: var(--lz-text);
+    --sidebar-border: var(--lz-divider); --sidebar-ring: var(--lz-focus);
+    --surface-control: var(--lz-field);
+    --surface-control-foreground: var(--lz-text);
+    --text-secondary: var(--lz-text-secondary);
+    --text-muted: var(--lz-text-muted);
+    --neutral-surface: var(--lz-card);
+    --neutral-surface-subtle: var(--lz-field);
+    --neutral-field-surface: var(--lz-field);
+    --neutral-surface-hover: var(--lz-hover);
+    --neutral-foreground: var(--lz-text);
+    --neutral-border: var(--lz-control-border);
+    /* 分段控件选中块比轨道更亮（暗色业内惯例：凸起的滑块），不再用比轨道更深的卡片色。 */
+    --neutral-control-selected: var(--lz-selected);
+    --field-focus-ring: var(--lz-focus);
+    --popover-border: rgb(255 255 255 / 0.12);
+    --popover-shadow: 0 1px 2px rgb(0 0 0 / 0.4), 0 12px 32px rgb(0 0 0 / 0.48);
+    --canvas-edge-color: var(--lz-edge);
+    --canvas-card-border-color: rgb(255 255 255 / 0.09);
+    --canvas-chrome-border-color: rgb(255 255 255 / 0.12);
+    --canvas-surface-raised: var(--lz-card);
+    /* 与浅色模式镜像（D-027）：内容区与画布最深，导航与外壳浅一级。 */
+    --workspace-bg: var(--lz-shell);
+    --module-workspace-bg: var(--lz-canvas);
     --generation-control-border-width: 1px;
     --generation-control-border: var(--neutral-border);
   }
@@ -692,6 +834,40 @@
   }
 
   :root[data-theme='nature']:not(.dark) .theme-default-input:focus {
+    border-color: var(--neutral-border) !important;
+    background: var(--card) !important;
+    box-shadow: none !important;
+  }
+
+  /* 生成页：灰底表达静止控件，仅可编辑输入在聚焦时显示边界。 */
+  :root[data-theme='nature'] .generation-workspace {
+    --generation-control-border: transparent;
+    --generation-control-bg: var(--neutral-field-surface);
+  }
+
+  /* 参数浮层（生成页“参数设置”与画布“画面参数”共用）：轨道灰底无描边，暗色下轨道下沉一级，与浮层底明确区分。 */
+  :root[data-theme='nature'] .parameter-popover {
+    --generation-control-border: transparent;
+    --generation-control-bg: var(--neutral-field-surface);
+  }
+
+  :root.dark[data-theme='nature'] .parameter-popover {
+    --generation-control-bg: var(--lz-card);
+  }
+
+  /* 暗色选中块与轨道明度差有限，补一圈细高光与投影让“凸起”可辨。 */
+  :root.dark[data-theme='nature'] .parameter-popover [aria-pressed='true'] {
+    box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.1), 0 1px 2px rgb(0 0 0 / 0.5) !important;
+  }
+
+  :root[data-theme='nature'] .generation-workspace .generation-number-field {
+    border: 1px solid transparent;
+    background: var(--neutral-field-surface) !important;
+    box-shadow: none !important;
+  }
+
+  :root[data-theme='nature'] .generation-workspace .generation-number-field:focus,
+  :root[data-theme='nature'] .generation-workspace .generation-prompt-field:focus-within {
     border-color: var(--neutral-border) !important;
     background: var(--card) !important;
     box-shadow: none !important;
@@ -1097,7 +1273,7 @@
     background: var(--surface-card-bg);
     color: var(--surface-card-foreground);
     box-shadow: var(--surface-card-shadow);
-    transition: background-color 160ms ease, border-color 160ms ease, transform 160ms ease, box-shadow 160ms ease;
+    transition: background-color 250ms ease-out, border-color 250ms ease-out, transform 250ms ease-out, box-shadow 250ms ease-out;
   }
 
   .module-card:hover {
@@ -1250,7 +1426,7 @@
 
   .node-container {
     @apply rounded-xl border border-border bg-card text-card-foreground shadow-lg;
-    @apply backdrop-blur-sm transition-all duration-200;
+    @apply backdrop-blur-sm transition-[border-color,box-shadow] duration-[250ms] ease-out;
   }
 
   .node-container:hover {

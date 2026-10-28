@@ -6,12 +6,13 @@
   /* 与其他模块面板同为白底，外层灰色只留给导航与工作区边距。 */
   --canvas-bg: var(--module-workspace-bg, var(--background));
   --canvas-dot: color-mix(in srgb, transparent, var(--foreground) 16%);
-  --canvas-edge: color-mix(in srgb, transparent, var(--foreground) 26%);
+  /* 主题可通过 --canvas-edge-color 提供满足 3:1 的连线色；未定义时沿用原混色。 */
+  --canvas-edge: var(--canvas-edge-color, color-mix(in srgb, transparent, var(--foreground) 26%));
   --canvas-edge-active: color-mix(in srgb, transparent, var(--foreground) 72%);
   --canvas-card: var(--card);
-  --canvas-card-border: color-mix(in srgb, transparent, var(--foreground) 9%);
+  --canvas-card-border: var(--canvas-card-border-color, color-mix(in srgb, transparent, var(--foreground) 9%));
   --canvas-chrome: color-mix(in srgb, var(--card) 90%, transparent);
-  --canvas-chrome-border: color-mix(in srgb, transparent, var(--foreground) 8%);
+  --canvas-chrome-border: var(--canvas-chrome-border-color, color-mix(in srgb, transparent, var(--foreground) 8%));
   --canvas-shadow: 0 1px 2px rgb(0 0 0 / 0.04), 0 8px 24px rgb(0 0 0 / 0.07);
   --canvas-shadow-lg: 0 2px 6px rgb(0 0 0 / 0.05), 0 18px 44px rgb(0 0 0 / 0.12);
   --xy-selection-background-color: color-mix(in srgb, transparent, var(--foreground) 5%);
@@ -25,15 +26,27 @@
   font-family: var(--font-pingfang);
 }
 
-/* 浮动侧栏样式下工作区外壳已有描边，画布不再重复一道。 */
-.ui-app-shell:not(.ui-app-shell-embedded) .lizuo-canvas {
+/*
+ * 工作区外壳已经带了圆角与描边（.ui-app-shell / .app-workspace），
+ * 画布不再重复画第二层，否则四角会出现双描边。
+ * 仅当画布直接挂在导航/无边框容器下时，才由画布自己提供面板描边。
+ */
+.ui-app-shell .lizuo-canvas,
+.app-workspace .lizuo-canvas {
   border: 0;
+  border-radius: 0;
 }
 
 .dark .lizuo-canvas,
 .lizuo-canvas:where(.dark *) {
+  /* 主题提供语义卡片面时直接使用；否则沿用 card 与 muted 的混色补丁。 */
+  --canvas-raised-surface: var(--canvas-surface-raised, color-mix(in srgb, var(--card) 60%, var(--muted)));
   --canvas-shadow: 0 1px 2px rgb(0 0 0 / 0.3), 0 10px 28px rgb(0 0 0 / 0.32);
   --canvas-shadow-lg: 0 2px 8px rgb(0 0 0 / 0.35), 0 20px 48px rgb(0 0 0 / 0.45);
+}
+
+.dark .lizuo-canvas :is(.react-flow__node-text .canvas-node-card, .canvas-prompt-panel, .canvas-view-controls) {
+  background: var(--canvas-raised-surface);
 }
 
 .lizuo-canvas .react-flow {
@@ -96,6 +109,20 @@
 .canvas-icon-button:disabled {
   pointer-events: none;
   opacity: 0.4;
+}
+
+/* ---------- 内联编辑输入 ----------
+   全局 input:focus-visible 会画 2px outline + 2px offset，和输入框自身的 border 叠成双层描边。
+   内联重命名框改为只在控件边界内换边框色，不使用 offset。 */
+.canvas-inline-edit {
+  outline: none;
+}
+
+.canvas-inline-edit:focus,
+.canvas-inline-edit:focus-visible {
+  outline: none;
+  border-color: var(--ring);
+  box-shadow: inset 0 0 0 1px var(--ring);
 }
 
 /* ---------- 节点 ---------- */
@@ -272,7 +299,75 @@
 }
 
 /* ---------- 小地图 ---------- */
+.canvas-view-controls {
+  background: color-mix(in srgb, var(--card) 65%, transparent);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+/* Default 暗色：底栏与展开侧栏共用画布近黑色，不沿用外壳灰。 */
+:root.dark[data-theme='nature'] .lizuo-canvas :is(.canvas-view-controls, .canvas-side-panel) {
+  background: color-mix(in srgb, var(--lz-canvas) 95%, transparent);
+}
+
+/* 只分隔朝向画布的边缘，覆盖绘制以保持原有尺寸。 */
+:root.dark[data-theme='nature'] .lizuo-canvas :is(.canvas-view-controls, .canvas-side-panel)::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  border: 0 solid color-mix(in srgb, var(--lz-divider) 55%, transparent);
+}
+
+:root.dark[data-theme='nature'] .lizuo-canvas .canvas-side-panel[aria-label='画布与图层']::after {
+  border-right-width: 1px;
+}
+
+:root.dark[data-theme='nature'] .lizuo-canvas .canvas-side-panel[aria-label='画布 Agent']::after {
+  border-left-width: 1px;
+}
+
+:root.dark[data-theme='nature'] .lizuo-canvas .canvas-view-controls::after {
+  border-top-width: 1px;
+}
+
+/* 底栏底色已等于 hover 面，按钮 hover/激活改用选中面，避免与底栏同色。 */
+:root.dark[data-theme='nature'] .lizuo-canvas .canvas-view-controls .canvas-icon-button:hover,
+:root.dark[data-theme='nature'] .lizuo-canvas .canvas-view-controls .canvas-icon-button[data-active] {
+  background: var(--lz-selected);
+}
+
+.canvas-view-controls .canvas-icon-button {
+  height: 24px;
+  width: 24px;
+  border-radius: 4px;
+  color: var(--muted-foreground);
+}
+
+.canvas-view-controls .canvas-icon-button svg {
+  width: 14px;
+  height: 14px;
+}
+
+.canvas-view-controls .canvas-icon-button[aria-label="画布缩放比例"] {
+  width: 44px;
+  font-size: 11px;
+}
+
+.canvas-view-controls .canvas-icon-button:hover,
+.canvas-view-controls .canvas-icon-button[data-active] {
+  background: var(--accent);
+  color: var(--foreground);
+}
+
+.canvas-view-controls .canvas-icon-button:focus-visible {
+  outline-offset: -2px;
+}
+
 .lizuo-canvas .react-flow__minimap {
+  left: auto;
+  right: 12px;
+  bottom: 36px;
   margin: 0;
   overflow: hidden;
   border-radius: calc(var(--radius) + 4px);
@@ -300,11 +395,8 @@
   }
 }
 
-.canvas-prompt-field {
-  field-sizing: content;
-}
-
-/* 输入框外层容器已用 focus-within 表示焦点，这里不再叠加全局 focus 轮廓。 */
+/* 不用 field-sizing: content：Chromium 在输入法拼音合成期间做内联尺寸计算会打断 IME，
+   导致合成串丢失、只剩最后一个字母（「我的」打成 "wode"）。 */
 .canvas-prompt-field:focus-visible {
   outline: none;
 }
@@ -626,4 +718,16 @@ textarea.canvas-note-text {
   .lizuo-canvas .canvas-handle-bubble {
     transition: none;
   }
+}
+
+/* 音频节点进度条：只显示真实播放进度，不绘制伪造波形。 */
+.canvas-audio-progress {
+  height: 16px;
+  accent-color: var(--foreground);
+  cursor: pointer;
+}
+
+.canvas-audio-progress:disabled {
+  cursor: default;
+  opacity: 0.4;
 }

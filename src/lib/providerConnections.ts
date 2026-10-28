@@ -10,7 +10,7 @@ import type {
   VerificationStatus,
 } from '../types/provider';
 
-export const MODEL_CATEGORIES: ModelCategory[] = ['language', 'image', 'video'];
+export const MODEL_CATEGORIES: ModelCategory[] = ['language', 'image', 'video', 'music'];
 
 const normalizeProtocol = (value: unknown): ProviderProtocol => {
   if (value === 'anthropic' || value === 'anthropic-messages') return 'anthropic-messages';
@@ -365,7 +365,7 @@ export const migrateProviderStateV6 = (value: unknown): ProviderStateSnapshot =>
         id,
         name: protocol === primaryProtocol
           ? String(source.name || '未命名厂商')
-          : `${String(source.name || '未命名厂商')} · ${protocol}`,
+          : `${String(source.name || '未命名厂商')}  / ${protocol}`,
         protocol,
         baseUrl: common.baseUrl,
         apiKey: common.apiKey,

@@ -14,7 +14,7 @@ export const FlowEdge = memo(({ id, source, target, sourceX, sourceY, targetX, t
   const highlight = useCanvasStore((state) => state.selectedNodes.includes(source) || state.selectedNodes.includes(target));
   const running = useCanvasStore((state) => Boolean(state.nodes.find((node) => node.id === target)?.data?.isGenerating));
   const [hovered, setHovered] = useState(false);
-  const leaveTimer = useRef<number>();
+  const leaveTimer = useRef<number | undefined>(undefined);
 
   const enter = () => {
     window.clearTimeout(leaveTimer.current);

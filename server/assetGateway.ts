@@ -1,4 +1,4 @@
-import { Router } from 'express';
+import express, { Router } from 'express';
 import type { LibraryRuntime } from './libraryRuntime';
 import type { SmartCollectionRules } from './repositories/SmartCollectionRepository';
 import { MacOsFilePickerProvider } from './import/MacOsFilePickerProvider';
@@ -6,6 +6,7 @@ import { FilePickerCancelledError, type FilePickerProvider } from './import/File
 import { FingerprintService } from './import/FingerprintService';
 import { randomUUID } from 'node:crypto';
 import { removeStoredGeneratedImage, storeGeneratedImage } from './generatedAssetStorage';
+import { MAX_AUDIO_BYTES, storeAudioAsset } from './audioAssetStorage';
 import { execFile } from 'node:child_process';
 import { constants as fsConstants } from 'node:fs';
 import fs from 'node:fs/promises';
@@ -187,6 +188,90 @@ export const createAssetRouter = (
         if (stored) await removeStoredGeneratedImage(stored);
         throw error;
       }
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // 画布上传音频：原始字节直接入库，按文件头校验格式；节点只保存返回的资产 ID。
+  router.post('/audio', express.raw({ type: () => true, limit: MAX_AUDIO_BYTES }), async (request, response, next) => {
+    try {
+      const header = request.header('x-lizuo-file-name') || '';
+      let fileName = '';
+      try {
+        fileName = path.basename(decodeURIComponent(header));
+      } catch {
+        throw statusError('文件名无效', 400);
+      }
+      if (!/\.(mp3|wav|m4a|aac|flac|ogg)$/i.test(fileName)) throw statusError('仅支持 MP3、WAV、M4A、AAC、FLAC 或 OGG 音频', 400);
+      const bytes = Buffer.isBuffer(request.body) ? request.body : Buffer.alloc(0);
+      const { asset } = await storeAudioAsset(await getRuntime(), bytes, {
+        title: fileName,
+        userMetadata: { source: 'local-upload', purpose: 'canvas-audio' },
+      });
+      response.status(201).json(mapAssetWithPreview(await getRuntime(), asset));
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  router.get('/:assetId/original', async (request, response, next) => {
+    response.setHeader('Cache-Control', 'private, no-store');
+    try {
+      const runtime = await getRuntime();
+      const asset = runtime.assets.get(request.params.assetId);
+      if (!asset || asset.status === 'deleted') throw statusError('图片资产不存在或已删除', 404);
+      if (asset.type !== 'image') throw statusError('只能读取图片资产的原文件', 400);
+      const { filePath } = await primaryFile(runtime, asset.id);
+      if (!(await fs.stat(filePath)).isFile()) throw statusError('图片原文件不存在', 404);
+      // 导入或生成的文件后缀不一定可信，以原文件内容判定格式，不读取预览。
+      const { default: sharp } = await import('sharp');
+      const { format, compression } = await sharp(filePath).metadata();
+      const formats: Record<string, { mime: string; extension: string }> = {
+        png: { mime: 'image/png', extension: '.png' },
+        jpeg: { mime: 'image/jpeg', extension: '.jpg' },
+        webp: { mime: 'image/webp', extension: '.webp' },
+        gif: { mime: 'image/gif', extension: '.gif' },
+        tiff: { mime: 'image/tiff', extension: '.tiff' },
+        heif: { mime: 'image/heif', extension: '.heif' },
+        svg: { mime: 'image/svg+xml', extension: '.svg' },
+      };
+      const storedFormat = format === 'heif'
+        ? compression === 'av1'
+          ? { mime: 'image/avif', extension: '.avif' }
+          : formats.heif
+        : formats[format || ''];
+      if (!storedFormat) throw statusError('不支持的图片原文件格式', 400);
+      response.setHeader('X-Content-Type-Options', 'nosniff');
+      // SVG 仍返回原文件，但作为独立文档打开时禁止脚本和外部资源。
+      if (format === 'svg') response.setHeader('Content-Security-Policy', "sandbox; default-src 'none'; style-src 'unsafe-inline'");
+      if (request.query.download === '1') {
+        const name = safeFileName(asset.title);
+        response.attachment(`${path.parse(name).name || 'image'}${storedFormat.extension}`);
+      }
+      response.type(storedFormat.mime);
+      response.sendFile(filePath, { cacheControl: false }, (error) => {
+        if (error) next(error);
+      });
+    } catch (error) {
+      next((error as NodeJS.ErrnoException).code === 'ENOENT'
+        ? statusError('图片原文件不存在', 404)
+        : error);
+    }
+  });
+
+  // 音频原文件，供节点和详情播放；sendFile 支持 Range，可拖动进度。
+  router.get('/:assetId/media', async (request, response, next) => {
+    try {
+      const runtime = await getRuntime();
+      const asset = runtime.assets.get(request.params.assetId);
+      if (!asset || asset.status === 'deleted') throw statusError('音频资产不存在或已删除', 404);
+      if (asset.type !== 'audio') throw statusError('只能读取音频资产的原文件', 400);
+      const { filePath } = await primaryFile(runtime, asset.id);
+      const mimeType = typeof asset.userMetadata?.mimeType === 'string' ? asset.userMetadata.mimeType : '';
+      if (mimeType.startsWith('audio/')) response.type(mimeType);
+      response.setHeader('Cache-Control', 'private, max-age=3600');
+      response.sendFile(filePath);
     } catch (error) {
       next(error);
     }

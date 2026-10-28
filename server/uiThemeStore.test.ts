@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { useUIStore } from '../src/stores/useUIStore';
+import { PERSONALIZATION_DEFAULTS, useUIStore } from '../src/stores/useUIStore';
 
 const classNames = new Set<string>();
 
@@ -17,6 +17,21 @@ Object.defineProperty(globalThis, 'document', {
       },
     },
   },
+});
+
+test('fresh preferences default to dark mode', () => {
+  assert.equal(PERSONALIZATION_DEFAULTS.themeMode, 'dark');
+  assert.equal(useUIStore.getInitialState().themeMode, 'dark');
+  assert.equal(useUIStore.getInitialState().theme, 'dark');
+});
+
+test('resetting personalization restores dark mode from a fixed light preset', () => {
+  useUIStore.setState({ themePreset: 'brutalist', themeMode: 'light', theme: 'light' });
+  useUIStore.getState().resetPersonalization();
+  assert.equal(useUIStore.getState().themePreset, 'nature');
+  assert.equal(useUIStore.getState().themeMode, 'dark');
+  assert.equal(useUIStore.getState().theme, 'dark');
+  assert.equal(classNames.has('dark'), true);
 });
 
 test('selecting Neo-brutalism forces its fixed light appearance', () => {

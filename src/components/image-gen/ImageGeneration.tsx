@@ -1,13 +1,15 @@
+import { FavoriteIcon } from '../ui/FavoriteIcon';
 import { useEffect, useMemo, useRef, useState, type MouseEvent as ReactMouseEvent } from 'react';
 import {
   AudioLines,
-  Heart,
   Check,
   ChevronDown,
   ChevronLeft,
   ChevronRight,
   Copy,
   Download,
+  Gallery,
+  LayoutGrid,
   Loader2,
   Pencil,
   Plus,
@@ -31,17 +33,18 @@ import { contentFeed } from '../../services/contentFeed';
 import { workspaceCacheService } from '../../services/workspaceCacheService';
 import { cn } from '../../lib/utils';
 import { GeneratedImageSet } from './GeneratedImageSet';
-import {
-  Button,
-  Input,
-  Textarea,
-} from '../ui';
+import { GenerationHistoryGrid } from './GenerationHistoryGrid';
+import { Button, NumberField, Textarea } from '../ui';
 import {
   normalizeGenerationHistory,
   type GenerationHistoryCache,
   type GenerationRecord,
 } from './generationHistory';
 import { GeneratedImageMenu, type GeneratedImageMenuTarget } from './GeneratedImageMenu';
+import { confirmAction } from '../ui/confirmation';
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '../ui/Select';
+import { Popover, PopoverTrigger, PopoverContent } from '../ui/Popover';
+import { Dialog, DialogContent, DialogTitle, DialogDescription } from '../ui/Dialog';
 
 const RESOLUTION_OPTIONS = ['1k', '2k', '4k'] as const;
 const QUALITY_OPTIONS = ['低', '中', '高'] as const;
@@ -139,8 +142,8 @@ const formatGenerationDate = (value: string) => {
 
 const formatGenerationParameters = (record: GenerationRecord) => (
   record.mode === 'video'
-    ? [record.ratio, record.duration ? `${record.duration}秒` : null, record.resolution].filter(Boolean).join('·')
-    : [record.ratio, record.quality, record.resolution].join('·')
+    ? [record.ratio, record.duration ? `${record.duration}秒` : null, record.resolution].filter(Boolean).join(' / ')
+    : [record.ratio, record.quality, record.resolution].join(' / ')
 );
 
 /** Images follow Eagle: click selects, double-click opens fullscreen, right-click opens the action menu. */
@@ -180,7 +183,7 @@ const GeneratedImagePreview = ({
     <div
       {...interactions}
       className={cn(
-        'group relative mx-2 flex max-h-[680px] min-h-[240px] cursor-default items-center justify-center overflow-hidden rounded-lg bg-[#0b0b0b] transition-shadow',
+        'group relative mx-2 flex max-h-[680px] min-h-0 cursor-default items-center justify-center overflow-hidden rounded-lg bg-[#0b0b0b] transition-shadow',
         selected && 'ring-2 ring-inset ring-foreground',
       )}
       style={{ aspectRatio: imageRatio || 4 / 3 }}
@@ -220,6 +223,7 @@ export const ImageGeneration = () => {
   const [fullscreenImage, setFullscreenImage] = useState<string | null>(null);
   const [imageMenu, setImageMenu] = useState<GeneratedImageMenuTarget | null>(null);
   const [history, setHistory] = useState<GenerationRecord[]>([]);
+  const [historyView, setHistoryView] = useState<'default' | 'grid'>('default');
   const historyCacheRef = useRef<GenerationHistoryCache>({ image: [], video: [] });
   const historyLoadedRef = useRef(false);
   const [isGenerating, setIsGenerating] = useState(false);
@@ -229,6 +233,7 @@ export const ImageGeneration = () => {
   const [outputRatios, setOutputRatios] = useState<Record<string, number>>({});
   const [savedAssetUrls, setSavedAssetUrls] = useState<Set<string>>(new Set());
   const [assetIdsByUrl, setAssetIdsByUrl] = useState<Record<string, string>>({});
+  const favoriteRequests = useRef(new Set<string>());
   // Session-only: failed counts of partial generations and which output each multi-image record shows.
   const [failedCountsByRecord, setFailedCountsByRecord] = useState<Record<string, number>>({});
   const [activeOutputByRecord, setActiveOutputByRecord] = useState<Record<string, string>>({});
@@ -239,11 +244,7 @@ export const ImageGeneration = () => {
   const audioInputRef = useRef<HTMLInputElement>(null);
   const promptInputRef = useRef<HTMLTextAreaElement>(null);
   const referencesRef = useRef<ReferenceImage[]>([]);
-  const modelPanelRef = useRef<HTMLDivElement>(null);
-  const parameterPanelRef = useRef<HTMLDivElement>(null);
-  const generationCountPanelRef = useRef<HTMLFieldSetElement>(null);
   const generationCountInputRef = useRef<HTMLInputElement>(null);
-  const videoDurationPanelRef = useRef<HTMLFieldSetElement>(null);
   const videoDurationInputRef = useRef<HTMLInputElement>(null);
   const providers = useProviderStore((state) => state.providers);
   const activeProviderIds = useProviderStore((state) => state.activeProviderIds);
@@ -264,8 +265,8 @@ export const ImageGeneration = () => {
   const selectedVideoDuration = videoDuration === 'custom' ? customVideoDuration : videoDuration;
   const selectedGenerationCount = generationCount === 'custom' ? customGenerationCount : generationCount;
   const parameterSummary = generationMode === 'video'
-    ? `${VIDEO_RATIO_OPTIONS.find((option) => option.value === ratio)?.label || ratio} · ${videoClarity}`
-    : `${ratio} · ${quality} · ${resolution}`;
+    ? `${VIDEO_RATIO_OPTIONS.find((option) => option.value === ratio)?.label || ratio} / ${videoClarity}`
+    : `${ratio} / ${quality} / ${resolution}`;
 
   referencesRef.current = referenceImages;
   useEffect(() => () => referencesRef.current.forEach((item) => URL.revokeObjectURL(item.url)), []);
@@ -290,74 +291,6 @@ export const ImageGeneration = () => {
     }).catch(() => undefined);
     return () => { active = false; };
   }, []);
-  useEffect(() => {
-    if (!modelPanelOpen) return;
-    const closeOnOutsidePress = (event: PointerEvent) => {
-      if (!modelPanelRef.current?.contains(event.target as Node)) setModelPanelOpen(false);
-    };
-    const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') setModelPanelOpen(false);
-    };
-    window.addEventListener('pointerdown', closeOnOutsidePress);
-    window.addEventListener('keydown', closeOnEscape);
-    return () => {
-      window.removeEventListener('pointerdown', closeOnOutsidePress);
-      window.removeEventListener('keydown', closeOnEscape);
-    };
-  }, [modelPanelOpen]);
-  useEffect(() => {
-    if (!parameterPanelOpen) return;
-    const closeOnOutsidePress = (event: PointerEvent) => {
-      if (!parameterPanelRef.current?.contains(event.target as Node)) setParameterPanelOpen(false);
-    };
-    const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') setParameterPanelOpen(false);
-    };
-    window.addEventListener('pointerdown', closeOnOutsidePress);
-    window.addEventListener('keydown', closeOnEscape);
-    return () => {
-      window.removeEventListener('pointerdown', closeOnOutsidePress);
-      window.removeEventListener('keydown', closeOnEscape);
-    };
-  }, [parameterPanelOpen]);
-  useEffect(() => {
-    if (!generationCountPanelOpen) return;
-    window.requestAnimationFrame(() => {
-      generationCountInputRef.current?.focus();
-      generationCountInputRef.current?.select();
-    });
-    const closeOnOutsidePress = (event: PointerEvent) => {
-      if (!generationCountPanelRef.current?.contains(event.target as Node)) setGenerationCountPanelOpen(false);
-    };
-    const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') setGenerationCountPanelOpen(false);
-    };
-    window.addEventListener('pointerdown', closeOnOutsidePress);
-    window.addEventListener('keydown', closeOnEscape);
-    return () => {
-      window.removeEventListener('pointerdown', closeOnOutsidePress);
-      window.removeEventListener('keydown', closeOnEscape);
-    };
-  }, [generationCountPanelOpen]);
-  useEffect(() => {
-    if (!videoDurationPanelOpen) return;
-    window.requestAnimationFrame(() => {
-      videoDurationInputRef.current?.focus();
-      videoDurationInputRef.current?.select();
-    });
-    const closeOnOutsidePress = (event: PointerEvent) => {
-      if (!videoDurationPanelRef.current?.contains(event.target as Node)) setVideoDurationPanelOpen(false);
-    };
-    const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') setVideoDurationPanelOpen(false);
-    };
-    window.addEventListener('pointerdown', closeOnOutsidePress);
-    window.addEventListener('keydown', closeOnEscape);
-    return () => {
-      window.removeEventListener('pointerdown', closeOnOutsidePress);
-      window.removeEventListener('keydown', closeOnEscape);
-    };
-  }, [videoDurationPanelOpen]);
   useEffect(() => {
     let cancelled = false;
     historyLoadedRef.current = false;
@@ -450,7 +383,7 @@ export const ImageGeneration = () => {
         setPreviewUrl(result.url);
         const feedItem = contentFeed.add({
           type: 'video',
-          title: `视频生成任务 · ${new Date().toLocaleDateString('zh-CN')}`,
+          title: `视频生成任务 / ${new Date().toLocaleDateString('zh-CN')}`,
           description: generationPrompt,
           previewUrl: result.url,
           metadata: {
@@ -539,7 +472,7 @@ export const ImageGeneration = () => {
       }, ...current.filter((item) => !item.outputs.some((output) => outputs.includes(output)))].slice(0, 12));
       const feedItems = outputs.map((output, index) => contentFeed.add({
           type: 'image',
-          title: `图片生成${outputs.length > 1 ? ` ${index + 1}/${outputs.length}` : ''} · ${new Date().toLocaleDateString('zh-CN')}`,
+          title: `图片生成${outputs.length > 1 ? ` ${index + 1}/${outputs.length}` : ''} / ${new Date().toLocaleDateString('zh-CN')}`,
           description: generationPrompt,
           previewUrl: output,
           metadata: { prompt: generationPrompt, model: imageModel, ratio, resolution, quality, generationCount: selectedGenerationCount, referenceImageNames: referenceImages.map((item) => item.file.name) },
@@ -591,17 +524,19 @@ export const ImageGeneration = () => {
   };
 
   const handleAddToAssets = async (urlOverride = previewUrl, promptOverride = prompt, mediaType: 'image' | 'video' = 'image') => {
-    if (!urlOverride) return;
+    if (!urlOverride || favoriteRequests.current.has(urlOverride)) return;
+    favoriteRequests.current.add(urlOverride);
+    const favorite = !savedAssetUrls.has(urlOverride);
     try {
       const existingAssetId = assetIdsByUrl[urlOverride];
       const asset = existingAssetId
-        ? await assetService.update(existingAssetId, { favorite: true })
+        ? await assetService.update(existingAssetId, { favorite })
         : await assetService.create({
             type: mediaType,
-            title: `${mediaType === 'video' ? '视频' : '图片'}生成 · ${new Date().toLocaleDateString('zh-CN')}`,
+            title: `${mediaType === 'video' ? '视频' : '图片'}生成 / ${new Date().toLocaleDateString('zh-CN')}`,
             description: promptOverride,
             sourceUrl: urlOverride,
-            favorite: true,
+            favorite,
             userMetadata: {
               source: mediaType === 'video' ? 'video-generation' : 'image-generation',
               prompt: promptOverride,
@@ -616,11 +551,19 @@ export const ImageGeneration = () => {
       const generated = contentFeed.list().find((item) => item.previewUrl === urlOverride);
       if (generated) contentFeed.markSaved(generated.id);
       setAssetIdsByUrl((current) => ({ ...current, [urlOverride]: asset.id }));
-      setSavedAssetUrls((current) => new Set(current).add(urlOverride));
-      setAssetNotice('已添加至收藏');
+      setSavedAssetUrls((current) => {
+        const next = new Set(current);
+        if (favorite) next.add(urlOverride);
+        else next.delete(urlOverride);
+        return next;
+      });
+      setImageMenu((current) => current?.url === urlOverride ? { ...current, saved: favorite } : current);
+      setAssetNotice(favorite ? '已添加至收藏' : '已取消收藏');
       window.setTimeout(() => setAssetNotice(''), 2200);
     } catch (requestError) {
-      setError(requestError instanceof Error ? requestError.message : '添加至收藏失败');
+      setError(requestError instanceof Error ? requestError.message : '更新收藏失败');
+    } finally {
+      favoriteRequests.current.delete(urlOverride);
     }
   };
 
@@ -634,8 +577,8 @@ export const ImageGeneration = () => {
     }
   };
 
-  const deleteRecord = (record: GenerationRecord) => {
-    if (!window.confirm('删除这条生成记录？')) return;
+  const deleteRecord = async (record: GenerationRecord) => {
+    if (!await confirmAction('删除这条生成记录？')) return;
     setHistory((current) => current.filter((item) => item.id !== record.id));
     contentFeed.removeByPreviewUrls(record.outputs);
     if (record.outputs.includes(previewUrl)) {
@@ -655,7 +598,7 @@ export const ImageGeneration = () => {
     const record = history.find((item) => item.outputs.includes(url));
     const asset = await assetService.create({
       type: 'image',
-      title: `图片生成 · ${new Date(record?.createdAt || Date.now()).toLocaleDateString('zh-CN')}`,
+      title: `图片生成 / ${new Date(record?.createdAt || Date.now()).toLocaleDateString('zh-CN')}`,
       description: record?.prompt || '',
       sourceUrl: url,
       userMetadata: {
@@ -690,13 +633,13 @@ export const ImageGeneration = () => {
   });
 
   /** 删除单张图片：从生成记录中移除；有资产时移入资产库回收站，可以恢复。 */
-  const deleteImage = (url: string, knownAssetId: string | null) => {
+  const deleteImage = async (url: string, knownAssetId: string | null) => {
     const assetId = knownAssetId || assetIdsByUrl[url] || null;
     const message = assetId
       ? '删除这张图片？它会从生成记录中移除，并移入资产库的回收站，可在资产库中恢复。'
       : '删除这张图片？它会从生成记录中移除。';
-    if (!window.confirm(message)) return;
-    void (async () => {
+    if (!await confirmAction(message)) return;
+    await (async () => {
       try {
         if (assetId) await assetService.remove(assetId);
       } catch (requestError) {
@@ -734,11 +677,6 @@ export const ImageGeneration = () => {
     });
   };
 
-  const selectRecord = (output: string, index: number) => {
-    setPreviewUrl(output);
-    document.getElementById(`generation-result-${index}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-  };
-
   const fullscreenRecord = fullscreenImage
     ? history.find((record) => record.outputs.includes(fullscreenImage))
     : null;
@@ -768,7 +706,7 @@ export const ImageGeneration = () => {
   const activateOutput = (recordId: string, url: string) => setActiveOutputByRecord((current) => current[recordId] === url ? current : { ...current, [recordId]: url });
 
   return (
-    <main className="module-workspace mx-3 mb-3 mt-0 grid h-[calc(100%-12px)] min-h-0 grid-cols-[minmax(0,480px)_minmax(0,1fr)] gap-0 !bg-transparent p-0 text-foreground">
+    <main className="generation-workspace module-workspace mx-3 mb-3 mt-0 grid h-[calc(100%-12px)] min-h-0 grid-cols-[minmax(0,480px)_minmax(0,1fr)] gap-0 !bg-transparent p-0 text-foreground">
       <section className="flex min-h-0 min-w-0 flex-col overflow-hidden rounded-l-lg border border-border bg-[var(--module-workspace-bg,var(--background))] p-4 text-foreground" aria-label="生成输入与参数">
         <header className="mb-5 shrink-0">
           <h1 className="text-xl font-semibold tracking-tight">{generationMode === 'image' ? '图片生成' : '视频生成'}</h1>
@@ -781,7 +719,7 @@ export const ImageGeneration = () => {
               onDragOver={(event) => { event.preventDefault(); setDraggingReference(true); }}
               onDragLeave={(event) => { if (!event.currentTarget.contains(event.relatedTarget as Node)) setDraggingReference(false); }}
               onDrop={(event) => { event.preventDefault(); setDraggingReference(false); addReferences(event.dataTransfer.files); }}
-              className={cn('relative overflow-hidden rounded-lg border-solid [border-color:var(--generation-control-border)] [border-width:var(--generation-control-border-width)] bg-[var(--generation-control-bg)] text-[var(--neutral-foreground)] transition-colors focus-within:ring-1 focus-within:ring-inset focus-within:ring-[var(--neutral-border)]', draggingReference && 'bg-[var(--neutral-surface)] text-[var(--neutral-foreground)] ring-2 ring-inset ring-[var(--neutral-border)]')}
+              className={cn('generation-prompt-field relative overflow-hidden rounded-lg border-solid [border-color:var(--generation-control-border)] [border-width:var(--generation-control-border-width)] bg-[var(--generation-control-bg)] text-[var(--neutral-foreground)] transition-colors focus-within:ring-1 focus-within:ring-inset focus-within:ring-[color:var(--neutral-border)]', draggingReference && 'bg-[var(--neutral-surface)] text-[var(--neutral-foreground)] ring-2 ring-inset ring-[color:var(--neutral-border)]')}
             >
               <input ref={fileInputRef} type="file" accept="image/*" multiple className="sr-only" onChange={(event) => { if (event.target.files) addReferences(event.target.files); event.target.value = ''; }} />
               <Textarea
@@ -875,176 +813,184 @@ export const ImageGeneration = () => {
           )}
 
           <div className="grid grid-cols-2 items-end gap-3">
-            <div ref={modelPanelRef} className="relative min-w-0">
-              <label className="mb-2 block text-xs font-semibold">生成模型</label>
-              <Button
-                type="button"
-                variant="ghost"
-                disabled={!modelOptions.length}
-                onClick={() => {
-                  setParameterPanelOpen(false);
-                  setGenerationCountPanelOpen(false);
-                  setVideoDurationPanelOpen(false);
-                  setModelPanelOpen((open) => !open);
+            <div className="relative min-w-0">
+              <label htmlFor="generation-model" className="mb-2 block text-xs font-semibold">生成模型</label>
+              <Select
+                value={selectedModel || ''}
+                onValueChange={selectModel}
+                open={modelPanelOpen}
+                onOpenChange={(open) => {
+                  if (open) {
+                    setParameterPanelOpen(false);
+                    setGenerationCountPanelOpen(false);
+                    setVideoDurationPanelOpen(false);
+                  }
+                  setModelPanelOpen(open);
                 }}
-                aria-haspopup="listbox"
-                aria-expanded={modelPanelOpen}
-                className="h-10 w-full justify-between rounded-lg border-solid [border-color:var(--generation-control-border)] [border-width:var(--generation-control-border-width)] bg-[var(--generation-control-bg)] px-3 text-sm font-normal text-[var(--neutral-foreground)] shadow-none hover:bg-[var(--neutral-surface-hover)] hover:text-[var(--neutral-foreground)]"
+                disabled={!modelOptions.length}
               >
-                <span className="truncate">{selectedModel || `选择${generationMode === 'image' ? '图像' : '视频'}模型`}</span>
-                <ChevronDown size={15} className={cn('shrink-0 text-muted-foreground transition-transform', modelPanelOpen && 'rotate-180')} />
-              </Button>
-              {modelPanelOpen && (
-                <div role="listbox" aria-label={`${generationMode === 'image' ? '图像' : '视频'}生成模型`} className="absolute bottom-12 left-0 z-[90] max-h-[360px] w-full overflow-y-auto rounded-lg border border-[var(--surface-border)] bg-popover p-1.5 text-popover-foreground shadow-xl">
-                  {modelOptions.map((model) => {
-                    const selected = selectedModel === model;
-                    return (
-                      <Button
-                        key={model}
-                        type="button"
-                        variant="ghost"
-                        role="option"
-                        aria-selected={selected}
-                        onClick={() => selectModel(model)}
-                        className={cn(
-                          'h-9 w-full min-w-0 justify-between rounded-md border-0 px-2.5 text-sm font-normal shadow-none',
-                          selected ? 'bg-[var(--neutral-control-selected)] text-[var(--neutral-foreground)]' : 'hover:bg-[var(--generation-segment-hover-bg)] hover:text-[var(--generation-segment-hover-foreground)]',
-                        )}
-                      >
-                        <span className="truncate">{model}</span>
-                        {selected && <Check size={14} className="shrink-0" />}
-                      </Button>
-                    );
-                  })}
-                </div>
-              )}
+                <SelectTrigger
+                  id="generation-model"
+                  aria-label={`${generationMode === 'image' ? '图像' : '视频'}生成模型`}
+                  className="h-10 w-full justify-between rounded-lg border-solid [border-color:var(--generation-control-border)] [border-width:var(--generation-control-border-width)] bg-[var(--generation-control-bg)] px-3 text-sm font-normal text-[var(--neutral-foreground)] shadow-none hover:bg-[var(--neutral-surface-hover)] hover:text-[var(--neutral-foreground)]"
+                >
+                  <SelectValue placeholder={`选择${generationMode === 'image' ? '图像' : '视频'}模型`} />
+                </SelectTrigger>
+                <SelectContent side="top" align="start" sideOffset={8} aria-label={`${generationMode === 'image' ? '图像' : '视频'}生成模型`} className="z-[90] max-h-[360px] w-[var(--radix-select-trigger-width)]">
+                  {modelOptions.map((model) => (
+                    <SelectItem key={model} value={model} className="h-9 min-w-0 rounded-md text-sm font-normal">
+                      {model}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
             {generationMode === 'image' && (
-              <fieldset ref={generationCountPanelRef} className="relative min-w-0">
-                <legend className="mb-2 text-xs font-semibold">生成数量</legend>
-                <div className="grid h-10 grid-cols-5 gap-1 rounded-lg border-solid [border-color:var(--generation-control-border)] [border-width:var(--generation-control-border-width)] bg-[var(--generation-control-bg)] p-1 text-[var(--neutral-foreground)]">
-                  {GENERATION_COUNT_OPTIONS.map((option) => (
-                    <Button key={option} type="button" variant="ghost" aria-pressed={generationCount === option} onClick={() => { setGenerationCount(option); setGenerationCountPanelOpen(false); }} className={cn('h-[var(--generation-count-option-height)] min-w-0 self-center whitespace-nowrap border-0 px-0 text-xs [transform:translateY(var(--generation-count-option-offset-y))] hover:bg-[var(--generation-segment-hover-bg)] hover:text-[var(--generation-segment-hover-foreground)]', generationCount === option && 'bg-[var(--generation-count-selected-bg)] text-[var(--generation-segment-selected-foreground)] hover:bg-[var(--generation-count-selected-bg)] hover:text-[var(--generation-segment-selected-foreground)]')}>
-                      {option}张
-                    </Button>
-                  ))}
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    aria-pressed={generationCount === 'custom'}
-                    aria-haspopup="dialog"
-                    aria-expanded={generationCountPanelOpen}
-                    onClick={() => {
-                      setGenerationCount('custom');
-                      setModelPanelOpen(false);
-                      setParameterPanelOpen(false);
-                      setGenerationCountPanelOpen((open) => !open);
+              <Popover open={generationCountPanelOpen} onOpenChange={setGenerationCountPanelOpen}>
+                <fieldset className="relative min-w-0">
+                  <legend className="mb-2 text-xs font-semibold">生成数量</legend>
+                  <div className="grid h-10 grid-cols-5 gap-1 rounded-lg border-solid [border-color:var(--generation-control-border)] [border-width:var(--generation-control-border-width)] bg-[var(--generation-control-bg)] p-1 text-[var(--neutral-foreground)]">
+                    {GENERATION_COUNT_OPTIONS.map((option) => (
+                      <Button key={option} type="button" variant="ghost" aria-pressed={generationCount === option} onClick={() => { setGenerationCount(option); setGenerationCountPanelOpen(false); }} className={cn('h-full min-h-0 min-w-0 whitespace-nowrap border-0 px-0 py-0 text-xs hover:bg-[var(--generation-segment-hover-bg)] hover:text-[var(--generation-segment-hover-foreground)]', generationCount === option && 'bg-[var(--generation-count-selected-bg)] text-[var(--generation-segment-selected-foreground)] hover:bg-[var(--generation-count-selected-bg)] hover:text-[var(--generation-segment-selected-foreground)]')}>
+                        {option}张
+                      </Button>
+                    ))}
+                    <PopoverTrigger asChild>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        aria-pressed={generationCount === 'custom'}
+                        aria-haspopup="dialog"
+                        aria-expanded={generationCountPanelOpen}
+                        onClick={() => {
+                          setGenerationCount('custom');
+                          setModelPanelOpen(false);
+                          setParameterPanelOpen(false);
+                        }}
+                        className={cn('h-full min-h-0 min-w-0 whitespace-nowrap px-0 py-0 text-xs hover:bg-[var(--generation-segment-hover-bg)] hover:text-[var(--generation-segment-hover-foreground)]', generationCount === 'custom' && 'bg-[var(--generation-segment-selected-bg)] text-[var(--generation-segment-selected-foreground)] hover:bg-[var(--generation-segment-selected-bg)] hover:text-[var(--generation-segment-selected-foreground)]')}
+                      >
+                        {generationCount === 'custom' ? `${customGenerationCount}张 +` : '自定义'}
+                      </Button>
+                    </PopoverTrigger>
+                  </div>
+                  <PopoverContent
+                    side="top"
+                    align="end"
+                    aria-label="自定义生成张数"
+                    onOpenAutoFocus={(event) => {
+                      event.preventDefault();
+                      generationCountInputRef.current?.focus();
+                      generationCountInputRef.current?.select();
                     }}
-                    className={cn('h-[var(--generation-count-option-height)] min-w-0 self-center whitespace-nowrap px-0 text-xs [transform:translateY(var(--generation-count-option-offset-y))] hover:bg-[var(--generation-segment-hover-bg)] hover:text-[var(--generation-segment-hover-foreground)]', generationCount === 'custom' && 'bg-[var(--generation-segment-selected-bg)] text-[var(--generation-segment-selected-foreground)] hover:bg-[var(--generation-segment-selected-bg)] hover:text-[var(--generation-segment-selected-foreground)]')}
+                    className="w-[180px] p-3"
                   >
-                    {generationCount === 'custom' ? `${customGenerationCount}张 +` : '自定义'}
-                  </Button>
-                </div>
-                {generationCountPanelOpen && (
-                  <div role="dialog" aria-label="自定义生成张数" className="absolute bottom-12 right-0 z-[90] w-[180px] rounded-lg border border-[var(--surface-border)] bg-popover p-3 text-popover-foreground shadow-xl">
                     <label className="mb-2 block text-xs font-semibold" htmlFor="custom-generation-count">自定义数量</label>
                     <div className="relative">
-                      <Input
+                      <NumberField
                         ref={generationCountInputRef}
                         id="custom-generation-count"
-                        type="number"
                         min={1}
                         max={10}
                         value={customGenerationCount}
-                        onChange={(event) => setCustomGenerationCount(Math.min(10, Math.max(1, Number(event.target.value) || 1)))}
+                        onValueChange={setCustomGenerationCount}
                         onKeyDown={(event) => {
                           if (event.key === 'Enter') setGenerationCountPanelOpen(false);
                         }}
-                        inputSize="sm"
                         aria-label="自定义生成张数"
-                        className="border-0 bg-[var(--neutral-surface)] pr-8 text-[var(--neutral-foreground)] shadow-none"
+                        className="generation-number-field border-0 bg-[var(--neutral-surface)] text-[var(--neutral-foreground)] shadow-none"
                       />
-                      <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">张</span>
+                      <span className="pointer-events-none absolute right-[4.5rem] top-1/2 -translate-y-1/2 text-xs text-muted-foreground">张</span>
                     </div>
-                  </div>
-                )}
-              </fieldset>
+                  </PopoverContent>
+                </fieldset>
+              </Popover>
             )}
             {generationMode === 'video' && (
-              <fieldset ref={videoDurationPanelRef} className="relative min-w-0">
-                <legend className="mb-2 text-xs font-semibold">秒数</legend>
-                <div className="grid h-10 grid-cols-4 gap-1 rounded-lg bg-[var(--neutral-surface-subtle)] p-1 text-[var(--neutral-foreground)]">
-                  {VIDEO_DURATION_OPTIONS.map((option) => (
-                    <Button key={option} type="button" variant="ghost" aria-pressed={videoDuration === option} onClick={() => { setVideoDuration(option); setVideoDurationPanelOpen(false); }} className={segmentedOptionClass(videoDuration === option)}>
-                      {option}s
-                    </Button>
-                  ))}
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    aria-pressed={videoDuration === 'custom'}
-                    aria-haspopup="dialog"
-                    aria-expanded={videoDurationPanelOpen}
-                    onClick={() => {
-                      setVideoDuration('custom');
-                      setModelPanelOpen(false);
-                      setParameterPanelOpen(false);
-                      setGenerationCountPanelOpen(false);
-                      setVideoDurationPanelOpen((open) => !open);
+              <Popover open={videoDurationPanelOpen} onOpenChange={setVideoDurationPanelOpen}>
+                <fieldset className="relative min-w-0">
+                  <legend className="mb-2 text-xs font-semibold">秒数</legend>
+                  <div className="grid h-10 grid-cols-4 gap-1 rounded-lg bg-[var(--neutral-surface-subtle)] p-1 text-[var(--neutral-foreground)]">
+                    {VIDEO_DURATION_OPTIONS.map((option) => (
+                      <Button key={option} type="button" variant="ghost" aria-pressed={videoDuration === option} onClick={() => { setVideoDuration(option); setVideoDurationPanelOpen(false); }} className={segmentedOptionClass(videoDuration === option)}>
+                        {option}s
+                      </Button>
+                    ))}
+                    <PopoverTrigger asChild>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        aria-pressed={videoDuration === 'custom'}
+                        aria-haspopup="dialog"
+                        aria-expanded={videoDurationPanelOpen}
+                        onClick={() => {
+                          setVideoDuration('custom');
+                          setModelPanelOpen(false);
+                          setParameterPanelOpen(false);
+                          setGenerationCountPanelOpen(false);
+                        }}
+                        className={segmentedOptionClass(videoDuration === 'custom')}
+                      >
+                        {videoDuration === 'custom' ? `${customVideoDuration}s +` : '自定义'}
+                      </Button>
+                    </PopoverTrigger>
+                  </div>
+                  <PopoverContent
+                    side="top"
+                    align="end"
+                    aria-label="自定义视频秒数"
+                    onOpenAutoFocus={(event) => {
+                      event.preventDefault();
+                      videoDurationInputRef.current?.focus();
+                      videoDurationInputRef.current?.select();
                     }}
-                    className={segmentedOptionClass(videoDuration === 'custom')}
+                    className="w-[180px] p-3"
                   >
-                    {videoDuration === 'custom' ? `${customVideoDuration}s +` : '自定义'}
-                  </Button>
-                </div>
-                {videoDurationPanelOpen && (
-                  <div role="dialog" aria-label="自定义视频秒数" className="absolute bottom-12 right-0 z-[90] w-[180px] rounded-lg border border-[var(--surface-border)] bg-popover p-3 text-popover-foreground shadow-xl">
                     <label className="mb-2 block text-xs font-semibold" htmlFor="custom-video-duration">自定义秒数</label>
                     <div className="relative">
-                      <Input
+                      <NumberField
                         ref={videoDurationInputRef}
                         id="custom-video-duration"
-                        type="number"
                         min={1}
                         max={60}
                         value={customVideoDuration}
-                        onChange={(event) => setCustomVideoDuration(Math.min(60, Math.max(1, Number(event.target.value) || 1)))}
+                        onValueChange={setCustomVideoDuration}
                         onKeyDown={(event) => {
                           if (event.key === 'Enter') setVideoDurationPanelOpen(false);
                         }}
-                        inputSize="sm"
                         aria-label="自定义视频秒数"
-                        className="border-0 bg-[var(--neutral-surface)] pr-8 text-[var(--neutral-foreground)] shadow-none"
+                        className="generation-number-field border-0 bg-[var(--neutral-surface)] text-[var(--neutral-foreground)] shadow-none"
                       />
-                      <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">s</span>
+                      <span className="pointer-events-none absolute right-[4.5rem] top-1/2 -translate-y-1/2 text-xs text-muted-foreground">s</span>
                     </div>
-                  </div>
-                )}
-              </fieldset>
+                  </PopoverContent>
+                </fieldset>
+              </Popover>
             )}
           </div>
 
-          <div ref={parameterPanelRef} className="relative">
-            <label className="mb-2 block text-xs font-semibold">参数设置</label>
-            <Button
-              type="button"
-              variant="ghost"
-              onClick={() => {
-                setModelPanelOpen(false);
-                setGenerationCountPanelOpen(false);
-                setVideoDurationPanelOpen(false);
-                setParameterPanelOpen((open) => !open);
-              }}
-              aria-haspopup="true"
-              aria-expanded={parameterPanelOpen}
-              className="h-10 w-full justify-between rounded-lg border-solid [border-color:var(--generation-control-border)] [border-width:var(--generation-control-border-width)] bg-[var(--generation-control-bg)] px-3 text-sm font-normal text-[var(--neutral-foreground)] shadow-none hover:bg-[var(--neutral-surface-hover)] hover:text-[var(--neutral-foreground)]"
-            >
-              <span className="truncate">{parameterSummary}</span>
-              <ChevronDown size={15} className={cn('shrink-0 text-muted-foreground transition-transform', parameterPanelOpen && 'rotate-180')} />
-            </Button>
+          <div className="relative">
+            <label htmlFor="generation-parameters" className="mb-2 block text-xs font-semibold">参数设置</label>
+            <Popover open={parameterPanelOpen} onOpenChange={setParameterPanelOpen}>
+              <PopoverTrigger asChild>
+                <Button
+                  id="generation-parameters"
+                  aria-label="参数设置"
+                  type="button"
+                  variant="ghost"
+                  onClick={() => {
+                    setModelPanelOpen(false);
+                    setGenerationCountPanelOpen(false);
+                    setVideoDurationPanelOpen(false);
+                  }}
+                  aria-expanded={parameterPanelOpen}
+                  className="h-10 w-full justify-between rounded-lg border-solid [border-color:var(--generation-control-border)] [border-width:var(--generation-control-border-width)] bg-[var(--generation-control-bg)] px-3 text-sm font-normal text-[var(--neutral-foreground)] shadow-none hover:bg-[var(--neutral-surface-hover)] hover:text-[var(--neutral-foreground)]"
+                >
+                  <span className="truncate">{parameterSummary}</span>
+                  <ChevronDown size={15} className={cn('shrink-0 text-muted-foreground transition-transform', parameterPanelOpen && 'rotate-180')} />
+                </Button>
+              </PopoverTrigger>
 
-            {parameterPanelOpen && (
-              <div role="dialog" aria-label="参数设置" className="absolute bottom-12 left-0 z-[90] w-full rounded-lg border border-[var(--surface-border)] bg-popover p-4 text-popover-foreground shadow-xl">
+              <PopoverContent side="top" align="start" aria-label="参数设置" className="parameter-popover w-[var(--radix-popover-trigger-width)] p-4">
                 <div className="space-y-4">
                   <fieldset>
                     <legend className="mb-2 text-xs font-semibold">画面比例</legend>
@@ -1118,8 +1064,8 @@ export const ImageGeneration = () => {
                     </div>
                   )}
                 </div>
-              </div>
-            )}
+              </PopoverContent>
+            </Popover>
           </div>
         </div>
 
@@ -1132,8 +1078,20 @@ export const ImageGeneration = () => {
         </div>
       </section>
 
-      <section className="flex min-h-0 min-w-0 overflow-hidden rounded-r-lg border !border-l-0 border-border bg-[var(--module-workspace-bg,var(--background))] pl-3 text-foreground" aria-label="生成结果列表">
-        <div className="min-w-0 flex-1 overflow-x-hidden overflow-y-auto scroll-smooth">
+      <section className="flex min-h-0 min-w-0 flex-col overflow-hidden rounded-r-lg border !border-l-0 border-border bg-[var(--module-workspace-bg,var(--background))] pl-3 text-foreground" aria-label="生成结果列表">
+        <header className="flex h-14 shrink-0 items-center justify-between gap-3 px-2 pr-4">
+          <h2 className="text-sm font-semibold">历史记录</h2>
+          <div role="group" aria-label="历史记录展示方式" className="flex items-center gap-1">
+            <Button type="button" variant="ghost" size="icon" aria-label="默认列表展示" title="默认列表展示" aria-pressed={historyView === 'default'} onClick={() => setHistoryView('default')} className={cn('h-8 w-8', historyView === 'default' ? 'bg-muted text-foreground' : 'text-muted-foreground')}>
+              <Gallery size={16} aria-hidden="true" />
+            </Button>
+            <Button type="button" variant="ghost" size="icon" aria-label="宫格展示" title="宫格展示" aria-pressed={historyView === 'grid'} onClick={() => setHistoryView('grid')} className={cn('h-8 w-8', historyView === 'grid' ? 'bg-muted text-foreground' : 'text-muted-foreground')}>
+              <LayoutGrid size={16} aria-hidden="true" />
+            </Button>
+          </div>
+        </header>
+        <div className="min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto scroll-smooth">
+        <div className={cn('min-h-full w-full', historyView === 'default' && 'mx-auto max-w-[760px]')}>
           {isGenerating && (pendingGeneration && pendingGeneration.total > 1 ? (
             <div className="pb-2 pt-2">
               <div className="flex min-h-9 items-center gap-2 px-2 text-sm text-muted-foreground">
@@ -1160,12 +1118,23 @@ export const ImageGeneration = () => {
             </div>
           ))}
 
-          {history.length > 0 ? history.map((record, index) => {
+          {history.length > 0 ? historyView === 'grid' ? (
+            <GenerationHistoryGrid
+              records={history}
+              savedUrls={savedAssetUrls}
+              onOpen={(url) => { setPreviewUrl(url); setFullscreenImage(url); }}
+              onContextMenu={(url, event) => imageInteractions(url).onContextMenu(event)}
+              onEdit={editRecordPrompt}
+              onCopy={(record) => void copyPrompt(record)}
+              onSave={(url, record) => void handleAddToAssets(url, record.prompt, record.mode === 'video' ? 'video' : 'image')}
+              onDownload={downloadImage}
+            />
+          ) : history.map((record) => {
             const output = record.outputs[0] || '';
             const selectedOutput = activeOutputOf(record.id, record.outputs) || output;
             const isVideoRecord = record.mode === 'video';
             return (
-              <article id={`generation-result-${index}`} key={record.id} className="scroll-mt-0 pb-2 last:pb-0">
+              <article key={record.id} className="scroll-mt-0 pb-2 last:pb-0">
                 <header className="bg-[var(--module-workspace-bg,var(--background))] px-2 pb-2 pt-2">
                   <div className="flex min-h-9 flex-wrap items-center gap-2">
                     <div className="min-w-[120px] flex-1">
@@ -1180,7 +1149,7 @@ export const ImageGeneration = () => {
                       <Button variant="ghost" size="iconSm" type="button" onClick={() => editRecordPrompt(record)} aria-label={`编辑提示词：${record.prompt}`} title="编辑提示词" className="h-6 w-6 p-0"><Pencil size={13} /></Button>
                       <Button variant="ghost" size="iconSm" type="button" onClick={() => deleteRecord(record)} aria-label="删除生成记录" title="删除生成记录" className="h-6 w-6 p-0 text-muted-foreground hover:text-destructive"><Trash2 size={13} /></Button>
                       {selectedOutput && <>
-                        <Button variant="ghost" size="iconSm" type="button" onClick={() => void handleAddToAssets(selectedOutput, record.prompt, isVideoRecord ? 'video' : 'image')} disabled={savedAssetUrls.has(selectedOutput)} aria-label={savedAssetUrls.has(selectedOutput) ? '已收藏' : '添加至收藏'} title={savedAssetUrls.has(selectedOutput) ? '已收藏' : '添加至收藏'} className="h-6 w-6 p-0"><Heart size={13} /></Button>
+                        <Button variant="ghost" size="iconSm" type="button" onClick={() => void handleAddToAssets(selectedOutput, record.prompt, isVideoRecord ? 'video' : 'image')} aria-pressed={savedAssetUrls.has(selectedOutput)} aria-label={savedAssetUrls.has(selectedOutput) ? '取消收藏' : '添加至收藏'} title={savedAssetUrls.has(selectedOutput) ? '取消收藏' : '添加至收藏'} className="h-6 w-6 p-0 disabled:opacity-100"><FavoriteIcon saved={savedAssetUrls.has(selectedOutput)} size={13} /></Button>
                         <Button variant="ghost" size="iconSm" type="button" onClick={() => downloadImage(selectedOutput)} aria-label={isVideoRecord ? '下载视频' : '下载图片'} title={isVideoRecord ? '下载视频' : '下载图片'} className="h-6 w-6 p-0"><Download size={13} /></Button>
                       </>}
                     </div>
@@ -1238,31 +1207,11 @@ export const ImageGeneration = () => {
             </div>
           )}
         </div>
-
-        <aside className="w-[84px] shrink-0 overflow-y-auto p-2" aria-label="快速切换生成结果">
-          <div className="space-y-2">
-            {history.map((record, index) => {
-              const output = record.outputs[0] || '';
-              return (
-                <button
-                  key={record.id}
-                  type="button"
-                  onClick={() => selectRecord(output, index)}
-                  aria-label={`切换到第 ${index + 1} 条生成结果`}
-                  aria-current={previewUrl === output ? 'true' : undefined}
-                  className={cn('block aspect-square w-full overflow-hidden rounded-md border-2 bg-[#111] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring', previewUrl === output ? 'border-foreground' : 'border-transparent hover:border-[var(--surface-border-strong)]')}
-                >
-                  {record.mode === 'video'
-                    ? <video src={output} preload="metadata" className="h-full w-full object-contain" />
-                    : <img src={output} alt="" className="h-full w-full object-contain" />}
-                </button>
-              );
-            })}
-          </div>
-        </aside>
+        </div>
       </section>
 
       <GeneratedImageMenu
+        allowUnsave
         target={imageMenu}
         onClose={() => setImageMenu(null)}
         ensureAsset={ensureImageAsset}
@@ -1273,14 +1222,21 @@ export const ImageGeneration = () => {
         onError={setError}
       />
 
-      {fullscreenImage && (
-        <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/30 backdrop-blur-xl" role="dialog" aria-modal="true" aria-label="全屏图片详情" onClick={() => setFullscreenImage(null)}>
-          <aside className="flex h-screen w-screen flex-col overflow-hidden bg-black/25 text-white shadow-2xl backdrop-blur-xl" onClick={(event) => event.stopPropagation()}>
+      <Dialog open={!!fullscreenImage} onOpenChange={(open) => { if (!open) setFullscreenImage(null); }}>
+        {fullscreenImage && (
+          <DialogContent
+            showCloseButton={false}
+            overlayClassName="bg-black/30 backdrop-blur-xl"
+            className="flex h-screen w-screen max-w-none flex-col gap-0 overflow-hidden rounded-none border-0 bg-black/25 p-0 text-white shadow-2xl backdrop-blur-xl"
+          >
+            <DialogTitle className="sr-only">全屏图片详情</DialogTitle>
+            <DialogDescription className="sr-only">查看生成结果、提示词与模型参数，可收藏、下载或切换图片。</DialogDescription>
             <header className="flex h-12 w-full shrink-0 items-center justify-between px-4">
               <span className="min-w-0 truncate text-sm font-semibold" title={fullscreenRecord?.prompt || '图片详情'}>
-                {fullscreenRecord ? `图片生成 · ${formatGenerationTime(fullscreenRecord.createdAt)}` : '图片详情'}
+                {fullscreenRecord ? `图片生成 / ${formatGenerationTime(fullscreenRecord.createdAt)}` : '图片详情'}
               </span>
               <div className="flex h-8 items-center gap-1 rounded-lg bg-white/10 text-white/85 backdrop-blur-xl">
+                <Button type="button" variant="ghost" size="iconSm" onClick={() => void handleAddToAssets(fullscreenImage, fullscreenRecord?.prompt || '', fullscreenRecord?.mode === 'video' ? 'video' : 'image')} aria-pressed={savedAssetUrls.has(fullscreenImage)} aria-label={savedAssetUrls.has(fullscreenImage) ? '取消收藏' : '添加至收藏'} title={savedAssetUrls.has(fullscreenImage) ? '取消收藏' : '添加至收藏'} className="h-8 w-8 disabled:opacity-100"><FavoriteIcon saved={savedAssetUrls.has(fullscreenImage)} size={15} /></Button>
                 <Button type="button" variant="ghost" size="iconSm" onClick={() => downloadImage(fullscreenImage)} aria-label="下载图片" title="下载图片" className="h-8 w-8"><Download size={15} /></Button>
                 <Button type="button" variant="ghost" size="iconSm" onClick={() => setFullscreenImage(null)} aria-label="关闭详情" title="关闭详情" className="h-8 w-8"><X size={16} /></Button>
               </div>
@@ -1301,12 +1257,12 @@ export const ImageGeneration = () => {
               {fullscreenRecord && (
                 <div className="flex min-h-0 w-full flex-col border-t border-white/10 bg-black/45 text-white backdrop-blur-xl md:mb-4 md:mr-2 md:max-w-[400px] md:rounded-xl md:border md:border-white/10 md:shadow-lg">
                   <div className="min-h-0 flex-1 space-y-2 overflow-y-auto p-3">
-                    <section className="max-h-[560px] space-y-3 rounded-lg bg-white/10 p-3">
+                    <section className="space-y-3 rounded-lg bg-white/10 p-3">
                       <div className="flex items-center justify-between gap-2">
                         <span className="text-xs font-medium text-white/75">提示词</span>
                         <Button type="button" variant="ghost" size="iconSm" onClick={() => void navigator.clipboard?.writeText(fullscreenRecord.prompt)} aria-label="复制提示词" title="复制提示词" className="h-7 w-7 text-white/70 hover:bg-white/10 hover:text-white"><Copy size={13} /></Button>
                       </div>
-                      <p className="whitespace-pre-wrap text-sm leading-6 text-white">{fullscreenRecord.prompt || '暂无提示词'}</p>
+                      <p className="whitespace-pre-wrap [overflow-wrap:anywhere] text-sm leading-6 text-white">{fullscreenRecord.prompt || '暂无提示词'}</p>
                     </section>
                     <section className="space-y-3 rounded-lg bg-white/10 p-3">
                       <span className="text-xs font-medium text-white/75">模型参数</span>
@@ -1321,9 +1277,9 @@ export const ImageGeneration = () => {
                 </div>
               )}
             </div>
-          </aside>
-        </div>
-      )}
+          </DialogContent>
+        )}
+      </Dialog>
 
     </main>
   );

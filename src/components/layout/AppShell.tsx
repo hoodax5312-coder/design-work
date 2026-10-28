@@ -12,6 +12,7 @@ import { useUIStore } from '../../stores/useUIStore';
 import { CreationModeSwitch } from './CreationModeSwitch';
 import { ProjectSidebar } from './ProjectSidebar';
 import { Button, Input } from '../ui';
+import { Dialog, DialogContent, DialogTitle, DialogDescription } from '../ui/Dialog';
 
 interface AppShellProps {
   children: ReactNode;
@@ -145,17 +146,10 @@ export const AppShell = ({ children }: AppShellProps) => {
 
       </div>
 
-      {commandOpen && (
-        <div
-          className="fixed inset-0 z-[200] flex items-start justify-center bg-black/35 px-4 pt-[12vh] backdrop-blur-[2px]"
-          onMouseDown={(event) => event.target === event.currentTarget && setCommandOpen(false)}
-        >
-          <div
-            role="dialog"
-            aria-modal="true"
-            aria-label="命令面板"
-            className="w-full max-w-lg overflow-hidden rounded-lg border bg-popover text-popover-foreground shadow-lg"
-          >
+      <Dialog open={commandOpen} onOpenChange={setCommandOpen}>
+          <DialogContent showCloseButton={false} className="gap-0 overflow-hidden bg-popover p-0 text-popover-foreground">
+            <DialogTitle className="sr-only">命令面板</DialogTitle>
+            <DialogDescription className="sr-only">搜索并打开工具或执行操作。</DialogDescription>
             <label className="flex h-14 items-center gap-3 border-b px-4">
               <Search size={17} className="text-muted-foreground" />
               <Input
@@ -198,9 +192,8 @@ export const AppShell = ({ children }: AppShellProps) => {
                 <div className="px-3 py-8 text-center text-xs text-muted-foreground">没有匹配的命令</div>
               )}
             </div>
-          </div>
-        </div>
-      )}
+          </DialogContent>
+      </Dialog>
     </div>
   );
 };

@@ -46,7 +46,7 @@ const DropdownMenuContent = forwardRef<
               animate="visible"
               exit="exit"
               className={cn(
-                'nokey nowheel z-[100] min-w-[168px] overflow-y-auto overflow-x-hidden rounded-lg border border-border bg-popover p-1 text-popover-foreground shadow-[0_12px_32px_rgba(0,0,0,0.16)] outline-none',
+                'nokey nowheel z-[100] min-w-[168px] overflow-y-auto overflow-x-hidden rounded-lg border border-[color:var(--popover-border)] bg-popover p-1 text-popover-foreground [box-shadow:var(--popover-shadow)] outline-none',
                 'max-h-[var(--radix-dropdown-menu-content-available-height)]',
                 className,
               )}
@@ -141,7 +141,7 @@ const DropdownMenuSubContent = forwardRef<
       sideOffset={sideOffset}
       collisionPadding={collisionPadding}
       className={cn(
-        'nokey nowheel z-[100] min-w-[168px] overflow-y-auto overflow-x-hidden rounded-lg border border-border bg-popover p-1 text-popover-foreground shadow-[0_12px_32px_rgba(0,0,0,0.16)] outline-none',
+        'nokey nowheel z-[100] min-w-[168px] overflow-y-auto overflow-x-hidden rounded-lg border border-[color:var(--popover-border)] bg-popover p-1 text-popover-foreground [box-shadow:var(--popover-shadow)] outline-none',
         'max-h-[var(--radix-dropdown-menu-content-available-height)]',
         className,
       )}

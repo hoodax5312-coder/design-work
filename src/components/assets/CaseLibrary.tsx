@@ -1,16 +1,21 @@
-import { useEffect, useMemo, useState } from 'react';
+import { FavoriteIcon } from '../ui/FavoriteIcon';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
-  Heart,
   Copy,
   Download,
   Globe2,
-  Maximize2,
   X,
+  ChevronLeft,
+  ChevronRight,
+  Play,
 } from '@/lib/remixIconShim';
 import { cn } from '../../lib/utils';
 import { assetService } from '../../services/assetService';
-import { Button } from '../ui';
-import { isCaseVideo } from './caseMedia';
+import { Button } from '../ui/Button';
+import { Dialog, DialogContent, DialogDescription, DialogTitle } from '../ui/Dialog';
+import { getCasePlaybackUrl, getCaseVideoUrl, isCaseVideo } from './caseMedia';
+import { CaseVideoPlayer } from './CaseVideoPlayer';
+import { CASE_PAGE_SIZE, paginateCases } from './casePagination';
 
 export type CaseItem = {
   id: string;
@@ -24,6 +29,7 @@ export type CaseItem = {
   sourceUrl: string;
   imageModel: string;
   mediaType?: string;
+  videoUrl?: string | null;
 };
 
 const caseTabs: Array<{ id: string; label: string }> = [
@@ -39,10 +45,22 @@ const caseModelMatches = (model: string, tabId: string) => {
   return normalized.includes(tabId.replace(/[^a-z0-9]+/g, ''));
 };
 
-const CaseActionIcon = ({ kind }: { kind: 'download' | 'save' | 'fullscreen' }) => {
-  const Icon = kind === 'download' ? Download : kind === 'save' ? Heart : Maximize2;
-  const opticalScale = kind === 'save' ? 'scale-[1.15]' : kind === 'fullscreen' ? 'scale-[0.95]' : 'scale-[1.05]';
-  return <span className="grid h-6 w-6 shrink-0 place-items-center"><Icon size={20} className={opticalScale} aria-hidden="true" /></span>;
+const CaseActionIcon = ({ kind, saved = false }: { kind: 'download' | 'save'; saved?: boolean }) => {
+  return <span className="grid h-6 w-6 shrink-0 place-items-center">{kind === 'save' ? <FavoriteIcon saved={saved} size={16} /> : <Download size={16} aria-hidden="true" />}</span>;
+};
+
+const CaseCover = ({ item }: { item: CaseItem }) => {
+  const [failed, setFailed] = useState(false);
+  const [hovered, setHovered] = useState(false);
+  const playbackUrl = getCasePlaybackUrl(item);
+  return <div className="relative aspect-[16/10] overflow-hidden bg-muted" onMouseEnter={() => setHovered(true)} onMouseLeave={() => setHovered(false)}>
+    {hovered && playbackUrl ? <CaseVideoPlayer src={playbackUrl} poster={getCaseVideoUrl(item) ? undefined : item.coverUrl || undefined} preview />
+      : !item.coverUrl || failed ? <div className="grid h-full place-items-center text-xs text-muted-foreground">{failed ? '封面加载失败，点击查看详情' : '暂无封面'}</div>
+      : getCaseVideoUrl(item)
+        ? <video src={item.coverUrl} muted playsInline preload="none" className="h-full w-full object-cover" onError={() => setFailed(true)} />
+        : <img src={item.coverUrl} alt="" className="h-full w-full object-cover" loading="lazy" decoding="async" onError={() => setFailed(true)} />}
+    {isCaseVideo(item) && <span className="absolute bottom-2 left-2 inline-flex items-center gap-1 rounded bg-black/60 px-2 py-1 text-[11px] text-white"><Play size={12} aria-hidden="true" />视频案例</span>}
+  </div>;
 };
 
 // 案例资源的状态与操作；布局外壳仍由 AssetLibraryPage 提供，各区块组件按位置嵌入。
@@ -67,6 +85,8 @@ export const useCaseLibrary = ({
   const [selectedCase, setSelectedCase] = useState<CaseItem | null>(null);
   const [savedCaseIds, setSavedCaseIds] = useState<Set<string>>(new Set());
   const [caseAssetIdsByCaseId, setCaseAssetIdsByCaseId] = useState<Record<string, string>>({});
+  const pendingFavoriteIds = useRef(new Set<string>());
+  const [pagination, setPagination] = useState({ key: '', page: 1 });
 
   useEffect(() => {
     if (!enabled) return;
@@ -91,37 +111,40 @@ export const useCaseLibrary = ({
     return () => window.removeEventListener('design-work:prompt-sources-updated', loadCases);
   }, [enabled, onError, query]);
 
-  useEffect(() => {
-    if (!selectedCase) return;
-    const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') setSelectedCase(null);
-    };
-    document.addEventListener('keydown', closeOnEscape);
-    return () => document.removeEventListener('keydown', closeOnEscape);
-  }, [selectedCase]);
-
   const downloadCaseImage = (item: CaseItem) => {
-    if (!item.coverUrl) return;
+    const url = getCaseVideoUrl(item) || item.coverUrl;
+    if (!url) return;
     const anchor = document.createElement('a');
-    anchor.href = item.coverUrl;
-    anchor.download = `${item.title || (isCaseVideo(item) ? 'case-video' : 'case-image')}.${isCaseVideo(item) ? 'mp4' : 'jpg'}`;
+    anchor.href = url;
+    anchor.download = `${item.title || (isCaseVideo(item) ? 'case-video' : 'case-image')}.${getCaseVideoUrl(item) ? 'mp4' : 'jpg'}`;
     anchor.target = '_blank';
     anchor.rel = 'noreferrer';
     anchor.click();
   };
 
-  const saveCaseToAssets = async (item: CaseItem) => {
-    if (!item.coverUrl || savedCaseIds.has(item.id)) return;
+  const copyCasePrompt = async (item: CaseItem) => {
+    try {
+      await navigator.clipboard.writeText(item.prompt || item.description);
+      onNotice('提示词已复制');
+    } catch {
+      onError('复制失败，请检查剪贴板权限后重试');
+    }
+  };
+
+  const toggleCaseFavorite = async (item: CaseItem) => {
+    if (!item.coverUrl || pendingFavoriteIds.current.has(item.id)) return;
+    pendingFavoriteIds.current.add(item.id);
+    const favorite = !savedCaseIds.has(item.id);
     try {
       const existingAssetId = caseAssetIdsByCaseId[item.id];
       if (existingAssetId) {
-        await assetService.update(existingAssetId, { favorite: true });
+        await assetService.update(existingAssetId, { favorite });
       } else {
         const created = await assetService.create({
-          type: isCaseVideo(item) ? 'video' : 'image',
+          type: getCaseVideoUrl(item) ? 'video' : 'image',
           title: item.title,
           description: item.prompt || item.description,
-          sourceUrl: item.coverUrl,
+          sourceUrl: getCaseVideoUrl(item) || item.coverUrl,
           favorite: true,
           userMetadata: {
             source: 'case-library',
@@ -135,11 +158,18 @@ export const useCaseLibrary = ({
         });
         setCaseAssetIdsByCaseId((current) => ({ ...current, [item.id]: created.id }));
       }
-      setSavedCaseIds((current) => new Set(current).add(item.id));
-      onNotice('已添加至收藏');
+      setSavedCaseIds((current) => {
+        const next = new Set(current);
+        if (favorite) next.add(item.id);
+        else next.delete(item.id);
+        return next;
+      });
+      onNotice(favorite ? '已添加至收藏' : '已取消收藏');
       onSaved();
     } catch (caught) {
-      onError(caught instanceof Error ? caught.message : '添加至收藏失败');
+      onError(caught instanceof Error ? caught.message : '更新收藏失败');
+    } finally {
+      pendingFavoriteIds.current.delete(item.id);
     }
   };
 
@@ -160,6 +190,10 @@ export const useCaseLibrary = ({
     (caseSourceTab === 'all' || item.sourceId === caseSourceTab)
       && caseModelMatches(item.imageModel, caseTab)
       && (!caseTag || item.tags.includes(caseTag))), [caseItems, caseSourceTab, caseTab, caseTag]);
+  const paginationKey = JSON.stringify([query, caseSourceTab, caseTab, caseTag]);
+  // 筛选发生变化即重置，切回旧分类也不恢复旧页码。
+  if (pagination.key !== paginationKey) setPagination({ key: paginationKey, page: 1 });
+  const casePagination = paginateCases(visibleCaseItems, pagination.key === paginationKey ? pagination.page : 1);
 
   return {
     caseTab,
@@ -175,8 +209,15 @@ export const useCaseLibrary = ({
     savedCaseIds,
     caseTagCounts,
     visibleCaseItems,
+    pagedCaseItems: casePagination.items,
+    casePage: casePagination.page,
+    casePageCount: casePagination.pageCount,
+    casePageStart: casePagination.start,
+    paginationKey,
+    setCasePage: (page: number) => setPagination({ key: paginationKey, page }),
     downloadCaseImage,
-    saveCaseToAssets,
+    copyCasePrompt,
+    toggleCaseFavorite,
     reset,
   };
 };
@@ -276,10 +317,10 @@ export const CaseFilterSections = ({ cases }: { cases: CaseLibraryState }) => {
 };
 
 export const CaseGrid = ({ cases }: { cases: CaseLibraryState }) => {
-  const { visibleCaseItems, caseSources, savedCaseIds, setSelectedCase, setCaseTag, downloadCaseImage, saveCaseToAssets } = cases;
+  const { visibleCaseItems, pagedCaseItems, casePage, casePageCount, casePageStart, paginationKey, setCasePage, caseSources, savedCaseIds, setSelectedCase, setCaseTag, downloadCaseImage, copyCasePrompt, toggleCaseFavorite } = cases;
   return <main className="flex min-w-0 flex-1 flex-col overflow-hidden bg-transparent">
-    <div className="min-h-0 flex-1 overflow-y-auto p-4">
-      {visibleCaseItems.length ? <div className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">{visibleCaseItems.map((item) => {
+    <div key={`${paginationKey}:${casePage}`} className="min-h-0 flex-1 overflow-y-auto p-4">
+      {visibleCaseItems.length ? <div className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">{pagedCaseItems.map((item) => {
         const sourceItem = caseSources.find((entry) => entry.id === item.sourceId);
         const saved = savedCaseIds.has(item.id);
         let sourceHost = '';
@@ -288,37 +329,31 @@ export const CaseGrid = ({ cases }: { cases: CaseLibraryState }) => {
           key={item.id}
           role="button"
           tabIndex={0}
-          aria-label={`查看案例详情：${item.title}`}
+          aria-label={`全屏查看案例：${item.title}`}
           onClick={() => setSelectedCase(item)}
           onKeyDown={(event) => {
             if (event.target !== event.currentTarget || (event.key !== 'Enter' && event.key !== ' ')) return;
             event.preventDefault();
             setSelectedCase(item);
           }}
-          className="group overflow-hidden rounded-md border border-border bg-card transition-shadow hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          className="cursor-pointer overflow-hidden rounded-md border border-border bg-card transition-shadow hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
         >
-          <div className="relative aspect-[16/10] overflow-hidden bg-muted">
-            {item.coverUrl ? <>
-              {isCaseVideo(item)
-                ? <video src={item.coverUrl} muted loop playsInline preload="metadata" className="h-full w-full object-cover" />
-                : <img src={item.coverUrl} alt="" className="h-full w-full object-cover" loading="lazy" />}
-              <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center bg-black/20 opacity-0 transition-opacity group-hover:pointer-events-auto group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:opacity-100">
-                <div className="pointer-events-none absolute inset-x-0 bottom-0 h-3/4 bg-gradient-to-t from-black/85 via-black/45 to-transparent" aria-hidden="true" />
-                <div className="relative z-10 flex items-center gap-3">
-                  <Button type="button" variant="ghost" size="iconSm" onClick={(event) => { event.stopPropagation(); downloadCaseImage(item); }} aria-label={`下载${item.title}`} title={isCaseVideo(item) ? '下载视频' : '下载图片'} className="h-10 w-10 bg-black/60 p-0 text-white shadow-lg hover:bg-black/85 hover:text-white"><CaseActionIcon kind="download" /></Button>
-                  <Button type="button" variant="ghost" size="iconSm" onClick={(event) => { event.stopPropagation(); void saveCaseToAssets(item); }} disabled={saved} aria-label={saved ? `${item.title}已收藏` : `添加${item.title}至收藏`} title={saved ? '已收藏' : '添加至收藏'} className={cn('h-10 w-10 bg-black/60 p-0 text-white shadow-lg hover:bg-black/85 hover:text-white', saved && 'cursor-default bg-white/20 text-white/45 hover:bg-white/20 hover:text-white/45')}><CaseActionIcon kind="save" /></Button>
-                  <Button type="button" variant="ghost" size="iconSm" onClick={(event) => { event.stopPropagation(); setSelectedCase(item); }} aria-label={`全屏查看${item.title}`} title="全屏查看" className="h-10 w-10 bg-black/60 p-0 text-white shadow-lg hover:bg-black/85 hover:text-white"><CaseActionIcon kind="fullscreen" /></Button>
-                </div>
-              </div>
-            </> : <div className="grid h-full place-items-center text-xs text-muted-foreground">暂无封面</div>}
-          </div>
+          <CaseCover key={item.coverUrl} item={item} />
           <div className="space-y-2 p-3">
             <h2 className="truncate text-sm font-semibold">{item.title}</h2>
             <p className="truncate text-xs leading-5 text-muted-foreground">{item.prompt}</p>
             <div className="flex min-h-5 flex-wrap gap-1">{item.tags.slice(0, 4).map((tag) => <button key={tag} type="button" onClick={(event) => { event.stopPropagation(); setCaseTag(tag); }} className="max-w-full truncate rounded bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground transition-colors hover:bg-[var(--surface-control)] hover:text-[var(--surface-control-foreground)]">{tag}</button>)}</div>
             <div className="flex items-center justify-between gap-2 text-[11px] text-muted-foreground">
-              <span className="truncate" title={sourceItem?.name || item.author || '公开来源'}>{sourceHost || sourceItem?.name || item.author || '公开来源'}</span>
-              {item.sourceUrl ? <a href={item.sourceUrl} target="_blank" rel="noreferrer" onClick={(event) => event.stopPropagation()} className="shrink-0 hover:text-foreground">查看来源</a> : null}
+              <div className="flex min-w-0 flex-1 items-center">
+                {item.sourceUrl ? <a href={item.sourceUrl} target="_blank" rel="noreferrer" onClick={(event) => event.stopPropagation()} className="min-w-0 truncate hover:text-foreground" title={sourceHost || sourceItem?.name || item.author || '公开来源'}>来源：{sourceHost || sourceItem?.name || item.author || '公开来源'}</a> : <span className="min-w-0 truncate" title={sourceItem?.name || item.author || '公开来源'}>来源：{sourceItem?.name || item.author || '公开来源'}</span>}
+              </div>
+              <div className="flex shrink-0 items-center gap-1" onClick={(event) => event.stopPropagation()}>
+                {item.coverUrl && <>
+                <Button type="button" variant="ghost" size="iconSm" onClick={() => downloadCaseImage(item)} aria-label={`下载${item.title}`} title={getCaseVideoUrl(item) ? '下载视频' : isCaseVideo(item) ? '下载封面' : '下载图片'} className="h-8 w-8 p-0"><CaseActionIcon kind="download" /></Button>
+                <Button type="button" variant="ghost" size="iconSm" onClick={() => { void toggleCaseFavorite(item); }} aria-pressed={saved} aria-label={saved ? `取消${item.title}收藏` : `添加${item.title}至收藏`} title={saved ? '取消收藏' : '添加至收藏'} className="h-8 w-8 p-0"><CaseActionIcon kind="save" saved={saved} /></Button>
+                </>}
+                <Button type="button" variant="ghost" size="iconSm" onClick={() => { void copyCasePrompt(item); }} disabled={!(item.prompt || item.description)} aria-label={`复制${item.title}提示词`} title="复制提示词" className="h-8 w-8 p-0"><Copy size={16} aria-hidden="true" /></Button>
+              </div>
             </div>
           </div>
         </article>;
@@ -330,35 +365,59 @@ export const CaseGrid = ({ cases }: { cases: CaseLibraryState }) => {
         <p className="mt-1.5 text-xs leading-5 text-muted-foreground">接入案例资源来源后，内容会显示在这里。</p>
       </div></div>}
     </div>
+    <nav aria-label="案例分页" className="flex shrink-0 flex-wrap items-center justify-end gap-2 px-4 py-3 text-xs text-muted-foreground">
+      <span className="mr-2 tabular-nums">共 {visibleCaseItems.length} 条 / 每页 {CASE_PAGE_SIZE} 条{visibleCaseItems.length ? ` / ${casePageStart + 1}–${casePageStart + pagedCaseItems.length}` : ''}</span>
+      <Button type="button" variant="ghost" size="iconSm" aria-label="上一页案例" title="上一页" disabled={casePage <= 1} onClick={() => setCasePage(casePage - 1)}><ChevronLeft size={16} /></Button>
+      <span className="tabular-nums text-foreground" aria-live="polite">{casePage} / {casePageCount}</span>
+      <Button type="button" variant="ghost" size="iconSm" aria-label="下一页案例" title="下一页" disabled={casePage >= casePageCount} onClick={() => setCasePage(casePage + 1)}><ChevronRight size={16} /></Button>
+    </nav>
   </main>;
 };
 
 export const CaseDetailOverlay = ({ cases }: { cases: CaseLibraryState }) => {
-  const { selectedCase, setSelectedCase, savedCaseIds, caseSources, setCaseTag, downloadCaseImage, saveCaseToAssets } = cases;
-  if (!selectedCase) return null;
+  const { selectedCase, setSelectedCase, savedCaseIds, caseSources, setCaseTag, downloadCaseImage, toggleCaseFavorite } = cases;
+  const returnFocusRef = useRef<HTMLElement | null>(null);
   return (
-    <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/30 backdrop-blur-xl" role="dialog" aria-modal="true" aria-label={`${selectedCase.title}详情`} onClick={() => setSelectedCase(null)}>
-      <aside className="flex h-screen w-screen flex-col overflow-hidden bg-black/25 text-white shadow-2xl backdrop-blur-xl" onClick={(event) => event.stopPropagation()}>
+    <Dialog open={Boolean(selectedCase)} onOpenChange={(open) => !open && setSelectedCase(null)}>
+      {selectedCase && <DialogContent
+        showCloseButton={false}
+        overlayClassName="bg-black/30 backdrop-blur-xl"
+        aria-label={`${selectedCase.title}详情`}
+        onOpenAutoFocus={() => {
+          returnFocusRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+        }}
+        onCloseAutoFocus={(event) => {
+          // Cases open from a separate grid, without a DialogTrigger to restore focus to.
+          if (returnFocusRef.current?.isConnected) {
+            event.preventDefault();
+            returnFocusRef.current.focus();
+          }
+        }}
+        className="!inset-0 !left-0 !top-0 !h-screen !w-screen !max-w-none !translate-x-0 !translate-y-0 !gap-0 !rounded-none !border-0 !bg-transparent !p-0 !shadow-none"
+      >
+        <aside className="flex h-screen w-screen flex-col overflow-hidden bg-black/25 text-white shadow-2xl backdrop-blur-xl">
         <header className="flex h-12 w-full shrink-0 items-center justify-between gap-4 px-4">
-          <span className="min-w-0 truncate text-sm font-semibold" title={selectedCase.title}>{selectedCase.title}</span>
+          <DialogTitle className="min-w-0 truncate text-sm font-semibold leading-5 tracking-normal" title={selectedCase.title}>{selectedCase.title}</DialogTitle>
+          <DialogDescription className="sr-only">案例详情及媒体预览</DialogDescription>
           <div className="flex h-8 shrink-0 items-center gap-1 rounded-lg bg-white/10 text-white/85 backdrop-blur-xl">
             {selectedCase.coverUrl ? <>
-              <Button type="button" variant="ghost" size="iconSm" onClick={() => downloadCaseImage(selectedCase)} aria-label={isCaseVideo(selectedCase) ? '下载视频' : '下载图片'} title={isCaseVideo(selectedCase) ? '下载视频' : '下载图片'} className="h-8 w-8 text-white hover:bg-white/10 hover:text-white"><Download size={15} /></Button>
-              <Button type="button" variant="ghost" size="iconSm" onClick={() => void saveCaseToAssets(selectedCase)} disabled={savedCaseIds.has(selectedCase.id)} aria-label={savedCaseIds.has(selectedCase.id) ? '已收藏' : '添加至收藏'} title={savedCaseIds.has(selectedCase.id) ? '已收藏' : '添加至收藏'} className="h-8 w-8 text-white hover:bg-white/10 hover:text-white"><Heart size={15} /></Button>
+              <Button type="button" variant="ghost" size="iconSm" onClick={() => downloadCaseImage(selectedCase)} aria-label={getCaseVideoUrl(selectedCase) ? '下载视频' : isCaseVideo(selectedCase) ? '下载封面' : '下载图片'} title={getCaseVideoUrl(selectedCase) ? '下载视频' : isCaseVideo(selectedCase) ? '下载封面' : '下载图片'} className="h-8 w-8 text-white hover:bg-white/10 hover:text-white"><Download size={15} /></Button>
+              <Button type="button" variant="ghost" size="iconSm" onClick={() => void toggleCaseFavorite(selectedCase)} aria-pressed={savedCaseIds.has(selectedCase.id)} aria-label={savedCaseIds.has(selectedCase.id) ? '取消收藏' : '添加至收藏'} title={savedCaseIds.has(selectedCase.id) ? '取消收藏' : '添加至收藏'} className="h-8 w-8 text-white hover:bg-white/10 hover:text-white disabled:opacity-100"><FavoriteIcon saved={savedCaseIds.has(selectedCase.id)} size={15} /></Button>
             </> : null}
             <Button type="button" variant="ghost" size="iconSm" onClick={() => setSelectedCase(null)} aria-label="关闭详情" title="关闭详情" className="h-8 w-8 text-white hover:bg-white/10 hover:text-white"><X size={16} /></Button>
           </div>
         </header>
         <div className="flex min-h-0 flex-1 flex-col items-stretch md:flex-row">
           <div className="relative flex min-h-[280px] min-w-0 flex-1 items-center justify-center overflow-hidden px-4 pb-4">
-            {selectedCase.coverUrl
-              ? isCaseVideo(selectedCase)
-                ? <video src={selectedCase.coverUrl} controls playsInline className="max-h-full max-w-full rounded-md object-contain" />
-                : <img src={selectedCase.coverUrl} alt={selectedCase.title} className="block max-h-full max-w-full rounded-md object-contain" />
+            {getCasePlaybackUrl(selectedCase)
+              ? <CaseVideoPlayer key={selectedCase.id} src={getCasePlaybackUrl(selectedCase)!} poster={getCaseVideoUrl(selectedCase) ? undefined : selectedCase.coverUrl || undefined} />
+              : selectedCase.coverUrl
+              ? <img src={selectedCase.coverUrl} alt={selectedCase.title} className="block max-h-full max-w-full rounded-md object-contain" />
               : <div className="grid h-full w-full place-items-center text-sm text-white/55">暂无封面</div>}
           </div>
           <div className="flex min-h-0 w-full flex-col border-t border-white/10 bg-black/45 text-white backdrop-blur-xl md:mb-4 md:mr-2 md:max-w-[400px] md:rounded-xl md:border md:border-white/10 md:shadow-lg">
             <div className="min-h-0 flex-1 space-y-2 overflow-y-auto p-3">
+              {isCaseVideo(selectedCase) && !getCasePlaybackUrl(selectedCase) && <p className="rounded-lg bg-white/10 p-3 text-xs leading-5 text-white/75">当前来源仅提供视频封面，未提供可播放的视频地址。可通过下方“查看来源”访问原视频。</p>}
               <section className="space-y-3 rounded-lg bg-white/10 p-3">
                 <div className="flex items-center justify-between gap-2">
                   <span className="text-xs font-medium text-white/75">提示词</span>
@@ -378,7 +437,8 @@ export const CaseDetailOverlay = ({ cases }: { cases: CaseLibraryState }) => {
             </div>
           </div>
         </div>
-      </aside>
-    </div>
+        </aside>
+      </DialogContent>}
+    </Dialog>
   );
 };

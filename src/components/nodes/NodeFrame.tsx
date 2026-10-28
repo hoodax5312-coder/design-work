@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type CSSProperties, type ElementType, type ReactNode } from 'react';
-import { Handle, NodeResizeControl, NodeResizer, NodeToolbar, Position } from '@xyflow/react';
+import { Handle, NodeResizeControl, NodeResizer, NodeToolbar, Position, useStore as useFlowStore } from '@xyflow/react';
 import {
   Check,
   Copy,
@@ -144,7 +144,7 @@ const NodeLabel = ({ id, kind, data }: { id: string; kind: CanvasNodeKind; data:
             if (event.key === 'Escape') setEditing(false);
           }}
           aria-label="节点名称"
-          className="nodrag nokey h-5 min-w-0 flex-1 rounded border border-border bg-background px-1 text-xs text-foreground outline-none"
+          className="canvas-inline-edit nodrag nokey h-5 min-w-0 flex-1 rounded border border-border bg-background px-1 text-xs text-foreground outline-none"
         />
       ) : (
         <span
@@ -242,6 +242,7 @@ export const NodeActionButtons = ({ actions }: { actions: NodeAction[] }) => (
 );
 
 export const NodeFrame = ({ id, kind, data, selected, resize, cardStyle, cardClassName, actions = [], panel, children }: NodeFrameProps) => {
+  const zoom = useFlowStore((state) => state.transform[2]);
   const single = useCanvasStore((state) => state.selectedNodes.length <= 1);
   const commit = useCanvasStore((state) => state.commit);
   const { openPicker } = useCanvasActions();
@@ -256,7 +257,8 @@ export const NodeFrame = ({ id, kind, data, selected, resize, cardStyle, cardCla
 
   return (
     <>
-      <NodeToolbar isVisible={showChrome} position={Position.Top} offset={34} align="center" className="!p-0">
+      {/* 标题随画布缩放，工具条不缩放；始终保留4px屏幕间距。 */}
+      <NodeToolbar isVisible={showChrome} position={Position.Top} offset={26 * zoom + 4} align="center" className="!p-0">
         <div className="canvas-chrome nodrag nopan flex items-center gap-0.5 rounded-lg p-1" onDoubleClick={(event) => event.stopPropagation()}>
           {generating && (
             <>

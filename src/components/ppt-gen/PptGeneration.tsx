@@ -1,4 +1,6 @@
-import { useMemo, useState } from 'react';
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '../ui/Select';
+import { Label } from '../ui/Label';
+import { useId, useMemo, useState } from 'react';
 import {
   Check,
   Download,
@@ -10,7 +12,7 @@ import {
   Wand2,
 } from '@/lib/remixIconShim';
 import { cn } from '../../lib/utils';
-import { Button, Card, Input, Select, Skeleton, Textarea } from '../ui';
+import { Button, Card, Input, Skeleton, Textarea } from '../ui';
 
 interface SlideDraft {
   id: number;
@@ -44,6 +46,8 @@ const buildSlides = (topic: string, count: number): SlideDraft[] => {
 };
 
 export const PptGeneration = () => {
+  const fieldId1 = useId();
+  const fieldId2 = useId();
   const [topic, setTopic] = useState('AI 视频创作如何重塑品牌内容工作流');
   const [audience, setAudience] = useState('品牌与创意团队');
   const [slideCount, setSlideCount] = useState(8);
@@ -98,8 +102,36 @@ export const PptGeneration = () => {
           <Textarea label="演示主题" value={topic} onChange={(event) => setTopic(event.target.value)} className="h-28 text-sm leading-6" placeholder="输入主题、目标或原始大纲…" />
 
           <div className="grid grid-cols-[1fr_86px] gap-3">
-            <Input label="目标受众" value={audience} onChange={(event) => setAudience(event.target.value)} className="text-xs" />
-            <Select label="页数" value={String(slideCount)} onChange={(event) => setSlideCount(Number(event.target.value))} options={[6, 8, 10, 12, 16].map((count) => ({ value: String(count), label: `${count} 页` }))} />
+            <div className="w-full">
+              <Label htmlFor={fieldId1} className="mb-1.5 block text-sm font-medium text-foreground">
+                目标受众
+              </Label>
+              <Input
+                id={fieldId1}
+                value={audience}
+                onChange={(event) => setAudience(event.target.value)}
+                className="text-xs"
+              />
+            </div>
+            <div className="w-full">
+              <Label htmlFor={fieldId2} className="mb-1.5 block text-sm font-medium text-foreground">
+                页数
+              </Label>
+              <Select value={String(slideCount)} onValueChange={(value) => setSlideCount(Number(value))}>
+                <SelectTrigger id={fieldId2}>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {[6, 8, 10, 12, 16]
+                    .map((count) => ({ value: String(count), label: `${count} 页` }))
+                    .map((option) => (
+                      <SelectItem key={option.value} value={option.value}>
+                        {option.label}
+                      </SelectItem>
+                    ))}
+                </SelectContent>
+              </Select>
+            </div>
           </div>
 
           <section>

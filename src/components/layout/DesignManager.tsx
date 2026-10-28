@@ -80,7 +80,7 @@ export const DesignManager = () => {
                     <div className="min-w-0 flex-1">
                       <div className="flex items-start justify-between gap-3"><div className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">{task.type}</div><Button type="button" variant="ghost" size="iconSm" aria-label={`${task.title} 更多操作`} className="h-7 w-7"><MoreHorizontal size={16} /></Button></div>
                       <h3 className="mt-2 truncate text-sm font-semibold tracking-[-0.015em]">{task.title}</h3>
-                      <div className="mt-1 text-xs text-muted-foreground">{task.project} · {task.artifacts} 个产物</div>
+                      <div className="mt-1 text-xs text-muted-foreground">{task.project} / {task.artifacts} 个产物</div>
                       <div className="mt-4 flex items-center gap-3"><div className="h-1 flex-1 overflow-hidden rounded-full bg-muted"><div className="h-full rounded-full bg-primary" style={{ width: `${task.progress}%` }} /></div><span className="text-xs font-medium tabular-nums text-muted-foreground">{task.progress}%</span></div>
                     </div>
                   </div>

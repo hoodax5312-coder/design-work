@@ -20,6 +20,7 @@ import {
 } from '@/lib/remixIconShim';
 import { cn } from '../../lib/utils';
 import { Button, Card, Checkbox, Input, Separator } from '../ui';
+import { confirmAction } from '../ui/confirmation';
 import { KnowledgeRichTextEditor } from '../knowledge/KnowledgeRichTextEditor';
 import { useProjectStore } from '../../stores/useProjectStore';
 
@@ -594,7 +595,7 @@ export const PersonalSpace = ({ embedded = false, query: externalQuery }: { embe
               <Button type="button" variant="ghost" size="sm" role="menuitem" onClick={() => { createEntry('document', contextEntry.kind === 'folder' ? contextEntry.id : contextEntry.parent ?? null); setContextMenu(null); }} className="h-9 w-full justify-start gap-2.5 px-2.5 text-left text-xs"><FilePlus2 size={15} className="text-muted-foreground" />{contextEntry.kind === 'folder' ? '在此新建笔记' : '新建同级笔记'}</Button>
               <Button type="button" variant="ghost" size="sm" role="menuitem" onClick={() => { startRenamingEntry(contextEntry); setContextMenu(null); }} className="h-9 w-full justify-start gap-2.5 px-2.5 text-left text-xs"><Pencil size={15} className="text-muted-foreground" />重命名</Button>
               <Separator className="my-1" />
-              <Button type="button" variant="ghost" size="sm" role="menuitem" onClick={() => { if (window.confirm(`确定删除“${contextEntry.name}”吗？${contextEntry.kind === 'folder' ? '\n文件夹内的笔记也会一并删除。' : ''}`)) deleteEntries([contextEntry.id]); setContextMenu(null); }} className="h-9 w-full justify-start gap-2.5 px-2.5 text-left text-xs text-destructive hover:bg-destructive/10 hover:text-destructive"><Trash2 size={15} />删除</Button>
+              <Button type="button" variant="ghost" size="sm" role="menuitem" onClick={async () => { setContextMenu(null); if (await confirmAction(`确定删除“${contextEntry.name}”吗？${contextEntry.kind === 'folder' ? '\n文件夹内的笔记也会一并删除。' : ''}`)) deleteEntries([contextEntry.id]); }} className="h-9 w-full justify-start gap-2.5 px-2.5 text-left text-xs text-destructive hover:bg-destructive/10 hover:text-destructive"><Trash2 size={15} />删除</Button>
             </>}
           </>}
         </Card>

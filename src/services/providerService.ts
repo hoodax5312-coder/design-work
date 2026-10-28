@@ -21,6 +21,7 @@ const categoryLabels: Record<ModelCategory, string> = {
   language: '文本',
   image: '生图',
   video: '视频',
+  music: '音乐',
 };
 
 const configPayload = (
@@ -77,7 +78,7 @@ export const listProviderModels = (
 
 export const generateProviderImage = (
   provider: ProviderConfig,
-  input: { prompt: string; size: string; quality: string },
+  input: { prompt: string; size: string; quality: string; referenceImage?: { assetId: string }; canvasParameters?: { aspectRatio: string; quality: string } },
   modelId?: string,
   signal?: AbortSignal,
 ) =>
@@ -94,6 +95,18 @@ export const generateProviderVideo = (
 ) =>
   request<{ url: string; id?: string }>('/api/provider/video', {
     config: configPayload(provider, 'video', modelId),
+    ...input,
+  }, signal);
+
+/** 文本生成音乐：网关按已登记的模型协议提交一次，结果直接写入本机资产库，只返回资产 ID。 */
+export const generateProviderMusic = (
+  provider: ProviderConfig,
+  input: { prompt: string; durationSeconds: number; instrumental: boolean; canvasNodeId?: string },
+  modelId?: string,
+  signal?: AbortSignal,
+) =>
+  request<{ assetId: string; title: string; mimeType: string; requestedSeconds: number; instrumental: boolean }>('/api/provider/music', {
+    config: configPayload(provider, 'music', modelId),
     ...input,
   }, signal);
 

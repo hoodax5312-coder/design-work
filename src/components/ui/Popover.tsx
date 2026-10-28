@@ -1,61 +1,38 @@
-import { createContext, forwardRef, useContext, useState, type ComponentPropsWithoutRef, type ElementRef } from 'react';
-import * as PopoverPrimitive from '@radix-ui/react-popover';
-import { AnimatePresence, motion } from 'framer-motion';
-import { cn } from '../../lib/utils';
-import { popVariants } from '../motion/tokens';
+// Source: https://ui.shadcn.com/r/styles/new-york/popover.json (MIT).
+// Project adaptation: overlay stack and canvas keyboard boundary.
+"use client"
 
-const OpenContext = createContext(false);
+import * as React from "react"
+import * as PopoverPrimitive from "@radix-ui/react-popover"
 
-const Popover = ({ open: openProp, defaultOpen = false, onOpenChange, children, ...props }: PopoverPrimitive.PopoverProps) => {
-  const [internalOpen, setInternalOpen] = useState(defaultOpen);
-  const open = openProp ?? internalOpen;
-  const handleOpenChange = (next: boolean) => {
-    if (openProp === undefined) setInternalOpen(next);
-    onOpenChange?.(next);
-  };
-  return (
-    <PopoverPrimitive.Root open={open} onOpenChange={handleOpenChange} {...props}>
-      <OpenContext.Provider value={open}>{children}</OpenContext.Provider>
-    </PopoverPrimitive.Root>
-  );
-};
+import { cn } from "@/lib/utils"
 
-const PopoverTrigger = PopoverPrimitive.Trigger;
-const PopoverAnchor = PopoverPrimitive.Anchor;
-const PopoverClose = PopoverPrimitive.Close;
+const Popover = PopoverPrimitive.Root
 
-/**
- * 内容通过 framer-motion 进出场。带 `nokey` 类，避免画布把浮层内的按键当作节点操作。
- */
-const PopoverContent = forwardRef<
-  ElementRef<typeof PopoverPrimitive.Content>,
-  ComponentPropsWithoutRef<typeof PopoverPrimitive.Content>
->(({ className, sideOffset = 8, collisionPadding = 8, children, style, ...props }, ref) => {
-  const open = useContext(OpenContext);
-  return (
-    <AnimatePresence>
-      {open && (
-        <PopoverPrimitive.Portal forceMount>
-          <PopoverPrimitive.Content ref={ref} forceMount asChild sideOffset={sideOffset} collisionPadding={collisionPadding} {...props}>
-            <motion.div
-              variants={popVariants}
-              initial="hidden"
-              animate="visible"
-              exit="exit"
-              className={cn(
-                'nokey nowheel z-[100] rounded-lg border border-border bg-popover p-3 text-popover-foreground shadow-[0_12px_32px_rgba(0,0,0,0.16)] outline-none',
-                className,
-              )}
-              style={{ transformOrigin: 'var(--radix-popover-content-transform-origin)', ...style }}
-            >
-              {children}
-            </motion.div>
-          </PopoverPrimitive.Content>
-        </PopoverPrimitive.Portal>
+const PopoverTrigger = PopoverPrimitive.Trigger
+
+const PopoverAnchor = PopoverPrimitive.Anchor
+
+const PopoverContent = React.forwardRef<
+  React.ElementRef<typeof PopoverPrimitive.Content>,
+  React.ComponentPropsWithoutRef<typeof PopoverPrimitive.Content>
+>(({ className, align = "center", sideOffset = 4, ...props }, ref) => (
+  <PopoverPrimitive.Portal>
+    <PopoverPrimitive.Content
+      ref={ref}
+      align={align}
+      sideOffset={sideOffset}
+      className={cn(
+        "nokey nowheel z-[130] w-72 rounded-md border bg-popover p-4 text-popover-foreground shadow-md outline-none data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 origin-[--radix-popover-content-transform-origin]",
+        className
       )}
-    </AnimatePresence>
-  );
-});
-PopoverContent.displayName = 'PopoverContent';
+      {...props}
+    />
+  </PopoverPrimitive.Portal>
+))
+PopoverContent.displayName = PopoverPrimitive.Content.displayName
 
-export { Popover, PopoverTrigger, PopoverAnchor, PopoverClose, PopoverContent };
+export { Popover, PopoverTrigger, PopoverContent, PopoverAnchor }
+
+const PopoverClose = PopoverPrimitive.Close
+export { PopoverClose }

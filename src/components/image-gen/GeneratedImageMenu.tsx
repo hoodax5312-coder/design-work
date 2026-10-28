@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Download, Folder, FolderInput, FolderOpen, Heart, Maximize2, Pencil, Trash2 } from '@/lib/remixIconShim';
+import { Download, Folder, FolderInput, FolderOpen, Heart, HeartFill, Maximize2, Pencil, Trash2 } from '@/lib/remixIconShim';
 import { assetService } from '../../services/assetService';
 import type { AssetFolder } from '../../types/asset.types';
 import { AnchoredMenu, type ScreenPoint } from '../canvas/CanvasContextMenu';
@@ -63,6 +63,7 @@ export const GeneratedImageMenu = ({
   ensureAsset,
   onFullscreen,
   onSave,
+  allowUnsave = false,
   onDelete,
   onNotice,
   onError,
@@ -75,6 +76,7 @@ export const GeneratedImageMenu = ({
   ensureAsset?: (url: string) => Promise<string>;
   onFullscreen: (url: string) => void;
   onSave: (url: string) => void;
+  allowUnsave?: boolean;
   onDelete: (url: string, assetId: string | null) => void;
   onNotice: (message: string) => void;
   onError: (message: string) => void;
@@ -175,8 +177,8 @@ export const GeneratedImageMenu = ({
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
         <DropdownMenuItem icon={Maximize2} shortcut="双击" onSelect={() => onFullscreen(url)}>全屏显示</DropdownMenuItem>
-        <DropdownMenuItem icon={Heart} disabled={target?.saved} onSelect={() => onSave(url)}>
-          {target?.saved ? '已收藏' : '添加至收藏'}
+        <DropdownMenuItem icon={target?.saved ? HeartFill : Heart} disabled={target?.saved && !allowUnsave} className={target?.saved ? 'data-[disabled]:opacity-100 [&>svg]:text-red-500 [&>svg]:opacity-100' : undefined} onSelect={() => onSave(url)}>
+          {target?.saved ? (allowUnsave ? '取消收藏' : '已收藏') : '添加至收藏'}
         </DropdownMenuItem>
         <DropdownMenuSub>
           <DropdownMenuSubTrigger icon={FolderInput} disabled={!ready}>移动至文件夹</DropdownMenuSubTrigger>

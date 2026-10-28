@@ -44,7 +44,7 @@ export const FONT_PRESETS: Record<FontPreset, { label: string }> = {
 export const PERSONALIZATION_DEFAULTS = {
   themePreset: 'nature' as ThemePreset,
   fontPreset: 'theme-default' as FontPreset,
-  themeMode: 'system' as ThemeMode,
+  themeMode: 'dark' as ThemeMode,
   contentLayout: 'full' as ContentLayout,
   topNavigationMode: 'scroll' as TopNavigationMode,
   sidebarStyle: 'embedded' as SidebarStyle,

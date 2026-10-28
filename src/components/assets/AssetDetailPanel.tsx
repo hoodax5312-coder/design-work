@@ -1,11 +1,10 @@
+import { FavoriteIcon } from '../ui/FavoriteIcon';
 import { useEffect, useState } from 'react';
 import {
   Copy,
   Download,
   Pencil,
   Plus,
-  Heart,
-  HeartFill,
   Trash2,
   X,
 } from '@/lib/remixIconShim';
@@ -14,6 +13,7 @@ import { assetService } from '../../services/assetService';
 import type { AssetDetail, AssetFolder, AssetSummary, AssetTag } from '../../types/asset.types';
 import { AssetThumbnail } from './AssetThumbnail';
 import { Button, Label, Skeleton } from '../ui';
+import { confirmAction } from '../ui/confirmation';
 
 interface AssetDetailPanelProps {
   assetId: string | null;
@@ -108,7 +108,9 @@ export const AssetDetailPanel = ({
     : '';
   const localMediaUrl = detail?.type === 'image' && detail.previewStatus === 'ready'
     ? detail.previewUrl
-    : '';
+    : detail?.type === 'audio' && detail.files?.length
+      ? `/api/assets/${encodeURIComponent(detail.id)}/media`
+      : '';
   const mediaUrl = detail ? (useRemotePreview ? generatedUrl : localMediaUrl || generatedUrl) : '';
   const metadata = detail?.userMetadata || {};
   const prompt = String(metadata.prompt || detail?.description || '');
@@ -192,7 +194,7 @@ export const AssetDetailPanel = ({
   };
 
   const deleteTag = async (tag: AssetTag) => {
-    if (!window.confirm(`删除标签「${tag.name}」？`)) return;
+    if (!await confirmAction(`删除标签「${tag.name}」？`)) return;
     try {
       if (assetTags.some((item) => item.id === tag.id) && detail) {
         await assetService.bulkTags([detail.id], [tag.id], 'remove');
@@ -217,7 +219,7 @@ export const AssetDetailPanel = ({
   };
 
   const deleteAsset = async () => {
-    if (!detail || !window.confirm(`删除资产「${title || '未命名资产'}」？`)) return;
+    if (!detail || !await confirmAction(`删除资产「${title || '未命名资产'}」？`)) return;
     try {
       await assetService.remove(detail.id);
       onClose();
@@ -269,10 +271,10 @@ export const AssetDetailPanel = ({
               title={detail.favorite ? '取消收藏' : '添加至收藏'}
               className={cn(
                 'h-8 w-8 text-white/70 hover:bg-white/15 hover:text-white',
-                detail.favorite && 'bg-white/15 text-amber-300 hover:text-amber-200',
+                detail.favorite && 'bg-white/15',
               )}
             >
-              {detail.favorite ? <HeartFill size={15} /> : <Heart size={15} />}
+              <FavoriteIcon saved={detail.favorite} size={15} />
             </Button>
             {detail.previewUrl || typeof detail.userMetadata?.generatedUrl === 'string' ? (
               <a

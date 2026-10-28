@@ -5,7 +5,6 @@ import { cn } from '../../lib/utils';
 import { useCanvasStore } from '../../stores/useCanvasStore';
 import { type VideoNodeData } from '../../types/node.types';
 import { AuroraVeil, ThinkingOrb } from '../motion';
-import { CanvasPromptOverlay } from '../canvas/CanvasPromptOverlay';
 import { nodeTitle, ratioToCss } from '../canvas/canvasModel';
 import { downloadMedia, useCanvasActions } from '../canvas/canvasContext';
 import { isNodeRunnable, runNodeGeneration } from '../canvas/generation';
@@ -16,7 +15,6 @@ import { useMediaFallback } from './useMediaFallback';
 type CanvasVideoNode = Node<VideoNodeData>;
 
 export const VideoNode = memo(({ id, data, selected }: NodeProps<CanvasVideoNode>) => {
-  const single = useCanvasStore((state) => state.selectedNodes.length <= 1);
   const runnable = useCanvasStore((state) => {
     const node = state.nodes.find((item) => item.id === id);
     return Boolean(node) && isNodeRunnable(node as Node, state.nodes, state.edges);
@@ -66,7 +64,6 @@ export const VideoNode = memo(({ id, data, selected }: NodeProps<CanvasVideoNode
       resize="width"
       cardStyle={{ aspectRatio: ratioToCss(data.aspectRatio) }}
       actions={actions}
-      panel={<CanvasPromptOverlay id={id} kind="video" data={data} visible={isSelected && single} />}
     >
       {shown ? (
         <div

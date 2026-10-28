@@ -65,7 +65,7 @@ export const ResultHistory = ({ id, kind, data }: { id: string; kind: MediaKind;
         </Tooltip>
         <PopoverContent side="bottom" align="start" className="w-[296px] p-2">
           <div className="mb-2 flex items-center justify-between px-1 text-xs text-muted-foreground">
-            <span>生成历史 · {results.length}</span>
+            <span>生成历史 / {results.length}</span>
             <span>点选设为当前结果</span>
           </div>
           <div className="grid max-h-[300px] grid-cols-3 gap-1.5 overflow-y-auto">
@@ -73,7 +73,7 @@ export const ResultHistory = ({ id, kind, data }: { id: string; kind: MediaKind;
               <button
                 key={result.id}
                 type="button"
-                title={[formatTime(result.createdAt), result.model].filter(Boolean).join(' · ')}
+                title={[formatTime(result.createdAt), result.model].filter(Boolean).join(' / ')}
                 onClick={() => { select(result); setOpen(false); }}
                 className={cn(
                   'group relative aspect-square overflow-hidden rounded-md bg-muted outline-none ring-offset-1 ring-offset-popover transition-shadow focus-visible:ring-2 focus-visible:ring-ring',

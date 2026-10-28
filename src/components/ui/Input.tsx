@@ -1,67 +1,38 @@
-import { forwardRef, type InputHTMLAttributes } from 'react';
-import { cva, type VariantProps } from 'class-variance-authority';
-import { cn } from '../../lib/utils';
+// Source: https://ui.shadcn.com/r/styles/new-york/input.json (MIT).
+// Project adaptation: legacy size/variant classes only; labels compose with Label.
+import * as React from "react"
 
-const inputVariants = cva(
-  'flex w-full rounded-md border border-neutral-border bg-[var(--neutral-field-surface)] px-3 py-2 text-sm text-neutral-foreground file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-neutral-border disabled:cursor-not-allowed disabled:opacity-50',
-  {
-    variants: {
-      variant: {
-        default:
-          'theme-default-input',
-        ghost:
-          'border-transparent bg-transparent focus-visible:ring-0',
-        filled:
-          'border-transparent bg-neutral-surface-subtle',
-      },
-      inputSize: {
-        sm: 'h-8 text-xs',
-        md: 'h-10 text-sm',
-        lg: 'h-12 text-base',
-      },
-    },
-    defaultVariants: {
-      variant: 'default',
-      inputSize: 'md',
-    },
-  }
-);
+import { cva } from "class-variance-authority"
 
-export interface InputProps
-  extends Omit<InputHTMLAttributes<HTMLInputElement>, 'size'>,
-    VariantProps<typeof inputVariants> {
-  label?: string;
-  error?: string;
-  helperText?: string;
+import { cn } from "@/lib/utils"
+
+const inputVariants = cva('', {
+  variants: {
+    variant: { default: '', ghost: 'border-transparent bg-transparent shadow-none', filled: 'border-transparent bg-muted' },
+    inputSize: { sm: 'h-8 text-xs', md: 'h-10 text-sm', lg: 'h-12 text-base' },
+  },
+});
+export interface InputProps extends Omit<React.ComponentProps<'input'>, 'size'> {
+  inputSize?: 'sm' | 'md' | 'lg';
+  size?: 'sm' | 'md' | 'lg';
+  variant?: 'default' | 'ghost' | 'filled';
 }
-
-export const Input = forwardRef<HTMLInputElement, InputProps>(
-  ({ className, variant, inputSize, label, error, helperText, ...props }, ref) => {
+const Input = React.forwardRef<HTMLInputElement, InputProps>(
+  ({ className, type, variant, inputSize, size, ...props }, ref) => {
     return (
-      <div className="w-full">
-        {label && (
-          <label className="mb-2 block text-sm font-medium leading-none">
-            {label}
-          </label>
+      <input
+        type={type}
+        className={cn(
+          "flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-base shadow-sm transition-colors file:border-0 file:bg-transparent file:text-sm file:font-medium file:text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 md:text-sm",
+          inputVariants({ variant, inputSize: size ?? inputSize }),
+          className
         )}
-        <input
-          ref={ref}
-          className={cn(
-            inputVariants({ variant, inputSize }),
-            error && 'border-red-500 focus:border-red-500 focus:ring-red-500',
-            className
-          )}
-          {...props}
-        />
-        {error && <p className="mt-1 text-xs text-red-500">{error}</p>}
-        {helperText && !error && (
-          <p className="mt-1 text-xs text-muted-foreground">{helperText}</p>
-        )}
-      </div>
-    );
+        ref={ref}
+        {...props}
+      />
+    )
   }
-);
+)
+Input.displayName = "Input"
 
-Input.displayName = 'Input';
-
-export { inputVariants };
+export { Input, inputVariants }

@@ -6,6 +6,10 @@ import {
   carryGeneratedOutputs,
   GROUP_Z_INDEX,
   groupBounds,
+  groupMemberIds,
+  groupLayoutPositions,
+  nodeRect,
+  type GroupLayout,
   isAnnotationKind,
   layoutLayers,
   normalizeRestoredCanvas,
@@ -28,6 +32,8 @@ interface UpdateNodeOptions {
 }
 
 interface CanvasState {
+  projectId: string | null;
+  loadProject: (projectId: string, canvas: CanvasSnapshot) => void;
   nodes: Node[];
   edges: Edge[];
   undoStack: CanvasSnapshot[];
@@ -80,6 +86,7 @@ interface CanvasState {
   moveNodes: (positions: Record<string, XYPosition>) => void;
   /** 为这些节点建一个包住它们的分组框并选中它，返回分组 id。 */
   groupNodes: (ids: string[]) => string | null;
+  arrangeGroup: (id: string, mode: GroupLayout) => void;
 
   // For undo/redo support
   setNodes: (nodes: Node[]) => void;
@@ -116,6 +123,23 @@ const stripTransient = (nodes: Node[]) => nodes.map((node) => {
 
 const newId = () => crypto.randomUUID();
 
+/** 先按旧位置捕获归属，再计算新外框，防止拖出边界时成员丢失。 */
+const fitChangedGroups = (previous: Node[], next: Node[], changed: Set<string>) => next.map((group) => {
+  if (group.type !== 'group' || group.data.locked || changed.has(group.id)) return group;
+  const before = previous.find((node) => node.id === group.id);
+  if (!before) return group;
+  const ids = groupMemberIds(before, previous);
+  if (!ids.some((id) => changed.has(id))) return group;
+  const members = next.filter((node) => ids.includes(node.id));
+  if (!members.length) return group;
+  const box = groupBounds(members.map(nodeRect));
+  return {
+    ...group, position: { x: box.x, y: box.y }, width: box.width, height: box.height,
+    measured: { width: box.width, height: box.height },
+    data: { ...group.data, memberIds: members.map((node) => node.id) },
+  };
+});
+
 const cloneWithNewIds = (source: CanvasClipboard, offset: XYPosition, extraEdges: Edge[] = []) => {
   const idMap = new Map(source.nodes.map((node) => [node.id, newId()]));
   const nodes = source.nodes.map((node) => ({
@@ -126,7 +150,7 @@ const cloneWithNewIds = (source: CanvasClipboard, offset: XYPosition, extraEdges
     dragging: false,
     draggable: undefined,
     deletable: undefined,
-    data: { ...node.data, isGenerating: false, error: undefined, notice: undefined, stoppedAt: undefined, assetSaved: undefined, locked: undefined },
+    data: { ...node.data, ...(node.type === 'group' ? { memberIds: groupMemberIds(node, source.nodes).map((id) => idMap.get(id)!) } : {}), isGenerating: false, error: undefined, notice: undefined, stoppedAt: undefined, assetSaved: undefined, locked: undefined },
   }));
   const edges = [...source.edges, ...extraEdges].flatMap((edge) => {
     const sourceId = idMap.get(edge.source) ?? edge.source;
@@ -138,6 +162,12 @@ const cloneWithNewIds = (source: CanvasClipboard, offset: XYPosition, extraEdges
 };
 
 export const useCanvasStore = create<CanvasState>((set, get) => ({
+  projectId: null,
+  loadProject: (projectId, canvas) => {
+    flushCanvasSave();
+    set({ projectId });
+    get().restoreSnapshot(canvas.nodes, canvas.edges);
+  },
   nodes: [],
   undoStack: [],
   redoStack: [],
@@ -152,7 +182,8 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
   onNodesChange: (changes) => {
     set((state) => {
       const structural = changes.some((change) => STRUCTURAL_CHANGES.has(change.type));
-      const nodes = applyNodeChanges(changes, state.nodes);
+      const changed = new Set(changes.flatMap((change) => change.type === 'position' || change.type === 'dimensions' ? [change.id] : []));
+      const nodes = fitChangedGroups(state.nodes, applyNodeChanges(changes, state.nodes), changed);
       const selectionChanged = changes.some((change) => change.type === 'select' || change.type === 'remove');
       return {
         ...(structural ? pushHistory(state) : {}),
@@ -379,9 +410,20 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
       width: box.width,
       height: box.height,
       zIndex: GROUP_Z_INDEX,
-      data: { title: '' },
+      data: { title: '', memberIds: get().nodes.filter((node) => picked.has(node.id) && node.type !== 'group').map((node) => node.id) },
     }]);
     return id;
+  },
+  arrangeGroup: (id, mode) => {
+    const state = get();
+    const group = state.nodes.find((node) => node.id === id && node.type === 'group');
+    if (!group || group.data.locked) return;
+    const ids = new Set(groupMemberIds(group, state.nodes));
+    const members = state.nodes.filter((node) => ids.has(node.id));
+    if (!members.length || members.some((node) => node.data.locked)) return;
+    const positions = groupLayoutPositions(members, mode, { x: group.position.x + 40, y: group.position.y + 64 });
+    const next = state.nodes.map((node) => positions[node.id] ? { ...node, position: positions[node.id] } : node);
+    set({ ...pushHistory(state), nodes: fitChangedGroups(state.nodes, next, ids) });
   },
 
   // For undo/redo support
@@ -407,13 +449,29 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
 }));
 
 let projectSaveTimer: number | undefined;
+let pendingProjectSave: { projectId: string; canvas: CanvasSnapshot } | undefined;
+
+export const flushCanvasSave = () => {
+  window.clearTimeout(projectSaveTimer);
+  if (!pendingProjectSave) return;
+  const { projectId, canvas } = pendingProjectSave;
+  useProjectStore.getState().saveProjectCanvas(projectId, canvas);
+  pendingProjectSave = undefined;
+};
+
 useCanvasStore.subscribe((state, previousState) => {
   if (state.nodes === previousState.nodes && state.edges === previousState.edges) return;
-  const projectId = useProjectStore.getState().activeProjectId;
+  const projectId = state.projectId;
   if (!projectId) return;
   window.clearTimeout(projectSaveTimer);
-  const canvas = { nodes: state.nodes, edges: state.edges };
-  projectSaveTimer = window.setTimeout(() => {
-    useProjectStore.getState().saveProjectCanvas(projectId, canvas);
-  }, 240);
+  pendingProjectSave = { projectId, canvas: { nodes: state.nodes, edges: state.edges } };
+  projectSaveTimer = window.setTimeout(flushCanvasSave, 240);
 });
+
+if (typeof window !== 'undefined') {
+  window.addEventListener('pagehide', flushCanvasSave);
+  window.addEventListener('beforeunload', flushCanvasSave);
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden') flushCanvasSave();
+  });
+}

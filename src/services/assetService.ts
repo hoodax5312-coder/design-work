@@ -67,7 +67,7 @@ export interface AssetQuery {
 }
 
 export const assetService = {
-  cases: (query = '') => request<{ items: Array<{ id: string; sourceId: string; title: string; prompt: string; description: string; coverUrl: string | null; tags: string[]; author: string; sourceUrl: string; imageModel: string; mediaType?: string }>; total: number; sources: Array<{ id: string; name: string; homepageUrl: string | null; itemCount: number }> }>(`/api/cases?query=${encodeURIComponent(query)}`),
+  cases: (query = '') => request<{ items: Array<{ id: string; sourceId: string; title: string; prompt: string; description: string; coverUrl: string | null; tags: string[]; author: string; sourceUrl: string; imageModel: string; mediaType?: string; videoUrl?: string | null }>; total: number; sources: Array<{ id: string; name: string; homepageUrl: string | null; itemCount: number }> }>(`/api/cases?query=${encodeURIComponent(query)}`),
   create: (input: {
     type: string;
     title: string;
@@ -150,6 +150,17 @@ export const assetService = {
     request('/api/assets/bulk/move', json({ assetIds, folderId })),
   bulkFavorite: (assetIds: string[], favorite: boolean) =>
     request('/api/assets/bulk/favorite', json({ assetIds, favorite })),
+  /** 上传本地音频：原始字节入库并校验文件头，返回音频资产。 */
+  uploadAudio: async (file: File) => {
+    const response = await fetch('/api/assets/audio', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/octet-stream', 'x-lizuo-file-name': encodeURIComponent(file.name) },
+      body: file,
+    });
+    const payload = await response.json().catch(() => ({})) as AssetSummary & { error?: string };
+    if (!response.ok || !payload.id) throw new Error(payload.error || `音频上传失败 (${response.status})`);
+    return payload;
+  },
   requestPreview: (assetId: string, size = 512) =>
     request<{ id: string }>(`/api/assets/${assetId}/preview`, json({ size })),
   pickFiles: () =>

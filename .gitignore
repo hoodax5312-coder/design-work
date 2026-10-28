@@ -76,3 +76,14 @@ vendor/infinite-canvas/history.json
 
 # Local screenshots and QA artifacts
 .artifacts/
+
+dist-admin/
+
+# Account data and local-only launch/verification helpers
+*.sqlite
+*.sqlite-wal
+*.sqlite-shm
+*.zip
+.claude/
+verify-agent-scroll-*.html
+verify-agent-scroll-*.tsx

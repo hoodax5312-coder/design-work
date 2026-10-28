@@ -1,8 +1,9 @@
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '../ui/Select';
 import { useMemo, useState } from 'react';
 import { AlertTriangle, Check, FilePlus2, X } from '@/lib/remixIconShim';
 import { assetService } from '../../services/assetService';
 import type { ImportItem, ImportSession } from '../../types/asset.types';
-import { Alert, AlertDescription, Badge, Button, Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, Select } from '../ui';
+import { Alert, AlertDescription, Badge, Button, Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '../ui';
 
 type Decision = NonNullable<ImportItem['decision']>;
 
@@ -61,7 +62,7 @@ export const ImportCenter = ({
             <div>
               <DialogTitle className="text-sm">确认导入内容</DialogTitle>
               <DialogDescription className="mt-0.5 text-xs">
-                {session.items.length} 个文件 · {session.summary.conflicts || 0} 个重复候选
+                {session.items.length} 个文件 / {session.summary.conflicts || 0} 个重复候选
               </DialogDescription>
             </div>
           </div>
@@ -104,21 +105,29 @@ export const ImportCenter = ({
                     <Badge variant="secondary" className="w-fit text-xs uppercase">{item.suggestedType}</Badge>
                     <Select
                       value={decisions[item.id]}
-                      onChange={(event) =>
+                      onValueChange={(value) =>
                         setDecisions((current) => ({
                           ...current,
-                          [item.id]: event.target.value as Decision,
+                          [item.id]: value as Decision,
                         }))
                       }
-                      selectSize="sm"
-                      className="text-xs"
-                      options={[
-                        { value: 'import_new', label: '作为新资产' },
-                        ...(conflict ? [{ value: 'merge_path', label: '合并为同一资产' }] : []),
-                        { value: 'keep_separate', label: '独立保留' },
-                        { value: 'skip', label: '跳过' },
-                      ]}
-                    />
+                    >
+                      <SelectTrigger className="h-8 text-xs" aria-label="导入处理方式">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {[
+                          { value: 'import_new', label: '作为新资产' },
+                          ...(conflict ? [{ value: 'merge_path', label: '合并为同一资产' }] : []),
+                          { value: 'keep_separate', label: '独立保留' },
+                          { value: 'skip', label: '跳过' },
+                        ].map((option) => (
+                          <SelectItem key={option.value} value={option.value}>
+                            {option.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
                 );
               })}

@@ -7,6 +7,7 @@ const categoryLabels: Record<ModelCategory, string> = {
   language: '文本',
   image: '生图',
   video: '视频',
+  music: '音乐',
 };
 
 interface ProviderModelCardProps {

@@ -175,6 +175,7 @@ const PROMPTS: Prompt[] = [
 export const Inspiration = () => {
   const [activeCategory, setActiveCategory] = useState<PromptCategory>('visual');
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [notice, setNotice] = useState('');
 
   const activeCategoryData = CATEGORIES.find((category) => category.id === activeCategory)!;
   const visiblePrompts = PROMPTS.filter((prompt) => prompt.category === activeCategory);
@@ -186,7 +187,8 @@ export const Inspiration = () => {
       window.setTimeout(() => setCopiedId((current) => current === prompt.id ? null : current), 1800);
     } catch {
       setCopiedId(null);
-      window.alert('复制失败，请检查浏览器的剪贴板权限。');
+      setNotice('复制失败，请检查浏览器的剪贴板权限。');
+      window.setTimeout(() => setNotice(''), 2600);
     }
   };
 
@@ -225,6 +227,7 @@ export const Inspiration = () => {
         </aside>
 
         <section className="min-h-0 min-w-0 flex-1 overflow-y-auto rounded-lg bg-background p-4">
+          {notice && <div role="status" className="mb-3 rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-xs text-destructive">{notice}</div>}
           <header className="mb-4 flex items-center gap-2">
             <h1 className="text-sm font-semibold tracking-[-0.01em] text-foreground">{activeCategoryData.label}</h1>
             <span className="text-xs tabular-nums text-muted-foreground">{visiblePrompts.length}</span>

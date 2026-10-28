@@ -1,5 +1,5 @@
 export type ProviderProtocol = 'responses' | 'chat-completions' | 'anthropic-messages';
-export type ModelCategory = 'language' | 'image' | 'video';
+export type ModelCategory = 'language' | 'image' | 'video' | 'music';
 export type VerificationStatus = 'pending' | 'healthy' | 'unhealthy' | 'unverified';
 
 export interface ProviderVerification {

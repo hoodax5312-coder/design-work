@@ -76,9 +76,8 @@ export const CreativeTaskPanel = () => {
         <>
           <div className="min-h-0 flex-1 overflow-y-auto p-4">
             <div className="mb-5">
-              <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground"><Sparkles size={13} className="text-primary" /> Production controller</div>
+              <div className="flex items-center gap-2 text-xs font-semibold text-muted-foreground"><Sparkles size={13} className="text-primary" /> 制作任务</div>
               <h2 className="mt-2 text-[17px] font-semibold tracking-[-0.025em]">{moduleName}</h2>
-              <p className="mt-1 text-xs leading-5 text-muted-foreground">在后台执行制作步骤，编辑器可继续操作。</p>
             </div>
 
             <Card padding="sm" className="mb-5">
@@ -133,13 +132,13 @@ export const CreativeTaskPanel = () => {
 
 const ArtifactList = () => {
   const artifacts = [
-    { icon: FileImage, title: '主视觉封面', meta: 'PNG · 2048×2048', color: 'bg-muted text-muted-foreground' },
-    { icon: Presentation, title: '演示稿结构', meta: '8 页 · 16:9', color: 'bg-muted text-muted-foreground' },
-    { icon: Film, title: '分镜预览', meta: '6 片段 · 24s', color: 'bg-muted text-muted-foreground' },
+    { icon: FileImage, title: '主视觉封面', meta: 'PNG / 2048×2048', color: 'bg-muted text-muted-foreground' },
+    { icon: Presentation, title: '演示稿结构', meta: '8 页 / 16:9', color: 'bg-muted text-muted-foreground' },
+    { icon: Film, title: '分镜预览', meta: '6 片段 / 24s', color: 'bg-muted text-muted-foreground' },
   ];
   return (
     <div className="min-h-0 flex-1 overflow-y-auto p-4">
-      <div className="mb-4 text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">Latest artifacts</div>
+      <h2 className="mb-4 text-sm font-semibold">设计产物</h2>
       <div className="space-y-2">
         {artifacts.map((artifact) => {
           const Icon = artifact.icon;
